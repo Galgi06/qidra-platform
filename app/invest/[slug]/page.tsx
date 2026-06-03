@@ -22,6 +22,7 @@ export default async function InvestPage({ params, searchParams }: { params: Pro
       <main className="section">
         <FeedbackForm
           className="container-qidra grid max-w-2xl gap-5"
+          endpoint={`/api/investments?lang=${locale}`}
           feedback={{
             title: locale === "ru" ? "Заявка создана" : "Application created",
             text:
@@ -36,10 +37,13 @@ export default async function InvestPage({ params, searchParams }: { params: Pro
         >
           <h1 className="subtitle-28">{locale === "ru" ? "Заявка на участие" : "Participation application"}</h1>
           <p className="text-18 text-qidra-grayBlue">{project.title[locale]}</p>
+          <input name="projectSlug" type="hidden" value={project.slug} />
           <InvestmentAmountInput locale={locale} />
           <NotificationCard title={locale === "ru" ? "Без гарантии доходности" : "No guaranteed returns"} text={dictionary[locale].common.noFixedYield} />
-          <Checkbox required>{locale === "ru" ? "Я изучил условия проекта и предупреждение о рисках." : "I reviewed project terms and the risk notice."}</Checkbox>
-          <Checkbox required>
+          <Checkbox name="termsAccepted" required>
+            {locale === "ru" ? "Я изучил условия проекта и предупреждение о рисках." : "I reviewed project terms and the risk notice."}
+          </Checkbox>
+          <Checkbox name="contractAccepted" required>
             {locale === "ru" ? "Я принимаю договорную структуру Mudaraba/Musharaka." : "I accept the Mudaraba/Musharaka contractual structure."}
           </Checkbox>
           <Button type="submit">{locale === "ru" ? "Создать заявку" : "Create application"}</Button>
