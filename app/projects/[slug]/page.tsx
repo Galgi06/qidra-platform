@@ -7,12 +7,14 @@ import { ProjectGallery } from "@/components/ProjectGallery";
 import { ButtonLink } from "@/components/ui/Button";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { ProjectStatusBadge } from "@/components/ui/ProjectStatusBadge";
-import { projects } from "@/lib/content";
 import { dictionary, getLocale, type SearchParams, withLocale } from "@/lib/i18n";
+import { getProjectBySlug } from "@/lib/project-catalog";
+
+export const dynamic = "force-dynamic";
 
 export default async function ProjectPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams?: SearchParams }) {
   const [{ slug }, locale] = await Promise.all([params, getLocale(searchParams)]);
-  const project = projects.find((item) => item.slug === slug);
+  const project = await getProjectBySlug(slug);
   if (!project) notFound();
   const progress = Math.round((project.fundedUsdt / project.targetUsdt) * 100);
   const riskLabel = locale === "ru" ? { Moderate: "Средний", High: "Высокий" }[project.riskLevel] ?? project.riskLevel : project.riskLevel;

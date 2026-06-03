@@ -1,11 +1,11 @@
-import type { Project } from "@/lib/content";
+import type { CatalogProject } from "@/lib/project-catalog";
 import type { Locale } from "@/lib/i18n";
 import { withLocale } from "@/lib/i18n";
 import { ButtonLink } from "@/components/ui/Button";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { ProjectStatusBadge } from "@/components/ui/ProjectStatusBadge";
 
-export function ProjectCard({ project, locale }: { project: Project; locale: Locale }) {
+export function ProjectCard({ project, locale }: { project: CatalogProject; locale: Locale }) {
   const progress = Math.round((project.fundedUsdt / project.targetUsdt) * 100);
   const isRu = locale === "ru";
   const riskLabel = isRu ? { Moderate: "Средний", High: "Высокий" }[project.riskLevel] ?? project.riskLevel : project.riskLevel;

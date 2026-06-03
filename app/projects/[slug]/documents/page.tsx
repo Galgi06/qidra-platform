@@ -2,12 +2,14 @@ import { notFound } from "next/navigation";
 import { DocumentItem } from "@/components/DocumentItem";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
-import { projects } from "@/lib/content";
 import { getLocale, type SearchParams } from "@/lib/i18n";
+import { getProjectBySlug } from "@/lib/project-catalog";
+
+export const dynamic = "force-dynamic";
 
 export default async function ProjectDocumentsPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams?: SearchParams }) {
   const [{ slug }, locale] = await Promise.all([params, getLocale(searchParams)]);
-  const project = projects.find((item) => item.slug === slug);
+  const project = await getProjectBySlug(slug);
   if (!project) notFound();
 
   return (

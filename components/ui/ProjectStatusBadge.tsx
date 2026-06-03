@@ -1,7 +1,10 @@
 const labels = {
   active: { ru: "Активен", en: "Active", tone: "green" },
+  closed: { ru: "Закрыт", en: "Closed", tone: "dark" },
+  draft: { ru: "Черновик", en: "Draft", tone: "dark" },
   review: { ru: "Проверка", en: "Review", tone: "accent" },
   funded: { ru: "Собран", en: "Funded", tone: "dark" },
+  paused: { ru: "Пауза", en: "Paused", tone: "red" },
   pending: { ru: "На проверке", en: "Pending", tone: "accent" },
   confirmed: { ru: "Подтверждено", en: "Confirmed", tone: "green" },
   approved: { ru: "Одобрено", en: "Approved", tone: "green" },

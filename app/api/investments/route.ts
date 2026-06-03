@@ -1,9 +1,9 @@
-import { Prisma, ProjectStatus } from "@prisma/client";
+import { InvestmentStatus, Prisma } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import { projects, type Project as ContentProject } from "@/lib/content";
 import { authOptions } from "@/lib/next-auth";
+import { ensureBaseProjects } from "@/lib/project-catalog";
 import { prisma } from "@/lib/prisma";
 
 const amountSchema = z
@@ -28,29 +28,6 @@ type SessionUser = {
 
 function isRu(request: NextRequest) {
   return request.nextUrl.searchParams.get("lang") !== "en";
-}
-
-function projectStatus(status: ContentProject["status"]) {
-  if (status === "active") return ProjectStatus.ACTIVE;
-  if (status === "funded") return ProjectStatus.FUNDED;
-  return ProjectStatus.REVIEW;
-}
-
-function projectPayload(project: ContentProject) {
-  return {
-    titleRu: project.title.ru,
-    titleEn: project.title.en,
-    summaryRu: project.summary.ru,
-    summaryEn: project.summary.en,
-    descriptionRu: project.description.ru,
-    descriptionEn: project.description.en,
-    status: projectStatus(project.status),
-    targetUsdt: project.targetUsdt,
-    fundedUsdt: project.fundedUsdt,
-    location: project.location,
-    structure: project.structure,
-    riskLevel: project.riskLevel
-  };
 }
 
 export async function POST(request: NextRequest) {
@@ -83,9 +60,12 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const contentProject = projects.find((project) => project.slug === parsed.data.projectSlug);
+  await ensureBaseProjects();
+  const project = await prisma.project.findUnique({
+    where: { slug: parsed.data.projectSlug }
+  });
 
-  if (!contentProject) {
+  if (!project) {
     return NextResponse.json(
       {
         title: localeRu ? "Проект не найден" : "Project not found",
@@ -117,19 +97,11 @@ export async function POST(request: NextRequest) {
   }
 
   await prisma.$transaction(async (tx) => {
-    const project = await tx.project.upsert({
-      where: { slug: contentProject.slug },
-      update: projectPayload(contentProject),
-      create: {
-        slug: contentProject.slug,
-        ...projectPayload(contentProject)
-      }
-    });
     const activeApplication = await tx.investmentApplication.findFirst({
       where: {
         userId,
         projectId: project.id,
-        status: "PENDING"
+        status: InvestmentStatus.PENDING
       },
       orderBy: { createdAt: "desc" }
     });
@@ -151,7 +123,7 @@ export async function POST(request: NextRequest) {
       data: {
         userId,
         projectId: project.id,
-        status: "PENDING",
+        status: InvestmentStatus.PENDING,
         ...applicationData
       }
     });

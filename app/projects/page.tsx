@@ -2,12 +2,15 @@ import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { ProjectCard } from "@/components/ProjectCard";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
-import { projects } from "@/lib/content";
 import { getLocale, type SearchParams, withLocale } from "@/lib/i18n";
+import { getPublicProjects } from "@/lib/project-catalog";
+
+export const dynamic = "force-dynamic";
 
 export default async function ProjectsPage({ searchParams }: { searchParams?: SearchParams }) {
   const locale = await getLocale(searchParams);
   const isRu = locale === "ru";
+  const projects = await getPublicProjects();
 
   return (
     <>

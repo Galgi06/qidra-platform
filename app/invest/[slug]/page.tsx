@@ -7,13 +7,15 @@ import { InvestmentAmountInput } from "@/components/InvestmentAmountInput";
 import { NotificationCard } from "@/components/NotificationCard";
 import { Button } from "@/components/ui/Button";
 import { requireAuth } from "@/lib/access";
-import { projects } from "@/lib/content";
 import { dictionary, getLocale, type SearchParams } from "@/lib/i18n";
+import { getProjectBySlug } from "@/lib/project-catalog";
+
+export const dynamic = "force-dynamic";
 
 export default async function InvestPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams?: SearchParams }) {
   const [{ slug }, locale] = await Promise.all([params, getLocale(searchParams)]);
   await requireAuth(locale, `/invest/${slug}`);
-  const project = projects.find((item) => item.slug === slug);
+  const project = await getProjectBySlug(slug);
   if (!project) notFound();
 
   return (
