@@ -10,8 +10,8 @@ import { getLocale, t, type SearchParams, withLocale } from "@/lib/i18n";
 
 const metrics = [
   { label: { ru: "Пользователи", en: "Users" }, value: "128", note: { ru: "17 KYC на проверке", en: "17 pending KYC" } },
-  { label: { ru: "Заявки", en: "Investment requests" }, value: "42", note: { ru: "9 требуют проверки", en: "9 require review" } },
-  { label: { ru: "Пополнения", en: "Manual deposits" }, value: "14", note: { ru: "USDT TRC20", en: "USDT TRC20" } },
+  { label: { ru: "Заявки", en: "Participation requests" }, value: "42", note: { ru: "9 требуют проверки", en: "9 require review" } },
+  { label: { ru: "Платежные операции", en: "Payment operations" }, value: "14", note: { ru: "USDT TRC20", en: "USDT TRC20" } },
   { label: { ru: "Проекты", en: "Published projects" }, value: "6", note: { ru: "2 в черновике", en: "2 in draft" } }
 ];
 
@@ -19,12 +19,12 @@ const sections = [
   {
     href: "/admin/users",
     label: { ru: "Пользователи", en: "Users" },
-    text: { ru: "Роли, профили инвесторов и проверка доступа.", en: "Roles, investor profiles and access review." }
+    text: { ru: "Роли, профили участников и проверка доступа.", en: "Roles, participant profiles and access review." }
   },
   {
     href: "/admin/kyc",
     label: { ru: "KYC", en: "KYC" },
-    text: { ru: "Ручная проверка анкет и риск-флаги.", en: "Manual verification workflow and risk flags." }
+    text: { ru: "Проверка анкет, риск-флаги и дополнительные запросы.", en: "Profile review workflow, risk flags and additional requests." }
   },
   {
     href: "/admin/projects",
@@ -34,12 +34,12 @@ const sections = [
   {
     href: "/admin/investments",
     label: { ru: "Заявки", en: "Applications" },
-    text: { ru: "Подтверждение или отклонение инвестиционных заявок.", en: "Approve or reject investment requests." }
+    text: { ru: "Подтверждение или отклонение заявок на участие.", en: "Approve or reject participation requests." }
   },
   {
     href: "/admin/payments",
     label: { ru: "Платежи", en: "Payments" },
-    text: { ru: "Ручное подтверждение USDT-пополнений.", en: "Confirm USDT deposits manually." }
+    text: { ru: "Сверка USDT-операций и статусов заявок.", en: "Reconcile USDT operations and application statuses." }
   }
 ];
 
@@ -65,8 +65,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
               <h1 className="mt-4 title-48 text-qidra-dark">Admin panel</h1>
               <p className="mt-5 max-w-3xl text-20 text-qidra-grayBlue">
                 {locale === "ru"
-                  ? "Операционный центр для комплаенса, публикации проектов, KYC и ручных подтверждений USDT."
-                  : "Manual-first control center for compliance, project publishing, KYC and USDT confirmations."}
+                  ? "Операционный центр для комплаенса, публикации проектов, KYC и платежной сверки."
+                  : "Operations center for compliance, project publishing, KYC and payment reconciliation."}
               </p>
             </div>
             <NotificationCard
@@ -74,8 +74,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
               title={locale === "ru" ? "Напоминание по безопасности" : "Security reminder"}
               text={
                 locale === "ru"
-                  ? "Используйте роли с минимальными правами и держите платежи ручными до аудита production-контролей."
-                  : "Use least-privilege manager roles and keep payment confirmations manual until production controls are audited."
+                  ? "Используйте роли с минимальными правами и фиксируйте каждую смену статуса перед запуском production-контролей."
+                  : "Use least-privilege manager roles and record every status change before production controls are launched."
               }
             />
           </div>

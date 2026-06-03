@@ -8,7 +8,7 @@ import { getLocale, t, type SearchParams, withLocale } from "@/lib/i18n";
 
 const users = [
   { name: "Adam M.", email: "qidra.hub@gmail.com", role: "super_admin", status: { ru: "Активен", en: "Active" } },
-  { name: "Investor Demo", email: "investor@example.com", role: "investor", status: { ru: "Email ожидает подтверждения", en: "Email pending" } },
+  { name: "Participant Demo", email: "participant@example.com", role: "participant", status: { ru: "Email ожидает подтверждения", en: "Email pending" } },
   { name: "Compliance Manager", email: "kyc@example.com", role: "admin", status: { ru: "Ограниченный доступ", en: "Limited access" } }
 ];
 
@@ -33,7 +33,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
             <div>
               <h1 className="title-48 text-qidra-dark">{locale === "ru" ? "Пользователи" : "Users"}</h1>
               <p className="mt-4 text-20 text-qidra-grayBlue">
-                {locale === "ru" ? "Управление инвесторами, администраторами и уровнями доступа менеджеров." : "Manage investors, admins and manager access levels."}
+                {locale === "ru" ? "Управление участниками, администраторами и уровнями доступа менеджеров." : "Manage participants, admins and manager access levels."}
               </p>
             </div>
             <FeedbackButton

@@ -9,19 +9,19 @@ import { getLocale, t, type SearchParams, withLocale } from "@/lib/i18n";
 
 const payments = [
   {
-    title: { ru: "Ручное пополнение", en: "Manual deposit" },
-    meta: { ru: "Investor Demo · TX ожидает проверки", en: "Investor Demo · TX pending verification" },
+    title: { ru: "Платежная операция", en: "Payment operation" },
+    meta: { ru: "Participant Demo · TX ожидает проверки", en: "Participant Demo · TX pending verification" },
     amount: "+5,000 USDT",
     tone: "pending"
   },
   {
-    title: { ru: "Ручное пополнение", en: "Manual deposit" },
+    title: { ru: "Платежная операция", en: "Payment operation" },
     meta: { ru: "A. Karim · Подтверждено администратором", en: "A. Karim · Confirmed by admin" },
     amount: "+12,000 USDT",
     tone: "success"
   },
   {
-    title: { ru: "Отклоненное пополнение", en: "Rejected deposit" },
+    title: { ru: "Отклоненная операция", en: "Rejected operation" },
     meta: { ru: "Некорректный transaction hash", en: "Invalid transaction hash" },
     amount: "2,000 USDT",
     tone: "error"
@@ -45,11 +45,11 @@ export default async function AdminPaymentsPage({ searchParams }: { searchParams
               { label: locale === "ru" ? "Платежи" : "Payments" }
             ]}
           />
-          <h1 className="mt-8 title-48 text-qidra-dark">{locale === "ru" ? "Подтверждение USDT-платежей" : "USDT payment confirmations"}</h1>
+          <h1 className="mt-8 title-48 text-qidra-dark">{locale === "ru" ? "Сверка USDT-платежей" : "USDT payment reconciliation"}</h1>
           <p className="mt-4 max-w-3xl text-20 text-qidra-grayBlue">
             {locale === "ru"
-              ? "Первый релиз использует ручную TRC20-проверку. Баланс не пополняется автоматически без подтверждения администратора."
-              : "The first release uses manual TRC20 verification. No automatic balance credit is performed without admin confirmation."}
+              ? "Сверяйте сеть, адрес, сумму и transaction hash перед обновлением статуса заявки участника."
+              : "Match the network, address, amount and transaction hash before updating the participant application status."}
           </p>
         </div>
       </section>
@@ -71,8 +71,8 @@ export default async function AdminPaymentsPage({ searchParams }: { searchParams
               title={locale === "ru" ? "Чеклист подтверждения" : "Confirmation checklist"}
               text={
                 locale === "ru"
-                  ? "Сверьте сеть, адрес кошелька, сумму, transaction hash и заявку инвестора перед сменой статуса."
-                  : "Match network, wallet address, amount, transaction hash and investor request before changing status."
+                  ? "Сверьте сеть, адрес кошелька, сумму, transaction hash и заявку участника перед сменой статуса."
+                  : "Match network, wallet address, amount, transaction hash and participant request before changing status."
               }
             />
             <FeedbackButton
@@ -81,8 +81,8 @@ export default async function AdminPaymentsPage({ searchParams }: { searchParams
                 title: locale === "ru" ? "Платеж подтвержден" : "Payment confirmed",
                 text:
                   locale === "ru"
-                    ? "Статус выбранного пополнения обновлен. Баланс инвестора можно начислять после финальной сверки."
-                    : "The selected deposit status was updated. The investor balance can be credited after final reconciliation.",
+                    ? "Статус выбранной операции обновлен. Баланс участника можно начислять после финальной сверки."
+                    : "The selected operation status was updated. The participant balance can be credited after final reconciliation.",
                 buttonLabel: locale === "ru" ? "Понятно" : "Got it",
                 dismissLabel: locale === "ru" ? "Закрыть уведомление" : "Close notification",
                 tone: "success"
@@ -96,8 +96,8 @@ export default async function AdminPaymentsPage({ searchParams }: { searchParams
                 title: locale === "ru" ? "Платеж отклонен" : "Payment rejected",
                 text:
                   locale === "ru"
-                    ? "Статус выбранного пополнения обновлен. Инвестору нужно отправить корректный transaction hash."
-                    : "The selected deposit status was updated. The investor should submit a valid transaction hash.",
+                    ? "Статус выбранной операции обновлен. Участнику нужно отправить корректный transaction hash."
+                    : "The selected operation status was updated. The participant should submit a valid transaction hash.",
                 buttonLabel: locale === "ru" ? "Понятно" : "Got it",
                 dismissLabel: locale === "ru" ? "Закрыть уведомление" : "Close notification",
                 tone: "warning"

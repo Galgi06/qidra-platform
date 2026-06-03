@@ -6,11 +6,11 @@ This document freezes the first build scope for Qidra so the product can be rebu
 
 The MVP includes:
 
-- Public website: home, investment project catalog, project page, project documents, FAQ, Terms, Privacy Policy, AML/KYC Policy, Risk Disclaimer, Sharia Compliance Statement.
+- Public website: home, project catalog, project page, project documents, FAQ, Terms, Privacy Policy, AML/KYC Policy, Risk Disclaimer, Sharia Compliance Statement.
 - Auth: registration, login, email verification, password recovery, and 2FA-ready structure disabled on launch.
-- Investor cabinet: profile, KYC questionnaire, USDT TRC20 wallet, manual deposit, transaction history, investments, project reports.
-- Investment flow: project selection, amount entry, terms confirmation, Mudaraba/Musharaka contract consent, investment application creation, statuses `pending`, `confirmed`, `rejected`.
-- Admin panel: users, KYC, projects, investment applications, manual USDT payment confirmation, documents, reports, project statuses.
+- Participant cabinet: profile, KYC questionnaire, wallet operations, transaction history, project participation, project reports.
+- Participation flow: project selection, amount entry, terms confirmation, Mudaraba/Musharaka contract consent, application creation, statuses `pending`, `confirmed`, `rejected`.
+- Admin panel: users, KYC, projects, participation applications, payment reconciliation, documents, reports, project statuses.
 
 Excluded from the first stage:
 
@@ -24,10 +24,10 @@ Excluded from the first stage:
 ## Legal And Trust Rules
 
 - The product must not promise fixed income, guaranteed yield, or risk-free results.
-- Investment copy must present expected scenarios as informational, non-guaranteed projections only.
-- Every investment flow must include risk, terms, and Mudaraba/Musharaka agreement consent.
-- Admin confirmation is required before manual USDT deposits affect investable balance.
-- Legal pages and project documents must be visible from public pages and investor flows.
+- Project copy must present expected scenarios as informational, non-guaranteed projections only.
+- Every participation flow must include risk, terms, and Mudaraba/Musharaka agreement consent.
+- Payment operations must remain traceable and auditable before balances or application statuses are updated.
+- Legal pages and project documents must be visible from public pages and participant flows.
 
 ## Design Rules
 

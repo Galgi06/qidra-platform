@@ -30,8 +30,8 @@ export default async function AdminProjectsPage({ searchParams }: { searchParams
               <h1 className="title-48 text-qidra-dark">{locale === "ru" ? "Управление проектами" : "Project management"}</h1>
               <p className="mt-4 text-20 text-qidra-grayBlue">
                 {locale === "ru"
-                  ? "Черновики, публикация и обновление инвестиционных страниц с юридическим раскрытием."
-                  : "Draft, publish and update compliant investment project pages."}
+                  ? "Черновики, публикация и обновление проектных страниц с юридическим раскрытием."
+                  : "Draft, publish and update compliant project pages."}
               </p>
             </div>
             <FeedbackButton

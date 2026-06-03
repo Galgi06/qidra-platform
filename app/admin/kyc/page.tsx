@@ -7,19 +7,19 @@ import { getLocale, t, type SearchParams, withLocale } from "@/lib/i18n";
 
 const applications = [
   {
-    investor: "Investor Demo",
+    participant: "Participant Demo",
     level: { ru: "Физическое лицо", en: "Individual" },
     risk: { ru: "Стандартный", en: "Standard" },
     status: "pending"
   },
   {
-    investor: "Noura Capital",
+    participant: "Noura Capital",
     level: { ru: "Юридическое лицо", en: "Entity" },
     risk: { ru: "Расширенная проверка", en: "Enhanced due diligence" },
     status: "review"
   },
   {
-    investor: "A. Karim",
+    participant: "A. Karim",
     level: { ru: "Физическое лицо", en: "Individual" },
     risk: { ru: "Стандартный", en: "Standard" },
     status: "approved"
@@ -46,18 +46,18 @@ export default async function AdminKycPage({ searchParams }: { searchParams: Pro
           <h1 className="mt-8 title-48 text-qidra-dark">{locale === "ru" ? "Управление KYC" : "KYC management"}</h1>
           <p className="mt-4 max-w-3xl text-20 text-qidra-grayBlue">
             {locale === "ru"
-              ? "Очередь ручной проверки с понятным разделением одобрения, отказа и дополнительной проверки."
-              : "Manual verification queue with clear separation between approval, rejection and additional review."}
+              ? "Очередь проверки с понятным разделением одобрения, отказа и дополнительного запроса."
+              : "Review queue with clear separation between approval, rejection and additional requests."}
           </p>
         </div>
       </section>
       <section className="section">
         <div className="container-qidra grid gap-4">
           {applications.map((item) => (
-            <div key={item.investor} className="surface grid gap-4 p-6 md:grid-cols-[1fr_1fr_1fr_auto] md:items-center">
+            <div key={item.participant} className="surface grid gap-4 p-6 md:grid-cols-[1fr_1fr_1fr_auto] md:items-center">
               <div>
-                <p className="text-14 text-qidra-grayBlue">{locale === "ru" ? "Инвестор" : "Investor"}</p>
-                <p className="mt-1 text-18 font-medium text-qidra-dark">{item.investor}</p>
+                <p className="text-14 text-qidra-grayBlue">{locale === "ru" ? "Участник" : "Participant"}</p>
+                <p className="mt-1 text-18 font-medium text-qidra-dark">{item.participant}</p>
               </div>
               <div>
                 <p className="text-14 text-qidra-grayBlue">{locale === "ru" ? "Тип профиля" : "Profile type"}</p>

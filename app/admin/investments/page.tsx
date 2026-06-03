@@ -7,9 +7,9 @@ import { requireAdmin } from "@/lib/access";
 import { getLocale, t, type SearchParams, withLocale } from "@/lib/i18n";
 
 const requests = [
-  { id: "INV-1004", investor: "Investor Demo", project: "Qidra Real Estate Income", amount: "5,000 USDT", status: "pending" },
-  { id: "INV-1003", investor: "A. Karim", project: "Trade Participation", amount: "12,000 USDT", status: "confirmed" },
-  { id: "INV-1002", investor: "Noura Capital", project: "Qidra Real Estate Income", amount: "25,000 USDT", status: "rejected" }
+  { id: "APP-1004", participant: "Participant Demo", project: "Qidra Real Estate Income", amount: "5,000 USDT", status: "pending" },
+  { id: "APP-1003", participant: "A. Karim", project: "Trade Participation", amount: "12,000 USDT", status: "confirmed" },
+  { id: "APP-1002", participant: "Noura Capital", project: "Qidra Real Estate Income", amount: "25,000 USDT", status: "rejected" }
 ] as const;
 
 export default async function AdminInvestmentsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
@@ -29,7 +29,7 @@ export default async function AdminInvestmentsPage({ searchParams }: { searchPar
               { label: locale === "ru" ? "Заявки" : "Applications" }
             ]}
           />
-          <h1 className="mt-8 title-48 text-qidra-dark">{locale === "ru" ? "Инвестиционные заявки" : "Investment applications"}</h1>
+          <h1 className="mt-8 title-48 text-qidra-dark">{locale === "ru" ? "Заявки на участие" : "Participation applications"}</h1>
           <p className="mt-4 text-20 text-qidra-grayBlue">
             {locale === "ru"
               ? "Подтверждайте заявки только после проверки средств, KYC и принятия договорных условий."
@@ -42,7 +42,7 @@ export default async function AdminInvestmentsPage({ searchParams }: { searchPar
           {requests.map((request) => (
             <div key={request.id} className="surface grid gap-4 p-6 lg:grid-cols-[0.7fr_1fr_1fr_0.8fr_auto] lg:items-center">
               <p className="text-16 font-medium text-qidra-dark">{request.id}</p>
-              <p className="text-16 text-qidra-grayBlue">{request.investor}</p>
+              <p className="text-16 text-qidra-grayBlue">{request.participant}</p>
               <p className="text-16 text-qidra-grayBlue">{request.project}</p>
               <p className="text-16 font-medium text-qidra-dark">{request.amount}</p>
               <div className="flex items-center gap-3">
