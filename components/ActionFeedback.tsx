@@ -49,7 +49,7 @@ export function FeedbackPopup({ feedback, onClose }: { feedback: FeedbackMessage
             onClick={onClose}
             type="button"
           >
-            x
+            <CloseIcon />
           </button>
         </div>
         <div className="mt-4 flex justify-end">
@@ -59,6 +59,14 @@ export function FeedbackPopup({ feedback, onClose }: { feedback: FeedbackMessage
         </div>
       </div>
     </div>
+  );
+}
+
+function CloseIcon() {
+  return (
+    <svg aria-hidden="true" className="size-4" fill="none" viewBox="0 0 16 16">
+      <path d="m4 4 8 8M12 4l-8 8" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
+    </svg>
   );
 }
 

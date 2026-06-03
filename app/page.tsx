@@ -213,7 +213,9 @@ function FeaturePanel({ title, text, tone = "light" }: { title: string; text: st
 function PrincipleItem({ title, text, last = false }: { title: string; text: string; last?: boolean }) {
   return (
     <div className={`grid grid-cols-[44px_1fr] gap-5 py-6 ${last ? "" : "border-b border-qidra-grayMedium/25"}`}>
-      <div className="flex h-11 w-11 items-center justify-center rounded-full bg-qidra-accent text-[28px] leading-none text-white">x</div>
+      <div className="flex h-11 w-11 items-center justify-center rounded-full bg-qidra-accent text-white">
+        <CrossIcon />
+      </div>
       <div>
         <h3 className="text-[28px] font-medium leading-tight tracking-[0] text-qidra-dark">{title}</h3>
         <p className="mt-2 text-20 text-qidra-grayBlue">{text}</p>
@@ -226,7 +228,7 @@ function StepCard({ title, items, action, href }: { title: string; items: string
   return (
     <article className="relative grid min-h-[480px] content-start rounded-[20px] bg-qidra-grayLight p-7 sm:p-10">
       <div className="absolute right-[-28px] top-12 hidden h-24 w-24 items-center justify-center rounded-full bg-white text-[62px] leading-none text-[#2418f2] shadow-qidra lg:flex">
-        {"->"}
+        <ArrowIcon />
       </div>
       <h3 className="max-w-md text-[30px] font-medium leading-[1.15] tracking-[0] text-qidra-dark sm:text-[36px]">{title}</h3>
       <ul className="mt-10 grid gap-6 text-20 leading-[1.35] text-qidra-grayBlue">
@@ -243,5 +245,21 @@ function StepCard({ title, items, action, href }: { title: string; items: string
         </ButtonLink>
       ) : null}
     </article>
+  );
+}
+
+function CrossIcon() {
+  return (
+    <svg aria-hidden="true" className="size-7" fill="none" viewBox="0 0 28 28">
+      <path d="m7 7 14 14M21 7 7 21" stroke="currentColor" strokeLinecap="round" strokeWidth="3" />
+    </svg>
+  );
+}
+
+function ArrowIcon() {
+  return (
+    <svg aria-hidden="true" className="size-14" fill="none" viewBox="0 0 56 56">
+      <path d="M12 28h29M30 16l12 12-12 12" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="5" />
+    </svg>
   );
 }

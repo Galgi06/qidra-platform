@@ -66,7 +66,7 @@ export function SignInForm({ locale, nextPath }: { locale: Locale; nextPath: str
         <h1 className="subtitle-28">{locale === "ru" ? "Вход" : "Sign in"}</h1>
         <Input label="Email" name="email" type="email" placeholder="name@example.com" required />
         <Input label={locale === "ru" ? "Пароль" : "Password"} name="password" type="password" placeholder="********" required />
-        <Button loading={loading} type="submit">
+        <Button loading={loading} loadingLabel={locale === "ru" ? "Входим..." : "Signing in..."} type="submit">
           {locale === "ru" ? "Войти" : "Sign in"}
         </Button>
         <div className="flex justify-between gap-3 text-14 text-qidra-grayBlue">

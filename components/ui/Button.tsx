@@ -23,12 +23,13 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: Variant;
   size?: Size;
   loading?: boolean;
+  loadingLabel?: ReactNode;
 };
 
-export function Button({ variant = "primary", size = "md", loading, children, className = "", ...props }: ButtonProps) {
+export function Button({ variant = "primary", size = "md", loading, loadingLabel = "Loading", children, className = "", ...props }: ButtonProps) {
   return (
     <button className={`${base} ${variants[variant]} ${sizes[size]} ${className}`} disabled={loading || props.disabled} {...props}>
-      {loading ? "Loading" : children}
+      {loading ? loadingLabel : children}
     </button>
   );
 }
