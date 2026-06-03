@@ -1,5 +1,5 @@
 import { Breadcrumbs } from "@/components/Breadcrumbs";
-import { FeedbackButton } from "@/components/ActionFeedback";
+import { FeedbackForm } from "@/components/ActionFeedback";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { NotificationCard } from "@/components/NotificationCard";
@@ -55,22 +55,12 @@ export default async function AdminInvestmentsPage({ searchParams }: { searchPar
                   <p className="text-16 font-medium text-qidra-dark">{formatUsdt(request.amountUsdt)}</p>
                   <div className="flex items-center gap-3">
                     <ProjectStatusBadge status={investmentStatus(request.status)} locale={locale} />
-                    <FeedbackButton
-                      feedback={{
-                        title: locale === "ru" ? "Заявка открыта" : "Application opened",
-                        text:
-                          locale === "ru"
-                            ? "Карточка заявки готова к проверке профиля, суммы и договорных условий."
-                            : "The application card is ready for profile, amount and contract review.",
-                        buttonLabel: locale === "ru" ? "Понятно" : "Got it",
-                        dismissLabel: locale === "ru" ? "Закрыть уведомление" : "Close notification",
-                        tone: "info"
-                      }}
-                      size="sm"
-                      variant="outline"
-                    >
-                      {locale === "ru" ? "Открыть" : "Open"}
-                    </FeedbackButton>
+                    {request.status === "PENDING" ? (
+                      <div className="flex flex-col gap-2 sm:flex-row">
+                        <InvestmentActionForm action="confirm" endpoint={`/api/admin/investments/${request.id}?lang=${locale}`} locale={locale} />
+                        <InvestmentActionForm action="reject" endpoint={`/api/admin/investments/${request.id}?lang=${locale}`} locale={locale} />
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               ))
@@ -85,6 +75,49 @@ export default async function AdminInvestmentsPage({ searchParams }: { searchPar
       </main>
       <Footer locale={locale} />
     </>
+  );
+}
+
+function InvestmentActionForm({ action, endpoint, locale }: { action: "confirm" | "reject"; endpoint: string; locale: "ru" | "en" }) {
+  const confirm = action === "confirm";
+
+  return (
+    <FeedbackForm
+      className="contents"
+      endpoint={endpoint}
+      feedback={{
+        title: confirm ? (locale === "ru" ? "Заявка подтверждена" : "Application confirmed") : locale === "ru" ? "Заявка отклонена" : "Application rejected",
+        text: confirm
+          ? locale === "ru"
+            ? "Сумма списана с доступного баланса участника."
+            : "The amount was deducted from the participant's available balance."
+          : locale === "ru"
+            ? "Участник увидит обновлённый статус в кабинете."
+            : "The participant will see the updated status in the cabinet.",
+        buttonLabel: locale === "ru" ? "Понятно" : "Got it",
+        dismissLabel: locale === "ru" ? "Закрыть уведомление" : "Close notification",
+        tone: confirm ? "success" : "warning"
+      }}
+      refreshOnSuccess
+    >
+      <input name="action" type="hidden" value={action} />
+      <ActionButton confirm={confirm} locale={locale} />
+    </FeedbackForm>
+  );
+}
+
+function ActionButton({ confirm, locale }: { confirm: boolean; locale: "ru" | "en" }) {
+  return (
+    <button
+      className={`inline-flex h-10 items-center justify-center rounded-qidra border px-4 text-14 font-medium transition-colors ${
+        confirm
+          ? "border-qidra-accent bg-qidra-accent text-white hover:bg-qidra-accent80"
+          : "border-qidra-grayMedium bg-transparent text-qidra-dark hover:border-qidra-red hover:text-qidra-red"
+      }`}
+      type="submit"
+    >
+      {confirm ? (locale === "ru" ? "Подтвердить" : "Confirm") : locale === "ru" ? "Отклонить" : "Reject"}
+    </button>
   );
 }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ComponentProps, type FormEvent, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 
 export type FeedbackTone = "info" | "success" | "warning" | "error";
@@ -76,10 +77,12 @@ type FeedbackFormProps = {
   endpoint?: string;
   feedback: FeedbackMessage;
   payload?: "json" | "form-data";
+  refreshOnSuccess?: boolean;
   resetOnSubmit?: boolean;
 };
 
-export function FeedbackForm({ children, className = "", endpoint, feedback, payload = "json", resetOnSubmit = false }: FeedbackFormProps) {
+export function FeedbackForm({ children, className = "", endpoint, feedback, payload = "json", refreshOnSuccess = false, resetOnSubmit = false }: FeedbackFormProps) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [activeFeedback, setActiveFeedback] = useState(feedback);
   const [submitting, setSubmitting] = useState(false);
@@ -144,6 +147,10 @@ export function FeedbackForm({ children, className = "", endpoint, feedback, pay
 
     if (resetOnSubmit) {
       form.reset();
+    }
+
+    if (refreshOnSuccess) {
+      router.refresh();
     }
   }
 

@@ -1,3 +1,4 @@
+import { InvestmentStatus } from "@prisma/client";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { NotificationCard } from "@/components/NotificationCard";
@@ -6,6 +7,7 @@ import { UserAvatar } from "@/components/UserAvatar";
 import { ButtonLink } from "@/components/ui/Button";
 import { requireAuth } from "@/lib/access";
 import { getLocale, type SearchParams, withLocale } from "@/lib/i18n";
+import { prisma } from "@/lib/prisma";
 
 export default async function InvestorPage({ searchParams }: { searchParams?: SearchParams }) {
   const locale = await getLocale(searchParams);
@@ -14,6 +16,17 @@ export default async function InvestorPage({ searchParams }: { searchParams?: Se
   const userName = session.user?.name || (isRu ? "Участник Qidra" : "Qidra participant");
   const userEmail = session.user?.email ?? "";
   const displayEmail = userEmail.endsWith("@telegram.qidra.local") ? (isRu ? "Аккаунт Telegram" : "Telegram account") : userEmail;
+  const userId = session.user?.id ?? "";
+  const [latestKyc, wallet, activeApplications] = await Promise.all([
+    prisma.kycApplication.findFirst({ where: { userId }, orderBy: { createdAt: "desc" } }),
+    prisma.wallet.findUnique({ where: { userId } }),
+    prisma.investmentApplication.count({ where: { userId, status: { in: [InvestmentStatus.PENDING, InvestmentStatus.CONFIRMED] } } })
+  ]);
+  const profileStatus = latestKyc?.status ?? "DRAFT";
+  const profileStatusText = profileStatusLabel(profileStatus, locale);
+  const profileNotice = profileNoticeContent(profileStatus, locale);
+  const primaryActionHref = profileStatus === "APPROVED" ? withLocale("/projects", locale) : withLocale("/investor/kyc", locale);
+  const primaryActionLabel = profileStatus === "APPROVED" ? (isRu ? "Выбрать проект" : "Choose project") : isRu ? "Начать проверку" : "Start review";
 
   return (
     <>
@@ -53,9 +66,9 @@ export default async function InvestorPage({ searchParams }: { searchParams?: Se
         <section className="px-5 py-12 sm:px-8 lg:px-11 lg:py-16">
           <div className="mx-auto grid max-w-[1840px] gap-8">
             <div className="grid gap-5 md:grid-cols-3">
-              <MetricCard label={isRu ? "Статус профиля" : "Profile status"} value={isRu ? "Нужно заполнить" : "Action needed"} tone="warning" />
-              <MetricCard label={isRu ? "Доступный баланс" : "Available balance"} value="0 USDT" />
-              <MetricCard label={isRu ? "Активные заявки" : "Active applications"} value="0" />
+              <MetricCard label={isRu ? "Статус профиля" : "Profile status"} value={profileStatusText} tone={profileStatus === "APPROVED" ? "neutral" : "warning"} />
+              <MetricCard label={isRu ? "Доступный баланс" : "Available balance"} value={formatUsdt(wallet?.availableUsdt ?? 0)} />
+              <MetricCard label={isRu ? "Активные заявки" : "Active applications"} value={activeApplications.toString()} />
             </div>
 
             <div className="grid gap-8 lg:grid-cols-[1fr_0.72fr]">
@@ -71,8 +84,8 @@ export default async function InvestorPage({ searchParams }: { searchParams?: Se
                         : "To submit a participation application, complete your profile first and review the terms of the selected project."}
                     </p>
                   </div>
-                  <ButtonLink href={withLocale("/investor/kyc", locale)} className="h-12 shrink-0">
-                    {isRu ? "Начать проверку" : "Start review"}
+                  <ButtonLink href={primaryActionHref} className="h-12 shrink-0">
+                    {primaryActionLabel}
                   </ButtonLink>
                 </div>
                 <div className="mt-8 grid gap-4">
@@ -97,16 +110,16 @@ export default async function InvestorPage({ searchParams }: { searchParams?: Se
 
               <aside className="grid content-start gap-5">
                 <NotificationCard
-                  title={isRu ? "Профиль ещё не отправлен" : "Profile not submitted yet"}
-                  text={isRu ? "Заполните анкету и прикрепите документы, чтобы команда Qidra могла начать проверку." : "Complete the form and attach documents so the Qidra team can start the review."}
-                  tone="warning"
+                  title={profileNotice.title}
+                  text={profileNotice.text}
+                  tone={profileNotice.tone}
                 />
                 <section className="rounded-[20px] bg-white p-6 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] sm:p-8">
                   <h2 className="text-[26px] font-medium leading-tight tracking-[0] text-qidra-dark">{isRu ? "Последние действия" : "Recent activity"}</h2>
                   <div className="mt-6 grid gap-4 text-16 text-qidra-grayBlue">
                     <ActivityItem label={isRu ? "Аккаунт создан" : "Account created"} value={isRu ? "Готово" : "Done"} />
-                    <ActivityItem label={isRu ? "Профиль участника" : "Participant profile"} value={isRu ? "Ожидает заполнения" : "Waiting"} />
-                    <ActivityItem label={isRu ? "Заявки" : "Applications"} value={isRu ? "Нет активных" : "No active"} />
+                    <ActivityItem label={isRu ? "Профиль участника" : "Participant profile"} value={profileStatusText} />
+                    <ActivityItem label={isRu ? "Заявки" : "Applications"} value={activeApplications ? activeApplications.toString() : isRu ? "Нет активных" : "No active"} />
                   </div>
                 </section>
               </aside>
@@ -117,6 +130,53 @@ export default async function InvestorPage({ searchParams }: { searchParams?: Se
       <Footer locale={locale} />
     </>
   );
+}
+
+function profileStatusLabel(status: string, locale: "ru" | "en") {
+  if (status === "APPROVED") return locale === "ru" ? "Одобрен" : "Approved";
+  if (status === "SUBMITTED") return locale === "ru" ? "На проверке" : "In review";
+  if (status === "REJECTED") return locale === "ru" ? "Нужны правки" : "Updates needed";
+  return locale === "ru" ? "Нужно заполнить" : "Action needed";
+}
+
+function profileNoticeContent(status: string, locale: "ru" | "en") {
+  if (status === "APPROVED") {
+    return {
+      title: locale === "ru" ? "Профиль одобрен" : "Profile approved",
+      text: locale === "ru" ? "Теперь можно выбирать проект и отправлять заявку на участие." : "You can now choose a project and submit a participation application.",
+      tone: "success" as const
+    };
+  }
+
+  if (status === "SUBMITTED") {
+    return {
+      title: locale === "ru" ? "Профиль на проверке" : "Profile in review",
+      text: locale === "ru" ? "Команда Qidra проверяет анкету и документы." : "The Qidra team is reviewing the profile and documents.",
+      tone: "info" as const
+    };
+  }
+
+  if (status === "REJECTED") {
+    return {
+      title: locale === "ru" ? "Анкету нужно обновить" : "Profile needs updates",
+      text: locale === "ru" ? "Откройте проверку профиля, обновите данные и отправьте анкету повторно." : "Open profile review, update the details and submit the profile again.",
+      tone: "error" as const
+    };
+  }
+
+  return {
+    title: locale === "ru" ? "Профиль ещё не отправлен" : "Profile not submitted yet",
+    text:
+      locale === "ru"
+        ? "Заполните анкету и прикрепите документы, чтобы команда Qidra могла начать проверку."
+        : "Complete the form and attach documents so the Qidra team can start the review.",
+    tone: "warning" as const
+  };
+}
+
+function formatUsdt(value: { toString(): string } | number) {
+  const amount = typeof value === "number" ? value : Number(value.toString());
+  return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(amount)} USDT`;
 }
 
 function MetricCard({ label, value, tone = "neutral" }: { label: string; value: string; tone?: "neutral" | "warning" }) {

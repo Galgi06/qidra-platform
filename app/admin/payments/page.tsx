@@ -125,6 +125,7 @@ function PaymentActionForm({ action, endpoint, locale }: { action: "confirm" | "
         dismissLabel: locale === "ru" ? "Закрыть уведомление" : "Close notification",
         tone: confirm ? "success" : "warning"
       }}
+      refreshOnSuccess
     >
       <input name="action" type="hidden" value={action} />
       <ButtonLike confirm={confirm} locale={locale} />
