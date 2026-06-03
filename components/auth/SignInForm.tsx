@@ -4,12 +4,23 @@ import Link from "next/link";
 import { signIn } from "next-auth/react";
 import { useState, type FormEvent } from "react";
 import { FeedbackPopup, type FeedbackMessage } from "@/components/ActionFeedback";
+import { SocialAuthButtons } from "@/components/auth/SocialAuthButtons";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import type { Locale } from "@/lib/i18n";
 import { withLocale } from "@/lib/i18n";
 
-export function SignInForm({ locale, nextPath }: { locale: Locale; nextPath: string }) {
+export function SignInForm({
+  googleEnabled,
+  locale,
+  nextPath,
+  telegramEnabled
+}: {
+  googleEnabled: boolean;
+  locale: Locale;
+  nextPath: string;
+  telegramEnabled: boolean;
+}) {
   const [feedback, setFeedback] = useState<FeedbackMessage | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -64,6 +75,12 @@ export function SignInForm({ locale, nextPath }: { locale: Locale; nextPath: str
     <>
       <form aria-busy={loading} className="container-qidra grid max-w-md gap-5" onSubmit={handleSubmit}>
         <h1 className="subtitle-28">{locale === "ru" ? "Вход" : "Sign in"}</h1>
+        <SocialAuthButtons googleEnabled={googleEnabled} locale={locale} mode="signIn" nextPath={nextPath} telegramEnabled={telegramEnabled} />
+        <div className="flex items-center gap-3 text-12 font-medium uppercase text-qidra-grayBlue">
+          <span className="h-px flex-1 bg-qidra-grayLight" />
+          {locale === "ru" ? "или email" : "or email"}
+          <span className="h-px flex-1 bg-qidra-grayLight" />
+        </div>
         <Input label="Email" name="email" type="email" placeholder="name@example.com" required />
         <Input label={locale === "ru" ? "Пароль" : "Password"} name="password" type="password" placeholder="********" required />
         <Button loading={loading} loadingLabel={locale === "ru" ? "Входим..." : "Signing in..."} type="submit">

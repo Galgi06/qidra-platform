@@ -1,13 +1,16 @@
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { FeedbackForm } from "@/components/ActionFeedback";
+import { SocialAuthButtons } from "@/components/auth/SocialAuthButtons";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { getLocale, type SearchParams } from "@/lib/i18n";
+import { getSocialAuthConfig } from "@/lib/social-auth";
 
 export default async function SignUpPage({ searchParams }: { searchParams?: SearchParams }) {
   const locale = await getLocale(searchParams);
+  const socialAuth = getSocialAuthConfig();
 
   return (
     <>
@@ -29,6 +32,18 @@ export default async function SignUpPage({ searchParams }: { searchParams?: Sear
           resetOnSubmit
         >
           <h1 className="subtitle-28">{locale === "ru" ? "Регистрация участника" : "Participant registration"}</h1>
+          <SocialAuthButtons
+            googleEnabled={socialAuth.googleEnabled}
+            locale={locale}
+            mode="signUp"
+            nextPath="/investor"
+            telegramEnabled={socialAuth.telegramEnabled}
+          />
+          <div className="flex items-center gap-3 text-12 font-medium uppercase text-qidra-grayBlue">
+            <span className="h-px flex-1 bg-qidra-grayLight" />
+            {locale === "ru" ? "или email" : "or email"}
+            <span className="h-px flex-1 bg-qidra-grayLight" />
+          </div>
           <Input label={locale === "ru" ? "Имя" : "Name"} name="name" placeholder={locale === "ru" ? "Ваше имя" : "Your name"} required />
           <Input label="Email" name="email" type="email" placeholder="name@example.com" required />
           <Input label={locale === "ru" ? "Пароль" : "Password"} name="password" type="password" placeholder="********" required />
