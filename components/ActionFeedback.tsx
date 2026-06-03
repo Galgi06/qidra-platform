@@ -75,10 +75,11 @@ type FeedbackFormProps = {
   className?: string;
   endpoint?: string;
   feedback: FeedbackMessage;
+  payload?: "json" | "form-data";
   resetOnSubmit?: boolean;
 };
 
-export function FeedbackForm({ children, className = "", endpoint, feedback, resetOnSubmit = false }: FeedbackFormProps) {
+export function FeedbackForm({ children, className = "", endpoint, feedback, payload = "json", resetOnSubmit = false }: FeedbackFormProps) {
   const [open, setOpen] = useState(false);
   const [activeFeedback, setActiveFeedback] = useState(feedback);
   const [submitting, setSubmitting] = useState(false);
@@ -97,12 +98,17 @@ export function FeedbackForm({ children, className = "", endpoint, feedback, res
 
       try {
         const formData = new FormData(form);
-        const payload = Object.fromEntries(formData.entries());
-        const response = await fetch(endpoint, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
+        const response =
+          payload === "form-data"
+            ? await fetch(endpoint, {
+                method: "POST",
+                body: formData
+              })
+            : await fetch(endpoint, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(Object.fromEntries(formData.entries()))
+              });
         const data = (await response.json().catch(() => ({}))) as { title?: string; message?: string };
 
         setActiveFeedback({
