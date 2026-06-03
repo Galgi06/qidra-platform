@@ -116,8 +116,8 @@ export const legalPages = [
     slug: "risk-disclaimer",
     title: { ru: "Risk Disclaimer", en: "Risk Disclaimer" },
     body: {
-      ru: "Инвестиции могут привести к частичной или полной потере капитала. Прошлые результаты и прогнозы не являются гарантией.",
-      en: "Investments may result in partial or total capital loss. Past performance and projections are not guarantees."
+      ru: "Участие в проектах может привести к частичной или полной потере капитала. Прошлые результаты и прогнозы не являются гарантией.",
+      en: "Participation in projects may result in partial or total capital loss. Past performance and projections are not guarantees."
     }
   },
   {

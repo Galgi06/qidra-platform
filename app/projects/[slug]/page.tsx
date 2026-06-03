@@ -15,6 +15,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
   const project = projects.find((item) => item.slug === slug);
   if (!project) notFound();
   const progress = Math.round((project.fundedUsdt / project.targetUsdt) * 100);
+  const riskLabel = locale === "ru" ? { Moderate: "Средний", High: "Высокий" }[project.riskLevel] ?? project.riskLevel : project.riskLevel;
 
   return (
     <>
@@ -54,7 +55,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                 </div>
                 <div className="flex justify-between gap-4">
                   <dt className="text-qidra-grayBlue">{locale === "ru" ? "Риск" : "Risk"}</dt>
-                  <dd>{project.riskLevel}</dd>
+                  <dd>{riskLabel}</dd>
                 </div>
               </dl>
               <ButtonLink href={withLocale(`/invest/${project.slug}`, locale)}>{locale === "ru" ? "Подать заявку" : "Create application"}</ButtonLink>
