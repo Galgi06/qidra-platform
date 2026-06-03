@@ -16,65 +16,117 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
   if (!project) notFound();
   const progress = Math.round((project.fundedUsdt / project.targetUsdt) * 100);
   const riskLabel = locale === "ru" ? { Moderate: "Средний", High: "Высокий" }[project.riskLevel] ?? project.riskLevel : project.riskLevel;
+  const isRu = locale === "ru";
 
   return (
     <>
       <Header locale={locale} path={`/projects/${project.slug}`} />
-      <main className="section">
-        <div className="container-qidra grid gap-8">
-          <Breadcrumbs
-            items={[
-              { label: "Qidra", href: withLocale("/", locale) },
-              { label: locale === "ru" ? "Проекты" : "Projects", href: withLocale("/projects", locale) },
-              { label: project.title[locale] }
-            ]}
-          />
-          <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
-            <div className="grid gap-5">
-              <ProjectStatusBadge status={project.status} locale={locale} />
-              <h1 className="title-48">{project.title[locale]}</h1>
-              <p className="text-18 text-qidra-grayBlue">{project.description[locale]}</p>
-              <ProjectGallery title={project.title[locale]} />
-            </div>
-            <aside className="surface grid content-start gap-5 p-6 shadow-qidra">
-              <div className="grid gap-2">
-                <ProgressBar value={progress} />
-                <div className="flex justify-between text-14 text-qidra-grayBlue">
-                  <span>{project.fundedUsdt.toLocaleString()} USDT</span>
-                  <span>{project.targetUsdt.toLocaleString()} USDT</span>
-                </div>
+      <main>
+        <section className="bg-qidra-grayLight px-5 py-12 sm:px-8 lg:px-11 lg:py-16">
+          <div className="mx-auto grid max-w-[1840px] gap-8">
+            <Breadcrumbs
+              items={[
+                { label: "Qidra", href: withLocale("/", locale) },
+                { label: locale === "ru" ? "Проекты" : "Projects", href: withLocale("/projects", locale) },
+                { label: project.title[locale] }
+              ]}
+            />
+            <div className="grid gap-8 lg:grid-cols-[1.15fr_0.85fr] lg:items-start">
+              <div className="grid gap-6">
+                <ProjectStatusBadge status={project.status} locale={locale} />
+                <h1 className="max-w-5xl text-[44px] font-medium leading-[1.1] tracking-[0] text-qidra-dark sm:text-[58px] lg:text-[72px]">
+                  {project.title[locale]}
+                </h1>
+                <p className="max-w-4xl text-20 text-qidra-grayBlue sm:text-[24px]">{project.description[locale]}</p>
               </div>
-              <dl className="grid gap-3 text-14">
-                <div className="flex justify-between gap-4">
-                  <dt className="text-qidra-grayBlue">{locale === "ru" ? "Структура" : "Structure"}</dt>
-                  <dd>{project.structure}</dd>
+              <aside className="grid gap-4 rounded-[20px] bg-white p-6 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] sm:p-8">
+                <div className="grid gap-2">
+                  <ProgressBar value={progress} />
+                  <div className="flex justify-between text-14 text-qidra-grayBlue">
+                    <span>{project.fundedUsdt.toLocaleString()} USDT</span>
+                    <span>{project.targetUsdt.toLocaleString()} USDT</span>
+                  </div>
                 </div>
-                <div className="flex justify-between gap-4">
-                  <dt className="text-qidra-grayBlue">{locale === "ru" ? "Локация" : "Location"}</dt>
-                  <dd>{project.location}</dd>
-                </div>
-                <div className="flex justify-between gap-4">
-                  <dt className="text-qidra-grayBlue">{locale === "ru" ? "Риск" : "Risk"}</dt>
-                  <dd>{riskLabel}</dd>
-                </div>
-              </dl>
-              <ButtonLink href={withLocale(`/invest/${project.slug}`, locale)}>{locale === "ru" ? "Подать заявку" : "Create application"}</ButtonLink>
-              <p className="text-12 text-qidra-grayBlue">{dictionary[locale].common.noFixedYield}</p>
-            </aside>
+                <dl className="grid gap-3 text-14">
+                  <ProjectFact label={isRu ? "Структура" : "Structure"} value={project.structure} />
+                  <ProjectFact label={isRu ? "Локация" : "Location"} value={project.location} />
+                  <ProjectFact label={isRu ? "Риск" : "Risk"} value={riskLabel} />
+                </dl>
+                <ButtonLink href={withLocale(`/invest/${project.slug}`, locale)} className="h-14">
+                  {isRu ? "Подать заявку" : "Create application"}
+                </ButtonLink>
+                <p className="text-12 text-qidra-grayBlue">{dictionary[locale].common.noFixedYield}</p>
+              </aside>
+            </div>
           </div>
-          <section className="grid gap-4">
-            <h2 className="subtitle-28">{locale === "ru" ? "Документы проекта" : "Project documents"}</h2>
+        </section>
+
+        <section className="px-5 py-12 sm:px-8 lg:px-11 lg:py-16">
+          <div className="mx-auto grid max-w-[1840px] gap-12">
+            <ProjectGallery title={project.title[locale]} locale={locale} />
+            <div className="grid gap-6 lg:grid-cols-3">
+              <InfoPanel
+                title={isRu ? "Формат участия" : "Participation format"}
+                text={
+                  isRu
+                    ? "Условия проекта раскрываются до подачи заявки, включая структуру договора и порядок взаимодействия сторон."
+                    : "Project terms are disclosed before application, including contract structure and cooperation process."
+                }
+              />
+              <InfoPanel
+                title={isRu ? "Проверка проекта" : "Project review"}
+                text={
+                  isRu
+                    ? "Юридическая, экономическая и шариатская экспертиза помогают участникам принимать решение на основе документов."
+                    : "Legal, economic and Sharia review help participants make decisions based on documents."
+                }
+              />
+              <InfoPanel
+                title={isRu ? "Открытая отчётность" : "Open reporting"}
+                text={
+                  isRu
+                    ? "После публикации проект сопровождается обновлениями, статусами и документами в кабинете участника."
+                    : "After publication, the project is supported with updates, statuses and documents in the participant cabinet."
+                }
+              />
+            </div>
+          </div>
+        </section>
+
+        <section className="px-5 pb-16 sm:px-8 lg:px-11 lg:pb-24">
+          <div className="mx-auto grid max-w-[1840px] gap-5">
+            <h2 className="text-[36px] font-medium leading-tight tracking-[0] text-qidra-dark sm:text-[44px]">
+              {isRu ? "Документы проекта" : "Project documents"}
+            </h2>
             <div className="grid gap-3 lg:grid-cols-2">
               {project.documents.length ? (
                 project.documents.map((document) => <DocumentItem key={document.href} title={document.title[locale]} href={document.href} meta={document.kind} />)
               ) : (
-                <p className="text-16 text-qidra-grayBlue">{locale === "ru" ? "Документы появятся после подготовки проекта." : "Documents will appear after the project is prepared."}</p>
+                <p className="text-16 text-qidra-grayBlue">{isRu ? "Документы появятся после подготовки проекта." : "Documents will appear after the project is prepared."}</p>
               )}
             </div>
-          </section>
-        </div>
+          </div>
+        </section>
       </main>
       <Footer locale={locale} />
     </>
+  );
+}
+
+function ProjectFact({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex min-w-0 flex-wrap justify-between gap-2 border-b border-qidra-grayMedium/20 pb-3 last:border-b-0 last:pb-0">
+      <dt className="text-qidra-grayBlue">{label}</dt>
+      <dd className="max-w-full break-words text-right font-medium text-qidra-dark">{value}</dd>
+    </div>
+  );
+}
+
+function InfoPanel({ title, text }: { title: string; text: string }) {
+  return (
+    <article className="rounded-[20px] bg-qidra-grayLight p-7 sm:p-8">
+      <h3 className="text-[28px] font-medium leading-tight tracking-[0] text-qidra-dark">{title}</h3>
+      <p className="mt-5 text-18 text-qidra-grayBlue">{text}</p>
+    </article>
   );
 }
