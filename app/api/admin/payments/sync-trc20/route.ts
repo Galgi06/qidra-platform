@@ -82,10 +82,10 @@ function syncMessage(result: Awaited<ReturnType<typeof syncWalletDeposits>>, loc
   const creditedUsdt = formatUsdt(new Prisma.Decimal(result.creditedUsdt));
 
   if (localeRu) {
-    return `Проверено кошельков: ${result.scannedWallets}. Зачислено переводов: ${result.creditedCount} на сумму ${creditedUsdt}. Уже учтено: ${result.skippedCount}.`;
+    return `Проверено кошельков: ${result.scannedWallets}. Зачислено переводов: ${result.creditedCount} на сумму ${creditedUsdt}. Подтверждено заявок на проверке: ${result.confirmedPendingCount}. Отклонено ошибочных заявок: ${result.rejectedClaimCount}. Уже учтено: ${result.skippedCount}.`;
   }
 
-  return `Wallets scanned: ${result.scannedWallets}. Credited transfers: ${result.creditedCount} for ${creditedUsdt}. Already accounted: ${result.skippedCount}.`;
+  return `Wallets scanned: ${result.scannedWallets}. Credited transfers: ${result.creditedCount} for ${creditedUsdt}. Pending requests confirmed: ${result.confirmedPendingCount}. Mismatched claims rejected: ${result.rejectedClaimCount}. Already accounted: ${result.skippedCount}.`;
 }
 
 function formatUsdt(value: Prisma.Decimal) {

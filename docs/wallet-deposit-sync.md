@@ -7,8 +7,10 @@ Qidra credits USDT TRC20 deposits by scanning each participant's personal TRC20 
 1. Each participant receives a personal `Wallet.trc20Address`.
 2. The sync job calls the payment verification provider for confirmed incoming USDT TRC20 transfers to that address.
 3. A transfer is credited only when its `transaction_id` has not already been used for a confirmed deposit.
-4. The wallet `availableUsdt` balance is incremented inside the same database transaction that creates the `WalletTransaction`.
-5. Re-running the sync is idempotent: already credited transaction hashes are skipped.
+4. If a pending deposit request already uses the same hash, the sync confirms it only when the wallet and amount match the on-chain transfer.
+5. Pending duplicate or mismatched claims are rejected before the real transfer is credited to the correct wallet.
+6. The wallet `availableUsdt` balance is incremented inside the same database transaction that creates or confirms the `WalletTransaction`.
+7. Re-running the sync is idempotent: already credited transaction hashes are skipped.
 
 ## Manual Admin Sync
 

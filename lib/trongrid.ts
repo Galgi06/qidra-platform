@@ -21,7 +21,7 @@ type TronGridTrc20Transfer = {
   };
 };
 
-type VerifiedTronTransfer = {
+export type VerifiedTronTransfer = {
   amountUsdt: Prisma.Decimal;
   blockTimestamp?: number;
   contractAddress: string;
