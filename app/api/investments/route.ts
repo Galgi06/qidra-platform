@@ -1,4 +1,4 @@
-import { InvestmentStatus, Prisma } from "@prisma/client";
+import { InvestmentStatus, KycStatus, Prisma } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
@@ -28,6 +28,10 @@ type SessionUser = {
 
 function isRu(request: NextRequest) {
   return request.nextUrl.searchParams.get("lang") !== "en";
+}
+
+function formatUsdt(value: Prisma.Decimal) {
+  return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 6 }).format(value.toNumber())} USDT`;
 }
 
 export async function POST(request: NextRequest) {
@@ -78,7 +82,7 @@ export async function POST(request: NextRequest) {
   const reviewApplication = await prisma.kycApplication.findFirst({
     where: {
       userId,
-      status: { in: ["SUBMITTED", "APPROVED"] }
+      status: KycStatus.APPROVED
     },
     orderBy: { createdAt: "desc" }
   });
@@ -89,22 +93,57 @@ export async function POST(request: NextRequest) {
         title: localeRu ? "Заполните профиль" : "Complete your profile",
         message:
           localeRu
-            ? "Перед заявкой на участие отправьте профиль и документы на проверку."
-            : "Submit your profile and documents for review before applying for participation."
+            ? "Перед заявкой на участие дождитесь одобрения профиля и документов."
+            : "Wait until your profile and documents are approved before applying for participation."
       },
       { status: 403 }
     );
   }
 
-  await prisma.$transaction(async (tx) => {
-    const activeApplication = await tx.investmentApplication.findFirst({
-      where: {
-        userId,
-        projectId: project.id,
-        status: InvestmentStatus.PENDING
+  const wallet = await prisma.wallet.findUnique({
+    where: { userId },
+    select: { availableUsdt: true }
+  });
+  const activeApplication = await prisma.investmentApplication.findFirst({
+    where: {
+      userId,
+      projectId: project.id,
+      status: InvestmentStatus.PENDING
+    },
+    orderBy: { createdAt: "desc" }
+  });
+  const reservedApplications = await prisma.investmentApplication.aggregate({
+    _sum: { amountUsdt: true },
+    where: {
+      userId,
+      status: InvestmentStatus.PENDING,
+      NOT: activeApplication ? { id: activeApplication.id } : undefined
+    }
+  });
+  const availableUsdt = wallet?.availableUsdt ?? new Prisma.Decimal(0);
+  const reservedUsdt = reservedApplications._sum.amountUsdt ?? new Prisma.Decimal(0);
+  const requestedUsdt = new Prisma.Decimal(parsed.data.amount);
+  const rawFreeUsdt = availableUsdt.minus(reservedUsdt);
+  const freeUsdt = rawFreeUsdt.gt(0) ? rawFreeUsdt : new Prisma.Decimal(0);
+
+  if (freeUsdt.lt(requestedUsdt)) {
+    const shortfallUsdt = requestedUsdt.minus(freeUsdt);
+
+    return NextResponse.json(
+      {
+        title: localeRu ? "Недостаточно доступного баланса" : "Insufficient available balance",
+        message:
+          localeRu
+            ? `На доступном балансе ${formatUsdt(freeUsdt)}. Для этой заявки нужно пополнить ещё ${formatUsdt(shortfallUsdt)}.`
+            : `Your available balance is ${formatUsdt(freeUsdt)}. Top up another ${formatUsdt(shortfallUsdt)} for this application.`,
+        availableUsdt: freeUsdt.toString(),
+        shortfallUsdt: shortfallUsdt.toString()
       },
-      orderBy: { createdAt: "desc" }
-    });
+      { status: 409 }
+    );
+  }
+
+  await prisma.$transaction(async (tx) => {
     const applicationData = {
       amountUsdt: parsed.data.amount,
       termsAcceptedAt: new Date(),

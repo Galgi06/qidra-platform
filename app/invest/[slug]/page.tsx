@@ -1,55 +1,66 @@
 import { notFound } from "next/navigation";
-import { FeedbackForm } from "@/components/ActionFeedback";
-import { Checkbox } from "@/components/ui/Checkbox";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
-import { InvestmentAmountInput } from "@/components/InvestmentAmountInput";
-import { NotificationCard } from "@/components/NotificationCard";
-import { Button } from "@/components/ui/Button";
+import { InvestmentApplicationForm } from "@/components/InvestmentApplicationForm";
 import { requireAuth } from "@/lib/access";
 import { dictionary, getLocale, type SearchParams } from "@/lib/i18n";
+import { prisma } from "@/lib/prisma";
 import { getProjectBySlug } from "@/lib/project-catalog";
 
 export const dynamic = "force-dynamic";
 
 export default async function InvestPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams?: SearchParams }) {
   const [{ slug }, locale] = await Promise.all([params, getLocale(searchParams)]);
-  await requireAuth(locale, `/invest/${slug}`);
+  const session = await requireAuth(locale, `/invest/${slug}`);
+  const userId = session.user?.id ?? "";
   const project = await getProjectBySlug(slug);
   if (!project) notFound();
+  const [latestKyc, wallet, activeApplication] = await Promise.all([
+    prisma.kycApplication.findFirst({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+      select: { status: true }
+    }),
+    prisma.wallet.findUnique({
+      where: { userId },
+      select: { availableUsdt: true }
+    }),
+    prisma.investmentApplication.findFirst({
+      where: {
+        userId,
+        project: { slug },
+        status: "PENDING"
+      },
+      orderBy: { createdAt: "desc" },
+      select: { id: true }
+    })
+  ]);
+  const reservedApplications = await prisma.investmentApplication.aggregate({
+    _sum: { amountUsdt: true },
+    where: {
+      userId,
+      status: "PENDING",
+      NOT: activeApplication ? { id: activeApplication.id } : undefined
+    }
+  });
+  const availableUsdt = Number(wallet?.availableUsdt?.toString() ?? 0);
+  const reservedUsdt = Number(reservedApplications._sum.amountUsdt?.toString() ?? 0);
+  const freeUsdt = Math.max(availableUsdt - reservedUsdt, 0);
+  const kycApproved = latestKyc?.status === "APPROVED";
 
   return (
     <>
       <Header locale={locale} path={`/invest/${project.slug}`} />
       <main className="section">
-        <FeedbackForm
-          className="container-qidra grid max-w-2xl gap-5"
+        <InvestmentApplicationForm
           endpoint={`/api/investments?lang=${locale}`}
-          feedback={{
-            title: locale === "ru" ? "Заявка создана" : "Application created",
-            text:
-              locale === "ru"
-                ? "Мы приняли заявку на участие. Проверьте кабинет: статус появится после рассмотрения проекта и условий."
-                : "We received your participation application. Check your cabinet: the status will appear after the project and terms are reviewed.",
-            buttonLabel: locale === "ru" ? "Понятно" : "Got it",
-            dismissLabel: locale === "ru" ? "Закрыть уведомление" : "Close notification",
-            tone: "success"
-          }}
-          resetOnSubmit
-        >
-          <h1 className="subtitle-28">{locale === "ru" ? "Заявка на участие" : "Participation application"}</h1>
-          <p className="text-18 text-qidra-grayBlue">{project.title[locale]}</p>
-          <input name="projectSlug" type="hidden" value={project.slug} />
-          <InvestmentAmountInput locale={locale} />
-          <NotificationCard title={locale === "ru" ? "Без гарантии доходности" : "No guaranteed returns"} text={dictionary[locale].common.noFixedYield} />
-          <Checkbox name="termsAccepted" required>
-            {locale === "ru" ? "Я изучил условия проекта и предупреждение о рисках." : "I reviewed project terms and the risk notice."}
-          </Checkbox>
-          <Checkbox name="contractAccepted" required>
-            {locale === "ru" ? "Я принимаю договорную структуру Mudaraba/Musharaka." : "I accept the Mudaraba/Musharaka contractual structure."}
-          </Checkbox>
-          <Button type="submit">{locale === "ru" ? "Создать заявку" : "Create application"}</Button>
-        </FeedbackForm>
+          freeUsdt={freeUsdt}
+          kycApproved={kycApproved}
+          locale={locale}
+          noFixedYieldText={dictionary[locale].common.noFixedYield}
+          projectSlug={project.slug}
+          projectTitle={project.title[locale]}
+        />
       </main>
       <Footer locale={locale} />
     </>

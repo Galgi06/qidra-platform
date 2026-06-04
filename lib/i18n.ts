@@ -1,5 +1,5 @@
 export type Locale = "ru" | "en";
-export type SearchParams = { lang?: string | string[] };
+export type SearchParams = Record<string, string | string[] | undefined> & { lang?: string | string[] };
 type MaybePromise<T> = T | Promise<T>;
 
 export async function getLocale(searchParams?: MaybePromise<SearchParams>): Promise<Locale> {

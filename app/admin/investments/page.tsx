@@ -14,7 +14,15 @@ export default async function AdminInvestmentsPage({ searchParams }: { searchPar
   const requests = await prisma.investmentApplication.findMany({
     include: {
       project: true,
-      user: true
+      user: {
+        include: {
+          wallet: true,
+          kycApplications: {
+            orderBy: { createdAt: "desc" },
+            take: 1
+          }
+        }
+      }
     },
     orderBy: { createdAt: "desc" },
     take: 50
@@ -44,8 +52,13 @@ export default async function AdminInvestmentsPage({ searchParams }: { searchPar
         <section className="section">
           <div className="container-qidra grid gap-4">
             {requests.length ? (
-              requests.map((request) => (
-                <div key={request.id} className="surface grid gap-4 p-6 lg:grid-cols-[0.7fr_1fr_1fr_0.8fr_auto] lg:items-center">
+              requests.map((request) => {
+                const latestKycStatus = request.user.kycApplications[0]?.status;
+                const hasEnoughBalance = Boolean(request.user.wallet?.availableUsdt.gte(request.amountUsdt));
+                const canConfirm = latestKycStatus === "APPROVED" && hasEnoughBalance;
+
+                return (
+                <div key={request.id} className="surface grid gap-4 p-6 lg:grid-cols-[0.7fr_1fr_1fr_0.8fr_0.8fr_auto] lg:items-center">
                   <div>
                     <p className="text-16 font-medium text-qidra-dark">{request.id.slice(-8).toUpperCase()}</p>
                     <p className="mt-1 text-14 text-qidra-grayBlue">{formatDate(request.createdAt, locale)}</p>
@@ -53,17 +66,24 @@ export default async function AdminInvestmentsPage({ searchParams }: { searchPar
                   <p className="text-16 text-qidra-grayBlue">{request.user.name || request.user.email}</p>
                   <p className="text-16 text-qidra-grayBlue">{locale === "ru" ? request.project.titleRu : request.project.titleEn}</p>
                   <p className="text-16 font-medium text-qidra-dark">{formatUsdt(request.amountUsdt)}</p>
+                  <div className="grid gap-1 text-14">
+                    <p className="font-medium text-qidra-dark">{locale === "ru" ? "KYC" : "KYC"}: {kycStatusLabel(latestKycStatus, locale)}</p>
+                    <p className={hasEnoughBalance ? "text-qidra-green" : "text-qidra-red"}>
+                      {locale === "ru" ? "Баланс" : "Balance"}: {formatUsdt(request.user.wallet?.availableUsdt ?? 0)}
+                    </p>
+                  </div>
                   <div className="flex items-center gap-3">
                     <ProjectStatusBadge status={investmentStatus(request.status)} locale={locale} />
                     {request.status === "PENDING" ? (
                       <div className="flex flex-col gap-2 sm:flex-row">
-                        <InvestmentActionForm action="confirm" endpoint={`/api/admin/investments/${request.id}?lang=${locale}`} locale={locale} />
+                        <InvestmentActionForm action="confirm" disabled={!canConfirm} endpoint={`/api/admin/investments/${request.id}?lang=${locale}`} locale={locale} />
                         <InvestmentActionForm action="reject" endpoint={`/api/admin/investments/${request.id}?lang=${locale}`} locale={locale} />
                       </div>
                     ) : null}
                   </div>
                 </div>
-              ))
+                );
+              })
             ) : (
               <NotificationCard
                 title={locale === "ru" ? "Заявок пока нет" : "No applications yet"}
@@ -78,7 +98,7 @@ export default async function AdminInvestmentsPage({ searchParams }: { searchPar
   );
 }
 
-function InvestmentActionForm({ action, endpoint, locale }: { action: "confirm" | "reject"; endpoint: string; locale: "ru" | "en" }) {
+function InvestmentActionForm({ action, disabled = false, endpoint, locale }: { action: "confirm" | "reject"; disabled?: boolean; endpoint: string; locale: "ru" | "en" }) {
   const confirm = action === "confirm";
 
   return (
@@ -101,19 +121,20 @@ function InvestmentActionForm({ action, endpoint, locale }: { action: "confirm" 
       refreshOnSuccess
     >
       <input name="action" type="hidden" value={action} />
-      <ActionButton confirm={confirm} locale={locale} />
+      <ActionButton confirm={confirm} disabled={disabled} locale={locale} />
     </FeedbackForm>
   );
 }
 
-function ActionButton({ confirm, locale }: { confirm: boolean; locale: "ru" | "en" }) {
+function ActionButton({ confirm, disabled, locale }: { confirm: boolean; disabled?: boolean; locale: "ru" | "en" }) {
   return (
     <button
       className={`inline-flex h-10 items-center justify-center rounded-qidra border px-4 text-14 font-medium transition-colors ${
         confirm
-          ? "border-qidra-accent bg-qidra-accent text-white hover:bg-qidra-accent80"
+          ? "border-qidra-accent bg-qidra-accent text-white hover:bg-qidra-accent80 disabled:cursor-not-allowed disabled:opacity-50"
           : "border-qidra-grayMedium bg-transparent text-qidra-dark hover:border-qidra-red hover:text-qidra-red"
       }`}
+      disabled={disabled}
       type="submit"
     >
       {confirm ? (locale === "ru" ? "Подтвердить" : "Confirm") : locale === "ru" ? "Отклонить" : "Reject"}
@@ -125,6 +146,13 @@ function investmentStatus(status: string): BadgeStatus {
   if (status === "CONFIRMED") return "confirmed";
   if (status === "REJECTED" || status === "CANCELLED") return "rejected";
   return "pending";
+}
+
+function kycStatusLabel(status: string | undefined, locale: "ru" | "en") {
+  if (status === "APPROVED") return locale === "ru" ? "одобрен" : "approved";
+  if (status === "SUBMITTED") return locale === "ru" ? "на проверке" : "under review";
+  if (status === "REJECTED") return locale === "ru" ? "отклонён" : "rejected";
+  return locale === "ru" ? "не отправлен" : "not submitted";
 }
 
 function formatUsdt(value: { toString(): string }) {

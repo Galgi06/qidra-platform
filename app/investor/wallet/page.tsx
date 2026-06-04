@@ -14,7 +14,8 @@ import { getPublicTronPaymentConfig } from "@/lib/trongrid";
 import { ensureUserDepositWallet } from "@/lib/wallet-addresses";
 
 export default async function WalletPage({ searchParams }: { searchParams?: SearchParams }) {
-  const locale = await getLocale(searchParams);
+  const params = await searchParams;
+  const locale = await getLocale(params);
   const session = await requireAuth(locale, "/investor/wallet");
   const isRu = locale === "ru";
   const userId = session.user?.id ?? "";
@@ -32,6 +33,7 @@ export default async function WalletPage({ searchParams }: { searchParams?: Sear
   const depositAddress = wallet?.trc20Address ?? issuedWallet.trc20Address;
   const availableUsdt = wallet?.availableUsdt ?? 0;
   const pendingUsdt = wallet?.pendingUsdt ?? 0;
+  const prefilledAmount = normalizeDepositAmount(searchParamString(params?.amount));
 
   return (
     <>
@@ -108,7 +110,7 @@ export default async function WalletPage({ searchParams }: { searchParams?: Sear
                   text={isRu ? "Qidra примет только подтверждённый входящий USDT TRC20-перевод на ваш личный адрес и с точно такой же суммой." : "Qidra will accept only a confirmed incoming USDT TRC20 transfer to your personal address with the exact submitted amount."}
                 />
                 <Input label="Transaction hash" name="txHash" placeholder="TRC20 transaction hash" required />
-                <Input label="Amount USDT" name="amount" inputMode="decimal" placeholder="1000" required />
+                <Input label="Amount USDT" name="amount" inputMode="decimal" placeholder="1000" required defaultValue={prefilledAmount} />
                 <Button disabled={!depositAddress || !tronPayment.verificationConfigured} type="submit">
                   {isRu ? "Проверить и пополнить" : "Verify and deposit"}
                 </Button>
@@ -193,4 +195,18 @@ function formatDate(date: Date, locale: "ru" | "en") {
     month: "short",
     year: "numeric"
   }).format(date);
+}
+
+function searchParamString(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function normalizeDepositAmount(value: string | undefined) {
+  const normalized = value?.trim().replace(",", ".").replace(/\s/g, "");
+
+  if (!normalized || !/^\d+(\.\d{1,6})?$/.test(normalized) || Number(normalized) <= 0) {
+    return undefined;
+  }
+
+  return normalized;
 }

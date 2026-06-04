@@ -1,4 +1,4 @@
-import { InvestmentStatus, PaymentStatus, TransactionType } from "@prisma/client";
+import { InvestmentStatus, KycStatus, PaymentStatus, TransactionType } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
@@ -55,7 +55,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       project: true,
       user: {
         include: {
-          wallet: true
+          wallet: true,
+          kycApplications: {
+            orderBy: { createdAt: "desc" },
+            take: 1
+          }
         }
       }
     }
@@ -83,6 +87,20 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   if (parsed.data.action === "confirm") {
     const wallet = application.user.wallet;
+    const latestKyc = application.user.kycApplications[0];
+
+    if (latestKyc?.status !== KycStatus.APPROVED) {
+      return NextResponse.json(
+        {
+          title: localeRu ? "KYC не одобрен" : "KYC is not approved",
+          message:
+            localeRu
+              ? "Перед подтверждением заявки профиль и документы участника должны быть одобрены."
+              : "Before confirming the application, the participant profile and documents must be approved."
+        },
+        { status: 409 }
+      );
+    }
 
     if (!wallet || wallet.availableUsdt.lt(application.amountUsdt)) {
       return NextResponse.json(
