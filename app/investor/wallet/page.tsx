@@ -3,6 +3,7 @@ import { FeedbackForm } from "@/components/ActionFeedback";
 import { Header } from "@/components/Header";
 import { NotificationCard } from "@/components/NotificationCard";
 import { Tabs } from "@/components/Tabs";
+import { WalletDepositAddress } from "@/components/WalletDepositAddress";
 import { WalletOperationItem } from "@/components/WalletOperationItem";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -83,13 +84,7 @@ export default async function WalletPage({ searchParams }: { searchParams?: Sear
               >
                 <h2 className="text-[32px] font-medium leading-tight tracking-[0] text-qidra-dark">{isRu ? "Создать пополнение" : "Create deposit"}</h2>
                 {tronPayment.walletConfigured ? (
-                  <div className="grid gap-2 rounded-qidra border border-qidra-grayLight bg-qidra-grayLight p-4">
-                    <p className="text-14 font-medium text-qidra-dark">{isRu ? "Адрес Qidra для USDT TRC20" : "Qidra USDT TRC20 address"}</p>
-                    <code className="break-all rounded-qidra bg-white px-3 py-2 text-14 text-qidra-dark">{tronPayment.walletAddress}</code>
-                    <p className="text-12 text-qidra-grayBlue">
-                      {isRu ? "Отправляйте только USDT в сети TRC20." : "Send only USDT on the TRC20 network."}
-                    </p>
-                  </div>
+                  <WalletDepositAddress address={tronPayment.walletAddress} locale={locale} />
                 ) : (
                   <NotificationCard
                     title={isRu ? "Адрес приёма скоро будет подключён" : "Receiving address will be connected soon"}

@@ -1,11 +1,16 @@
 import Image from "next/image";
 import Link from "next/link";
+import { getServerSession } from "next-auth";
 import type { Locale } from "@/lib/i18n";
 import { dictionary, withLocale } from "@/lib/i18n";
 import { ButtonLink } from "@/components/ui/Button";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { authOptions } from "@/lib/next-auth";
+import { SignOutButton } from "@/components/auth/SignOutButton";
 
-export function Header({ locale, path = "/" }: { locale: Locale; path?: string }) {
+export async function Header({ locale, path = "/" }: { locale: Locale; path?: string }) {
+  const session = await getServerSession(authOptions);
+  const signedIn = Boolean(session?.user);
   const t = dictionary[locale].nav;
   const links = [
     { href: "/projects", label: t.projects },
@@ -28,14 +33,20 @@ export function Header({ locale, path = "/" }: { locale: Locale; path?: string }
         </nav>
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
           <LanguageSwitcher locale={locale} path={path} />
-          <div className="hidden sm:block">
-            <ButtonLink href={withLocale("/auth/sign-up", locale)} size="sm" variant="outline" className="shrink-0">
-              {t.signUp}
-            </ButtonLink>
-          </div>
-          <ButtonLink href={withLocale("/auth/sign-in", locale)} size="sm" variant="dark" className="shrink-0">
-            {t.signIn}
-          </ButtonLink>
+          {signedIn ? (
+            <SignOutButton callbackUrl={withLocale("/", locale)} label={locale === "ru" ? "Выход" : "Sign out"} />
+          ) : (
+            <>
+              <div className="hidden sm:block">
+                <ButtonLink href={withLocale("/auth/sign-up", locale)} size="sm" variant="outline" className="shrink-0">
+                  {t.signUp}
+                </ButtonLink>
+              </div>
+              <ButtonLink href={withLocale("/auth/sign-in", locale)} size="sm" variant="dark" className="shrink-0">
+                {t.signIn}
+              </ButtonLink>
+            </>
+          )}
         </div>
       </div>
       <nav className="container-qidra flex gap-5 overflow-x-auto border-t border-qidra-grayLight py-3 text-14 font-medium text-qidra-grayBlue lg:hidden">
@@ -44,9 +55,11 @@ export function Header({ locale, path = "/" }: { locale: Locale; path?: string }
             {link.label}
           </Link>
         ))}
-        <Link href={withLocale("/auth/sign-up", locale)} className="shrink-0 font-semibold text-qidra-accent sm:hidden">
-          {t.signUp}
-        </Link>
+        {!signedIn ? (
+          <Link href={withLocale("/auth/sign-up", locale)} className="shrink-0 font-semibold text-qidra-accent sm:hidden">
+            {t.signUp}
+          </Link>
+        ) : null}
       </nav>
     </header>
   );
