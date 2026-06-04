@@ -97,6 +97,7 @@ export default async function KycPage({ searchParams }: { searchParams?: SearchP
                 tone: "success"
               }}
               payload="form-data"
+              refreshOnSuccess
             >
               <div>
                 <h2 className="text-[32px] font-medium leading-tight tracking-[0] text-qidra-dark">{isRu ? "Анкета" : "Profile form"}</h2>
