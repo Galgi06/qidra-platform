@@ -1,3 +1,4 @@
+import { FeedbackForm } from "@/components/ActionFeedback";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { NotificationCard } from "@/components/NotificationCard";
@@ -19,6 +20,15 @@ export default async function InvestmentsPage({ searchParams }: { searchParams?:
     include: { project: true },
     orderBy: { createdAt: "desc" }
   });
+  const wallet = await prisma.wallet.findUnique({
+    where: { userId },
+    select: { availableUsdt: true }
+  });
+  const pendingTotal = applications
+    .filter((application) => application.status === "PENDING")
+    .reduce((total, application) => total + Number(application.amountUsdt.toString()), 0);
+  const availableUsdt = Number(wallet?.availableUsdt.toString() ?? 0);
+  const freeUsdt = Math.max(availableUsdt - pendingTotal, 0);
 
   return (
     <>
@@ -50,9 +60,19 @@ export default async function InvestmentsPage({ searchParams }: { searchParams?:
 
         <section className="px-5 py-12 sm:px-8 lg:px-11 lg:py-16">
           <div className="mx-auto grid max-w-[1840px] gap-5">
+            <div className="grid gap-4 md:grid-cols-3">
+              <SummaryCard label={isRu ? "Доступный баланс" : "Available balance"} value={formatUsdt(availableUsdt)} />
+              <SummaryCard label={isRu ? "В заявках на проверке" : "Pending applications"} value={formatUsdt(pendingTotal)} />
+              <SummaryCard label={isRu ? "Свободно для новых заявок" : "Free for new applications"} value={formatUsdt(freeUsdt)} tone={freeUsdt > 0 ? "success" : "warning"} />
+            </div>
             {applications.length ? (
               <div className="grid gap-4">
-                {applications.map((application) => (
+                {applications.map((application) => {
+                  const amount = Number(application.amountUsdt.toString());
+                  const balanceWarning = application.status === "PENDING" && pendingTotal > availableUsdt;
+                  const shortfall = Math.max(pendingTotal - availableUsdt, 0);
+
+                  return (
                   <article key={application.id} className="rounded-[20px] bg-white p-6 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] sm:p-8">
                     <div className="grid gap-5 lg:grid-cols-[1.2fr_0.7fr_0.7fr_auto] lg:items-center">
                       <div>
@@ -75,8 +95,29 @@ export default async function InvestmentsPage({ searchParams }: { searchParams?:
                         {isRu ? "Документы" : "Documents"}
                       </ButtonLink>
                     </div>
+                    {balanceWarning ? (
+                      <div className="mt-5 grid gap-3 rounded-qidra border border-qidra-gold bg-yellow-50 p-4 lg:grid-cols-[1fr_auto_auto] lg:items-center">
+                        <div>
+                          <p className="text-16 font-medium text-qidra-dark">{isRu ? "Недостаточно баланса для подтверждения" : "Insufficient balance for confirmation"}</p>
+                          <p className="mt-1 text-14 text-qidra-grayBlue">
+                            {isRu
+                              ? `На балансе ${formatUsdt(availableUsdt)}, на проверке заявок на ${formatUsdt(pendingTotal)}. Пополните ${formatUsdt(shortfall)} или отмените лишнюю заявку.`
+                              : `Balance is ${formatUsdt(availableUsdt)}, pending applications total ${formatUsdt(pendingTotal)}. Top up ${formatUsdt(shortfall)} or cancel an extra application.`}
+                          </p>
+                        </div>
+                        <ButtonLink href={withLocale(`/investor/wallet?amount=${formatAmountForInput(shortfall)}`, locale)} size="sm">
+                          {isRu ? "Пополнить разницу" : "Top up difference"}
+                        </ButtonLink>
+                        <CancelApplicationForm applicationId={application.id} locale={locale} />
+                      </div>
+                    ) : application.status === "PENDING" ? (
+                      <div className="mt-5 flex justify-end">
+                        <CancelApplicationForm applicationId={application.id} locale={locale} />
+                      </div>
+                    ) : null}
                   </article>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <section className="grid gap-5 rounded-[20px] bg-white p-6 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] sm:p-8 lg:grid-cols-[1fr_auto] lg:items-center">
@@ -95,6 +136,39 @@ export default async function InvestmentsPage({ searchParams }: { searchParams?:
   );
 }
 
+function SummaryCard({ label, tone = "default", value }: { label: string; tone?: "default" | "success" | "warning"; value: string }) {
+  const color = tone === "success" ? "bg-green-50 text-qidra-green" : tone === "warning" ? "bg-yellow-50 text-qidra-dark" : "bg-white text-qidra-dark";
+
+  return (
+    <article className={`rounded-[20px] p-6 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] ${color}`}>
+      <p className="text-14 font-medium text-qidra-grayBlue">{label}</p>
+      <p className="mt-3 text-[28px] font-medium leading-tight tracking-[0]">{value}</p>
+    </article>
+  );
+}
+
+function CancelApplicationForm({ applicationId, locale }: { applicationId: string; locale: "ru" | "en" }) {
+  return (
+    <FeedbackForm
+      className="contents"
+      endpoint={`/api/investments/${applicationId}?lang=${locale}`}
+      feedback={{
+        title: locale === "ru" ? "Заявка отменена" : "Application cancelled",
+        text: locale === "ru" ? "Заявка снята с проверки. Страница обновится." : "The application was removed from review. The page will refresh.",
+        buttonLabel: locale === "ru" ? "Понятно" : "Got it",
+        dismissLabel: locale === "ru" ? "Закрыть уведомление" : "Close notification",
+        tone: "warning"
+      }}
+      refreshOnSuccess
+    >
+      <input name="action" type="hidden" value="cancel" />
+      <button className="inline-flex h-10 items-center justify-center rounded-qidra border border-qidra-grayMedium bg-white px-4 text-14 font-medium text-qidra-dark transition-colors hover:border-qidra-red hover:text-qidra-red" type="submit">
+        {locale === "ru" ? "Отменить заявку" : "Cancel application"}
+      </button>
+    </FeedbackForm>
+  );
+}
+
 function investmentStatus(status: string): BadgeStatus {
   if (status === "CONFIRMED") return "confirmed";
   if (status === "REJECTED" || status === "CANCELLED") return "rejected";
@@ -104,6 +178,10 @@ function investmentStatus(status: string): BadgeStatus {
 function formatUsdt(value: { toString(): string }) {
   const amount = Number(value.toString());
   return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(amount)} USDT`;
+}
+
+function formatAmountForInput(value: number) {
+  return Math.max(value, 0).toFixed(6).replace(/\.?0+$/, "");
 }
 
 function formatDate(date: Date, locale: "ru" | "en") {

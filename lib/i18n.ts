@@ -9,7 +9,7 @@ export async function getLocale(searchParams?: MaybePromise<SearchParams>): Prom
 }
 
 export function withLocale(path: string, locale: Locale) {
-  return `${path}?lang=${locale}`;
+  return `${path}${path.includes("?") ? "&" : "?"}lang=${locale}`;
 }
 
 export function t(locale: Locale, path: string) {
