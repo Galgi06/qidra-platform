@@ -25,6 +25,7 @@ type VerifiedTronTransfer = {
   amountUsdt: Prisma.Decimal;
   blockTimestamp?: number;
   contractAddress: string;
+  fromAddress?: string;
   toAddress: string;
   transactionId: string;
 };
@@ -35,6 +36,11 @@ export type TronVerificationResult =
   | { status: "not_found"; verified: false }
   | { status: "mismatch"; verified: false; reason: "amount" | "contract" | "recipient"; transfer: VerifiedTronTransfer }
   | { status: "network_error"; verified: false };
+
+export type TronDepositScanResult =
+  | { status: "configured"; transfers: VerifiedTronTransfer[] }
+  | { status: "unconfigured" }
+  | { status: "network_error" };
 
 function configuredValue(value: string | undefined) {
   const cleaned = value?.trim();
@@ -102,31 +108,61 @@ export async function verifyTrc20Deposit(txHash: string, expectedAmount: Prisma.
   }
 }
 
+export async function listConfirmedTrc20Deposits(accountAddress: string, limit = 100): Promise<TronDepositScanResult> {
+  const config = getTronPaymentConfig();
+
+  if (!config.apiKey || !accountAddress) {
+    return { status: "unconfigured" };
+  }
+
+  try {
+    const transfers = await listTrc20Transfers(accountAddress, limit);
+
+    return {
+      status: "configured",
+      transfers: transfers.filter((transfer) => transfer.contractAddress === config.usdtContractAddress && transfer.toAddress === accountAddress)
+    };
+  } catch {
+    return { status: "network_error" };
+  }
+}
+
 async function findTrc20Transfer(txHash: string, accountAddress: string) {
+  const transfers = await listTrc20Transfers(accountAddress, 200);
+  const normalizedHash = txHash.trim().toLowerCase();
+  const transfer = transfers.find((item) => item.transactionId.toLowerCase() === normalizedHash);
+
+  return transfer ?? null;
+}
+
+async function listTrc20Transfers(accountAddress: string, limit: number) {
   const config = getTronPaymentConfig();
   const params = new URLSearchParams({
     only_confirmed: "true",
     only_to: "true",
-    limit: "200",
+    limit: String(Math.min(Math.max(limit, 1), 200)),
     contract_address: config.usdtContractAddress
   });
   const response = await fetchTronGrid<TronGridTrc20Response>(`/v1/accounts/${encodeURIComponent(accountAddress)}/transactions/trc20?${params}`);
-  const normalizedHash = txHash.trim().toLowerCase();
-  const transfer = response.data?.find((item) => item.transaction_id?.toLowerCase() === normalizedHash);
 
-  if (!transfer?.transaction_id || !transfer.to || !transfer.value) {
-    return null;
-  }
+  return (response.data ?? []).flatMap((transfer): VerifiedTronTransfer[] => {
+    if (!transfer.transaction_id || !transfer.to || !transfer.value) {
+      return [];
+    }
 
-  const decimals = transfer.token_info?.decimals ?? USDT_DECIMALS;
+    const decimals = transfer.token_info?.decimals ?? USDT_DECIMALS;
 
-  return {
-    amountUsdt: new Prisma.Decimal(transfer.value).div(new Prisma.Decimal(10).pow(decimals)),
-    blockTimestamp: transfer.block_timestamp,
-    contractAddress: transfer.token_info?.address ?? config.usdtContractAddress,
-    toAddress: transfer.to,
-    transactionId: transfer.transaction_id
-  };
+    return [
+      {
+        amountUsdt: new Prisma.Decimal(transfer.value).div(new Prisma.Decimal(10).pow(decimals)),
+        blockTimestamp: transfer.block_timestamp,
+        contractAddress: transfer.token_info?.address ?? config.usdtContractAddress,
+        fromAddress: transfer.from,
+        toAddress: transfer.to,
+        transactionId: transfer.transaction_id
+      }
+    ];
+  });
 }
 
 async function fetchTronGrid<T>(path: string) {

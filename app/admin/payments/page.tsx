@@ -4,6 +4,7 @@ import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { NotificationCard } from "@/components/NotificationCard";
 import { WalletOperationItem } from "@/components/WalletOperationItem";
+import { Button } from "@/components/ui/Button";
 import { requireAdmin } from "@/lib/access";
 import { getLocale, t, type SearchParams, withLocale } from "@/lib/i18n";
 import { prisma } from "@/lib/prisma";
@@ -105,6 +106,33 @@ export default async function AdminPaymentsPage({ searchParams }: { searchParams
               )}
             </div>
             <div className="space-y-4">
+              <FeedbackForm
+                className="grid gap-3 rounded-qidra bg-qidra-grayLight p-4"
+                endpoint={`/api/admin/payments/sync-trc20?lang=${locale}`}
+                feedback={{
+                  title: locale === "ru" ? "Входящие переводы синхронизированы" : "Incoming transfers synced",
+                  text:
+                    locale === "ru"
+                      ? "Система проверила личные USDT TRC20-адреса участников и зачислила новые подтверждённые переводы."
+                      : "The system scanned participant personal USDT TRC20 addresses and credited new confirmed transfers.",
+                  buttonLabel: locale === "ru" ? "Понятно" : "Got it",
+                  dismissLabel: locale === "ru" ? "Закрыть уведомление" : "Close notification",
+                  tone: "success"
+                }}
+                popupPlacement="center"
+                refreshOnSuccess
+              >
+                <input name="limitPerWallet" type="hidden" value="100" />
+                <div>
+                  <p className="text-16 font-medium text-qidra-dark">{locale === "ru" ? "Автосверка входящих" : "Incoming auto-reconciliation"}</p>
+                  <p className="mt-2 text-14 text-qidra-grayBlue">
+                    {locale === "ru"
+                      ? "Проверяет подтверждённые USDT TRC20-переводы на личные адреса участников и зачисляет только новые операции."
+                      : "Scans confirmed USDT TRC20 transfers to participant personal addresses and credits only new operations."}
+                  </p>
+                </div>
+                <Button type="submit">{locale === "ru" ? "Синхронизировать входящие" : "Sync incoming transfers"}</Button>
+              </FeedbackForm>
               <NotificationCard
                 title={locale === "ru" ? "Чеклист подтверждения" : "Confirmation checklist"}
                 text={
