@@ -23,6 +23,7 @@ type ExistingDeposit = {
   amountUsdt: Prisma.Decimal;
   id: string;
   status: PaymentStatus;
+  type: TransactionType;
   walletId: string;
 };
 
@@ -105,21 +106,30 @@ async function syncTransfer(tx: Prisma.TransactionClient, walletId: string, tran
     return { outcome: "skipped" as const, rejectedClaimCount: 0 };
   }
 
-  const existingDeposits = await tx.walletTransaction.findMany({
+  const existingTransactions = await tx.walletTransaction.findMany({
     where: {
-      txHash,
-      type: TransactionType.DEPOSIT
+      txHash
     },
     select: {
       amountUsdt: true,
       id: true,
       status: true,
+      type: true,
       walletId: true
     }
   });
+  const existingDeposits = existingTransactions.filter((transaction) => transaction.type === TransactionType.DEPOSIT);
+  const hashAlreadyUsed = existingTransactions.some((transaction) => transaction.type !== TransactionType.DEPOSIT || transaction.status !== PaymentStatus.PENDING);
 
-  if (existingDeposits.some((deposit) => deposit.status === PaymentStatus.CONFIRMED)) {
-    return { outcome: "skipped" as const, rejectedClaimCount: 0 };
+  if (hashAlreadyUsed) {
+    let rejectedClaimCount = 0;
+
+    for (const claim of existingDeposits.filter((deposit) => deposit.status === PaymentStatus.PENDING)) {
+      await rejectPendingDepositClaim(tx, claim, transfer, txHash, actorId);
+      rejectedClaimCount += 1;
+    }
+
+    return { outcome: "skipped" as const, rejectedClaimCount };
   }
 
   const matchingPendingDeposit = existingDeposits.find(

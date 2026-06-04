@@ -58,8 +58,7 @@ export async function POST(request: NextRequest) {
   const amountUsdt = new Prisma.Decimal(parsed.data.amount);
   const duplicate = await prisma.walletTransaction.findFirst({
     where: {
-      txHash,
-      type: TransactionType.DEPOSIT
+      txHash
     }
   });
 
