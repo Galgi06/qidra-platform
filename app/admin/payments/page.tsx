@@ -5,6 +5,7 @@ import { Header } from "@/components/Header";
 import { NotificationCard } from "@/components/NotificationCard";
 import { WalletOperationItem } from "@/components/WalletOperationItem";
 import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
 import { requireAdmin } from "@/lib/access";
 import { getLocale, t, type SearchParams, withLocale } from "@/lib/i18n";
 import { prisma } from "@/lib/prisma";
@@ -67,11 +68,19 @@ export default async function AdminPaymentsPage({ searchParams }: { searchParams
                       </div>
                     ) : null}
                     {payment.type === "WITHDRAWAL" ? (
-                      <div className="rounded-qidra border border-qidra-grayLight bg-qidra-grayLight p-4">
-                        <p className="text-14 text-qidra-grayBlue">{locale === "ru" ? "Адрес получателя" : "Recipient address"}</p>
-                        <code className="mt-2 block break-all rounded-qidra bg-white px-3 py-2 text-12 text-qidra-dark">
-                          {payment.destinationAddress || (locale === "ru" ? "Адрес не указан" : "Address not provided")}
-                        </code>
+                      <div className="grid gap-3 rounded-qidra border border-qidra-grayLight bg-qidra-grayLight p-4">
+                        <div>
+                          <p className="text-14 text-qidra-grayBlue">{locale === "ru" ? "Адрес получателя" : "Recipient address"}</p>
+                          <code className="mt-2 block break-all rounded-qidra bg-white px-3 py-2 text-12 text-qidra-dark">
+                            {payment.destinationAddress || (locale === "ru" ? "Адрес не указан" : "Address not provided")}
+                          </code>
+                        </div>
+                        {payment.txHash ? (
+                          <div>
+                            <p className="text-14 text-qidra-grayBlue">{locale === "ru" ? "Hash отправки" : "Outgoing hash"}</p>
+                            <code className="mt-2 block break-all rounded-qidra bg-white px-3 py-2 text-12 text-qidra-dark">{payment.txHash}</code>
+                          </div>
+                        ) : null}
                       </div>
                     ) : null}
                     <div className="grid gap-3 border-t border-qidra-grayLight pt-4 md:grid-cols-[1fr_auto] md:items-center">
@@ -137,8 +146,8 @@ export default async function AdminPaymentsPage({ searchParams }: { searchParams
                 title={locale === "ru" ? "Чеклист подтверждения" : "Confirmation checklist"}
                 text={
                   locale === "ru"
-                    ? "Для пополнений используйте автоматическую проверку платежа. Для выводов подтверждайте статус только после фактической отправки USDT на адрес получателя."
-                    : "Use automatic payment verification for deposits. Confirm withdrawals only after USDT is actually sent to the recipient address."
+                    ? "Для пополнений используйте автоматическую проверку платежа. Для выводов подтверждайте статус только после фактической отправки USDT и внесения hash отправки."
+                    : "Use automatic payment verification for deposits. Confirm withdrawals only after USDT is actually sent and the outgoing hash is entered."
                 }
               />
             </div>
@@ -180,7 +189,7 @@ function PaymentActionForm({ action, endpoint, locale, type }: { action: "confir
 
   return (
     <FeedbackForm
-      className="contents"
+      className={confirm && withdrawal ? "grid gap-2 sm:min-w-[320px]" : "contents"}
       endpoint={endpoint}
       feedback={{
         title: paymentActionTitle(confirm, withdrawal, locale),
@@ -206,6 +215,15 @@ function PaymentActionForm({ action, endpoint, locale, type }: { action: "confir
       refreshOnSuccess
     >
       <input name="action" type="hidden" value={action} />
+      {confirm && withdrawal ? (
+        <Input
+          label={locale === "ru" ? "Hash отправки" : "Outgoing hash"}
+          name="txHash"
+          pattern="[a-fA-F0-9]{64}"
+          placeholder={locale === "ru" ? "64 символа TRON transaction hash" : "64-character TRON transaction hash"}
+          required
+        />
+      ) : null}
       <ButtonLike confirm={confirm} locale={locale} />
     </FeedbackForm>
   );

@@ -8,8 +8,11 @@ import { prisma } from "@/lib/prisma";
 
 const paymentActionSchema = z.object({
   action: z.enum(["confirm", "reject"]),
-  note: z.string().trim().max(300).optional()
+  note: z.string().trim().max(300).optional(),
+  txHash: z.string().trim().optional()
 });
+
+const tronTxHashPattern = /^[a-fA-F0-9]{64}$/;
 
 type SessionUser = {
   user?: {
@@ -88,12 +91,68 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
 
   const nextStatus = parsed.data.action === "confirm" ? PaymentStatus.CONFIRMED : PaymentStatus.REJECTED;
+  const outgoingTxHash = parsed.data.txHash?.trim().toLowerCase() || undefined;
+  const auditPayload: Prisma.InputJsonObject = {
+    type: transaction.type,
+    status: nextStatus,
+    amountUsdt: transaction.amountUsdt.toString(),
+    ...(transaction.destinationAddress ? { destinationAddress: transaction.destinationAddress } : {}),
+    ...(outgoingTxHash ? { txHash: outgoingTxHash } : {}),
+    ...(parsed.data.note ? { note: parsed.data.note } : {})
+  };
+
+  if (transaction.type === TransactionType.WITHDRAWAL && nextStatus === PaymentStatus.CONFIRMED) {
+    if (!transaction.destinationAddress) {
+      return NextResponse.json(
+        {
+          title: localeRu ? "Нет адреса получателя" : "Recipient address is missing",
+          message: localeRu ? "Нельзя подтвердить вывод без адреса получателя." : "A withdrawal cannot be confirmed without a recipient address."
+        },
+        { status: 409 }
+      );
+    }
+
+    if (!outgoingTxHash || !tronTxHashPattern.test(outgoingTxHash)) {
+      return NextResponse.json(
+        {
+          title: localeRu ? "Нужен hash отправки" : "Outgoing hash required",
+          message:
+            localeRu
+              ? "Перед подтверждением вывода укажите полный TRON transaction hash из 64 символов."
+              : "Before confirming a withdrawal, enter the full 64-character TRON transaction hash."
+        },
+        { status: 400 }
+      );
+    }
+
+    const duplicateHash = await prisma.walletTransaction.findFirst({
+      where: {
+        txHash: outgoingTxHash,
+        NOT: { id: transaction.id }
+      },
+      select: { id: true }
+    });
+
+    if (duplicateHash) {
+      return NextResponse.json(
+        {
+          title: localeRu ? "Hash уже используется" : "Hash already used",
+          message:
+            localeRu
+              ? "Этот transaction hash уже сохранён в другой операции. Повторное использование hash невозможно."
+              : "This transaction hash is already saved on another operation. Hash reuse is not allowed."
+        },
+        { status: 409 }
+      );
+    }
+  }
 
   await prisma.$transaction(async (tx) => {
     await tx.walletTransaction.update({
       where: { id: transaction.id },
       data: {
         status: nextStatus,
+        ...(outgoingTxHash && transaction.type === TransactionType.WITHDRAWAL ? { txHash: outgoingTxHash } : {}),
         note: parsed.data.note || transaction.note
       }
     });
@@ -119,12 +178,29 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       where: { id: transaction.walletId },
       data: walletUpdateForAction(transaction.type, nextStatus, transaction.amountUsdt)
     });
+
+    await tx.adminAuditLog.create({
+      data: {
+        actorId: session?.user?.id,
+        action: paymentAuditAction(transaction.type, nextStatus),
+        entityType: "WalletTransaction",
+        entityId: transaction.id,
+        payload: auditPayload
+      }
+    });
   });
 
   return NextResponse.json({
     title: responseTitle(transaction.type, nextStatus, localeRu),
     message: responseMessage(transaction.type, nextStatus, localeRu)
   });
+}
+
+function paymentAuditAction(type: TransactionType, status: PaymentStatus) {
+  const normalizedType = type.toLowerCase();
+  const normalizedStatus = status === PaymentStatus.CONFIRMED ? "confirm" : "reject";
+
+  return `payment.${normalizedType}.${normalizedStatus}`;
 }
 
 function walletUpdateForAction(type: TransactionType, status: PaymentStatus, amountUsdt: Prisma.Decimal) {
