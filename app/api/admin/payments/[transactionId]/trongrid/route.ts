@@ -67,13 +67,26 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     );
   }
 
-  const verification = await verifyTrc20Deposit(transaction.txHash, transaction.amountUsdt);
+  if (!transaction.wallet.trc20Address) {
+    return NextResponse.json(
+      {
+        title: localeRu ? "Адрес участника не выдан" : "Participant address was not issued",
+        message:
+          localeRu
+            ? "Нельзя проверить депозит без личного TRC20-адреса участника. Отклоните старую заявку и попросите участника создать пополнение заново."
+            : "A deposit cannot be verified without the participant's personal TRC20 address. Reject the old request and ask the participant to create a new deposit."
+      },
+      { status: 400 }
+    );
+  }
+
+  const verification = await verifyTrc20Deposit(transaction.txHash, transaction.amountUsdt, transaction.wallet.trc20Address);
 
   if (verification.status === "unconfigured") {
     return NextResponse.json(
       {
         title: localeRu ? "TronGrid не настроен" : "TronGrid is not configured",
-        message: localeRu ? "Добавьте TRONGRID_API_KEY и QIDRA_TRON_WALLET_ADDRESS в переменные окружения." : "Add TRONGRID_API_KEY and QIDRA_TRON_WALLET_ADDRESS to environment variables."
+        message: localeRu ? "Добавьте TRONGRID_API_KEY в переменные окружения." : "Add TRONGRID_API_KEY to environment variables."
       },
       { status: 400 }
     );
@@ -110,8 +123,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
               : "The on-chain amount differs from the submitted amount."
             : verification.reason === "recipient"
               ? localeRu
-                ? "Перевод отправлен не на адрес Qidra."
-                : "The transfer was not sent to the Qidra address."
+                ? "Перевод отправлен не на личный адрес участника."
+                : "The transfer was not sent to the participant personal address."
               : localeRu
                 ? "Hash относится не к USDT TRC20."
                 : "The hash does not belong to USDT TRC20."

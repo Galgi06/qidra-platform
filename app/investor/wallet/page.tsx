@@ -11,14 +11,16 @@ import { requireAuth } from "@/lib/access";
 import { getLocale, type SearchParams, withLocale } from "@/lib/i18n";
 import { prisma } from "@/lib/prisma";
 import { getPublicTronPaymentConfig } from "@/lib/trongrid";
+import { ensureUserDepositWallet } from "@/lib/wallet-addresses";
 
 export default async function WalletPage({ searchParams }: { searchParams?: SearchParams }) {
   const locale = await getLocale(searchParams);
   const session = await requireAuth(locale, "/investor/wallet");
   const isRu = locale === "ru";
   const userId = session.user?.id ?? "";
+  const issuedWallet = await ensureUserDepositWallet(userId);
   const wallet = await prisma.wallet.findUnique({
-    where: { userId },
+    where: { id: issuedWallet.id },
     include: {
       transactions: {
         orderBy: { createdAt: "desc" },
@@ -27,6 +29,7 @@ export default async function WalletPage({ searchParams }: { searchParams?: Sear
     }
   });
   const tronPayment = getPublicTronPaymentConfig();
+  const depositAddress = wallet?.trc20Address ?? issuedWallet.trc20Address;
   const availableUsdt = wallet?.availableUsdt ?? 0;
   const pendingUsdt = wallet?.pendingUsdt ?? 0;
 
@@ -84,22 +87,29 @@ export default async function WalletPage({ searchParams }: { searchParams?: Sear
                 reloadOnSuccess
               >
                 <h2 className="text-[32px] font-medium leading-tight tracking-[0] text-qidra-dark">{isRu ? "Создать пополнение" : "Create deposit"}</h2>
-                {tronPayment.walletConfigured ? (
-                  <WalletDepositAddress address={tronPayment.walletAddress} locale={locale} />
+                {depositAddress ? (
+                  <WalletDepositAddress address={depositAddress} locale={locale} />
                 ) : (
                   <NotificationCard
                     title={isRu ? "Адрес приёма скоро будет подключён" : "Receiving address will be connected soon"}
-                    text={isRu ? "Перед реальным пополнением администратор добавит адрес Qidra для USDT TRC20." : "Before real deposits, an administrator will add the Qidra USDT TRC20 address."}
+                    text={isRu ? "Система выдаст вам личный адрес USDT TRC20 перед реальным пополнением." : "The system will issue your personal USDT TRC20 address before a real deposit."}
                     tone="warning"
                   />
                 )}
+                {!tronPayment.verificationConfigured ? (
+                  <NotificationCard
+                    title={isRu ? "Автопроверка временно недоступна" : "Auto verification is temporarily unavailable"}
+                    text={isRu ? "Пополнение будет включено после подключения TronGrid API key." : "Deposits will be enabled after the TronGrid API key is connected."}
+                    tone="warning"
+                  />
+                ) : null}
                 <NotificationCard
                   title={isRu ? "Перед отправкой" : "Before submitting"}
-                  text={isRu ? "Qidra примет только подтверждённый входящий USDT TRC20-перевод на указанный адрес и с точно такой же суммой." : "Qidra will accept only a confirmed incoming USDT TRC20 transfer to the shown address with the exact submitted amount."}
+                  text={isRu ? "Qidra примет только подтверждённый входящий USDT TRC20-перевод на ваш личный адрес и с точно такой же суммой." : "Qidra will accept only a confirmed incoming USDT TRC20 transfer to your personal address with the exact submitted amount."}
                 />
                 <Input label="Transaction hash" name="txHash" placeholder="TRC20 transaction hash" required />
                 <Input label="Amount USDT" name="amount" inputMode="decimal" placeholder="1000" required />
-                <Button disabled={!tronPayment.walletConfigured} type="submit">
+                <Button disabled={!depositAddress || !tronPayment.verificationConfigured} type="submit">
                   {isRu ? "Проверить и пополнить" : "Verify and deposit"}
                 </Button>
               </FeedbackForm>

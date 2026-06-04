@@ -50,7 +50,7 @@ export function getTronPaymentConfig() {
   return {
     apiKey,
     baseUrl: baseUrl.replace(/\/$/, ""),
-    enabled: Boolean(walletAddress && apiKey),
+    enabled: Boolean(apiKey),
     usdtContractAddress,
     walletAddress,
     walletConfigured: Boolean(walletAddress)
@@ -63,6 +63,7 @@ export function getPublicTronPaymentConfig() {
   return {
     network: "TRC20",
     usdtContractAddress: config.usdtContractAddress,
+    verificationConfigured: Boolean(config.apiKey),
     walletAddress: config.walletAddress,
     walletConfigured: config.walletConfigured
   };

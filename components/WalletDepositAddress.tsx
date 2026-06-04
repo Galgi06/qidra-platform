@@ -55,7 +55,7 @@ export function WalletDepositAddress({ address, locale }: { address: string; loc
         )}
       </div>
       <div className="min-w-0">
-        <p className="text-14 font-medium text-qidra-dark">{isRu ? "Адрес Qidra для USDT TRC20" : "Qidra USDT TRC20 address"}</p>
+        <p className="text-14 font-medium text-qidra-dark">{isRu ? "Ваш личный адрес Qidra для USDT TRC20" : "Your personal Qidra USDT TRC20 address"}</p>
         <code className="mt-3 block break-all rounded-qidra bg-white px-3 py-3 text-14 text-qidra-dark">{address}</code>
         <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
           <Button onClick={handleCopy} size="sm" type="button" variant="dark">

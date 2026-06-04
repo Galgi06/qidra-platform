@@ -5,6 +5,7 @@ import { z } from "zod";
 import { authOptions } from "@/lib/next-auth";
 import { prisma } from "@/lib/prisma";
 import { verifyTrc20Deposit } from "@/lib/trongrid";
+import { ensureUserDepositWallet } from "@/lib/wallet-addresses";
 
 const depositSchema = z.object({
   amount: z
@@ -75,7 +76,23 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const verification = await verifyTrc20Deposit(txHash, amountUsdt);
+  const wallet = await ensureUserDepositWallet(userId);
+  const personalDepositAddress = wallet.trc20Address;
+
+  if (!personalDepositAddress) {
+    return NextResponse.json(
+      {
+        title: localeRu ? "Адрес не выдан" : "Address was not issued",
+        message:
+          localeRu
+            ? "Обновите страницу кошелька, чтобы получить личный адрес USDT TRC20."
+            : "Refresh the wallet page to receive your personal USDT TRC20 address."
+      },
+      { status: 503 }
+    );
+  }
+
+  const verification = await verifyTrc20Deposit(txHash, amountUsdt, personalDepositAddress);
 
   if (verification.status === "unconfigured") {
     return NextResponse.json(
@@ -83,8 +100,8 @@ export async function POST(request: NextRequest) {
         title: localeRu ? "Автопроверка не подключена" : "Auto verification is not connected",
         message:
           localeRu
-            ? "Пополнение временно недоступно: не настроены TronGrid API key или адрес приёма Qidra."
-            : "Deposits are temporarily unavailable: TronGrid API key or Qidra receiving address is not configured."
+            ? "Пополнение временно недоступно: не настроен TronGrid API key."
+            : "Deposits are temporarily unavailable: TronGrid API key is not configured."
       },
       { status: 503 }
     );
@@ -109,49 +126,32 @@ export async function POST(request: NextRequest) {
         title: localeRu ? "Платеж не найден" : "Payment not found",
         message:
           localeRu
-            ? "TronGrid не нашёл подтверждённый входящий USDT TRC20-перевод с этим hash на адрес Qidra. Проверьте hash или повторите позже, если перевод только что отправлен."
-            : "TronGrid did not find a confirmed incoming USDT TRC20 transfer with this hash to the Qidra address. Check the hash or retry later if the transfer was just sent."
+            ? "TronGrid не нашёл подтверждённый входящий USDT TRC20-перевод с этим hash на ваш личный адрес. Проверьте hash или повторите позже, если перевод только что отправлен."
+            : "TronGrid did not find a confirmed incoming USDT TRC20 transfer with this hash to your personal address. Check the hash or retry later if the transfer was just sent."
       },
       { status: 404 }
     );
   }
 
   if (verification.status === "mismatch") {
-    const reason =
-      verification.reason === "amount"
-        ? localeRu
-          ? "Сумма в сети не совпадает с указанной суммой."
-          : "The on-chain amount does not match the submitted amount."
-        : verification.reason === "recipient"
-          ? localeRu
-            ? "Перевод отправлен не на адрес Qidra."
-            : "The transfer was not sent to the Qidra address."
-          : localeRu
-            ? "Hash относится не к USDT TRC20."
-            : "The hash does not belong to USDT TRC20.";
-
     return NextResponse.json(
       {
         title: localeRu ? "Платеж не совпадает" : "Payment does not match",
-        message: reason
+        message: mismatchReason(verification.reason, localeRu)
       },
       { status: 400 }
     );
   }
 
   await prisma.$transaction(async (tx) => {
-    const wallet = await tx.wallet.upsert({
-      where: { userId },
-      update: { availableUsdt: { increment: amountUsdt } },
-      create: {
-        userId,
-        availableUsdt: amountUsdt
-      }
+    const updatedWallet = await tx.wallet.update({
+      where: { id: wallet.id },
+      data: { availableUsdt: { increment: amountUsdt } }
     });
 
     const transaction = await tx.walletTransaction.create({
       data: {
-        walletId: wallet.id,
+        walletId: updatedWallet.id,
         type: TransactionType.DEPOSIT,
         status: PaymentStatus.CONFIRMED,
         amountUsdt,
@@ -174,6 +174,18 @@ export async function POST(request: NextRequest) {
     title: localeRu ? "Платеж подтвержден" : "Payment confirmed",
     message: depositMessage(verification.status, localeRu)
   });
+}
+
+function mismatchReason(reason: "amount" | "contract" | "recipient", localeRu: boolean) {
+  if (reason === "amount") {
+    return localeRu ? "Сумма в сети не совпадает с указанной суммой." : "The on-chain amount does not match the submitted amount.";
+  }
+
+  if (reason === "recipient") {
+    return localeRu ? "Перевод отправлен не на ваш личный адрес Qidra." : "The transfer was not sent to your personal Qidra address.";
+  }
+
+  return localeRu ? "Hash относится не к USDT TRC20." : "The hash does not belong to USDT TRC20.";
 }
 
 function depositNote(status: string, localeRu: boolean) {

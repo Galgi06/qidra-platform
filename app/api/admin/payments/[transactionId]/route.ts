@@ -1,4 +1,4 @@
-import { PaymentStatus } from "@prisma/client";
+import { PaymentStatus, TransactionType } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
@@ -71,6 +71,19 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         message: localeRu ? "Этот платеж уже был подтвержден или отклонен." : "This payment has already been confirmed or rejected."
       },
       { status: 409 }
+    );
+  }
+
+  if (transaction.type === TransactionType.DEPOSIT && parsed.data.action === "confirm") {
+    return NextResponse.json(
+      {
+        title: localeRu ? "Нужна проверка TronGrid" : "TronGrid verification required",
+        message:
+          localeRu
+            ? "Пополнение USDT нельзя подтвердить вручную. Используйте проверку TronGrid, чтобы сверить hash, сумму и личный адрес участника."
+            : "USDT deposits cannot be confirmed manually. Use TronGrid verification to match the hash, amount and participant personal address."
+      },
+      { status: 400 }
     );
   }
 

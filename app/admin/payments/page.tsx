@@ -57,6 +57,14 @@ export default async function AdminPaymentsPage({ searchParams }: { searchParams
                       amount={`+${formatUsdt(payment.amountUsdt)}`}
                       tone={paymentTone(payment.status)}
                     />
+                    {payment.type === "DEPOSIT" ? (
+                      <div className="rounded-qidra border border-qidra-grayLight bg-qidra-grayLight p-4">
+                        <p className="text-14 text-qidra-grayBlue">{locale === "ru" ? "Личный адрес участника" : "Participant personal address"}</p>
+                        <code className="mt-2 block break-all rounded-qidra bg-white px-3 py-2 text-12 text-qidra-dark">
+                          {payment.wallet.trc20Address || (locale === "ru" ? "Адрес ещё не выдан" : "Address not issued yet")}
+                        </code>
+                      </div>
+                    ) : null}
                     <div className="grid gap-3 border-t border-qidra-grayLight pt-4 md:grid-cols-[1fr_auto] md:items-center">
                       <div>
                         <p className="text-14 text-qidra-grayBlue">{locale === "ru" ? "Дата" : "Date"}</p>
@@ -69,8 +77,8 @@ export default async function AdminPaymentsPage({ searchParams }: { searchParams
                       </div>
                       {payment.status === "PENDING" ? (
                         <div className="flex flex-col gap-2 sm:flex-row">
-                          <TronGridCheckForm endpoint={`/api/admin/payments/${payment.id}/trongrid?lang=${locale}`} locale={locale} />
-                          <PaymentActionForm action="confirm" endpoint={`/api/admin/payments/${payment.id}?lang=${locale}`} locale={locale} />
+                          {payment.type === "DEPOSIT" ? <TronGridCheckForm endpoint={`/api/admin/payments/${payment.id}/trongrid?lang=${locale}`} locale={locale} /> : null}
+                          {payment.type !== "DEPOSIT" ? <PaymentActionForm action="confirm" endpoint={`/api/admin/payments/${payment.id}?lang=${locale}`} locale={locale} /> : null}
                           <PaymentActionForm action="reject" endpoint={`/api/admin/payments/${payment.id}?lang=${locale}`} locale={locale} />
                         </div>
                       ) : (
