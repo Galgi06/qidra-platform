@@ -1,8 +1,14 @@
+import { randomUUID } from "node:crypto";
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
 import { getServerSession } from "next-auth";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
+import { readKycDocuments, type KycDocumentKind, type KycDocuments, type KycFileMeta } from "@/lib/kyc-documents";
 import { authOptions } from "@/lib/next-auth";
 import { prisma } from "@/lib/prisma";
+
+export const runtime = "nodejs";
 
 const optionalText = z.preprocess((value) => {
   if (typeof value !== "string") return undefined;
@@ -27,17 +33,9 @@ type SessionUser = {
   };
 };
 
-type FileMeta = {
-  name: string;
-  size: number;
-  type: string;
-};
-
-type KycDocuments = {
-  addressProof?: FileMeta;
-  identityDocument?: FileMeta;
-  submittedAt?: string;
-};
+const maxKycFileSize = 10 * 1024 * 1024;
+const allowedMimeTypes = new Set(["application/pdf", "image/jpeg", "image/png"]);
+const allowedExtensions = new Set([".pdf", ".jpg", ".jpeg", ".png"]);
 
 function isRu(request: NextRequest) {
   return request.nextUrl.searchParams.get("lang") !== "en";
@@ -48,49 +46,68 @@ function readText(formData: FormData, key: string) {
   return typeof value === "string" ? value : "";
 }
 
-function readFileMeta(formData: FormData, key: string) {
+function readUploadedFile(formData: FormData, key: string) {
   const value = formData.get(key);
 
   if (!(value instanceof File) || value.size === 0) {
     return null;
   }
 
-  return {
-    name: value.name,
-    size: value.size,
-    type: value.type || "application/octet-stream"
-  };
+  return value;
 }
 
-function readExistingDocuments(value: unknown): KycDocuments {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+function validateKycFile(file: File) {
+  if (file.size > maxKycFileSize) return "size";
 
-  const documents = value as Record<string, unknown>;
-  return {
-    identityDocument: readStoredFileMeta(documents.identityDocument),
-    addressProof: readStoredFileMeta(documents.addressProof)
-  };
-}
+  const extension = path.extname(file.name).toLowerCase();
+  const acceptedByType = file.type ? allowedMimeTypes.has(file.type) : false;
+  const acceptedByExtension = allowedExtensions.has(extension);
 
-function readStoredFileMeta(value: unknown): FileMeta | undefined {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  if (!acceptedByType && !acceptedByExtension) return "type";
 
-  const file = value as Record<string, unknown>;
-  if (typeof file.name !== "string" || typeof file.size !== "number" || typeof file.type !== "string") {
-    return undefined;
-  }
-
-  return {
-    name: file.name,
-    size: file.size,
-    type: file.type
-  };
+  return null;
 }
 
 function parseDate(value: string | undefined) {
   if (!value) return undefined;
   const date = new Date(`${value}T00:00:00.000Z`);
   return Number.isNaN(date.getTime()) ? undefined : date;
+}
+
+async function saveKycFile(file: File, userId: string, kind: KycDocumentKind): Promise<KycFileMeta> {
+  const userUploadDir = path.join(process.cwd(), "storage", "kyc", userId);
+  await mkdir(userUploadDir, { recursive: true });
+
+  const safeName = sanitizeFileName(file.name);
+  const storedName = `${Date.now()}-${randomUUID()}-${kind}-${safeName}`;
+  const absolutePath = path.join(userUploadDir, storedName);
+
+  await writeFile(absolutePath, Buffer.from(await file.arrayBuffer()));
+
+  return {
+    name: file.name,
+    size: file.size,
+    storagePath: path.relative(process.cwd(), absolutePath),
+    type: file.type || contentTypeFromName(file.name)
+  };
+}
+
+function sanitizeFileName(fileName: string) {
+  const parsed = path.parse(fileName);
+  const base = parsed.name.replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "document";
+  const extension = parsed.ext.toLowerCase();
+
+  return `${base}${extension}`;
+}
+
+function contentTypeFromName(fileName: string) {
+  const extension = path.extname(fileName).toLowerCase();
+
+  if (extension === ".pdf") return "application/pdf";
+  if (extension === ".jpg" || extension === ".jpeg") return "image/jpeg";
+  if (extension === ".png") return "image/png";
+
+  return "application/octet-stream";
 }
 
 export async function POST(request: NextRequest) {
@@ -119,8 +136,8 @@ export async function POST(request: NextRequest) {
     sourceOfFunds: readText(formData, "sourceOfFunds"),
     occupation: readText(formData, "occupation")
   });
-  const identityDocument = readFileMeta(formData, "identityDocument");
-  const addressProof = readFileMeta(formData, "addressProof");
+  const identityUpload = readUploadedFile(formData, "identityDocument");
+  const addressUpload = readUploadedFile(formData, "addressProof");
 
   if (!parsed.success) {
     return NextResponse.json(
@@ -141,11 +158,32 @@ export async function POST(request: NextRequest) {
     where: { userId },
     orderBy: { createdAt: "desc" }
   });
-  const previousDocuments = readExistingDocuments(latestApplication?.documents);
-  const nextIdentityDocument = identityDocument ?? previousDocuments.identityDocument;
-  const nextAddressProof = addressProof ?? previousDocuments.addressProof;
+  const previousDocuments = readKycDocuments(latestApplication?.documents);
 
-  if (!nextIdentityDocument || !nextAddressProof) {
+  for (const file of [identityUpload, addressUpload]) {
+    if (!file) continue;
+
+    const error = validateKycFile(file);
+
+    if (error) {
+      return NextResponse.json(
+        {
+          title: localeRu ? "Проверьте документы" : "Check documents",
+          message:
+            error === "size"
+              ? localeRu
+                ? "Каждый файл должен быть не больше 10 МБ."
+                : "Each file must be no larger than 10 MB."
+              : localeRu
+                ? "Загрузите документы в формате PDF, JPG или PNG."
+                : "Upload documents as PDF, JPG or PNG."
+        },
+        { status: 400 }
+      );
+    }
+  }
+
+  if ((!identityUpload && !previousDocuments.identityDocument) || (!addressUpload && !previousDocuments.addressProof)) {
     return NextResponse.json(
       {
         title: localeRu ? "Прикрепите документы" : "Attach documents",
@@ -158,9 +196,12 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const nextIdentityDocument = identityUpload ? await saveKycFile(identityUpload, userId, "identityDocument") : previousDocuments.identityDocument;
+  const nextAddressProof = addressUpload ? await saveKycFile(addressUpload, userId, "addressProof") : previousDocuments.addressProof;
+
   const documents: KycDocuments = {
-    identityDocument: nextIdentityDocument,
-    addressProof: nextAddressProof,
+    identityDocument: nextIdentityDocument!,
+    addressProof: nextAddressProof!,
     submittedAt: new Date().toISOString()
   };
 

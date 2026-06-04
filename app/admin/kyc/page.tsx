@@ -7,19 +7,8 @@ import { Button } from "@/components/ui/Button";
 import { ProjectStatusBadge, type BadgeStatus } from "@/components/ui/ProjectStatusBadge";
 import { requireAdmin } from "@/lib/access";
 import { getLocale, t, type SearchParams, withLocale } from "@/lib/i18n";
+import { readKycDocuments, type KycDocumentKind, type KycFileMeta } from "@/lib/kyc-documents";
 import { prisma } from "@/lib/prisma";
-
-type FileMeta = {
-  name: string;
-  size: number;
-  type: string;
-};
-
-type KycDocuments = {
-  addressProof?: FileMeta;
-  identityDocument?: FileMeta;
-  submittedAt?: string;
-};
 
 export default async function AdminKycPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const locale = await getLocale(searchParams);
@@ -98,12 +87,16 @@ export default async function AdminKycPage({ searchParams }: { searchParams: Pro
 
                     <div className="grid gap-4 md:grid-cols-2">
                       <DocumentBlock
+                        applicationId={item.id}
                         document={documents.identityDocument}
+                        kind="identityDocument"
                         label={locale === "ru" ? "Документ личности" : "Identity document"}
                         locale={locale}
                       />
                       <DocumentBlock
+                        applicationId={item.id}
                         document={documents.addressProof}
+                        kind="addressProof"
                         label={locale === "ru" ? "Подтверждение адреса" : "Proof of address"}
                         locale={locale}
                       />
@@ -185,7 +178,19 @@ function InfoBlock({ label, value, locale, compact = false }: { label: string; v
   );
 }
 
-function DocumentBlock({ document, label, locale }: { document: FileMeta | undefined; label: string; locale: "ru" | "en" }) {
+function DocumentBlock({
+  applicationId,
+  document,
+  kind,
+  label,
+  locale
+}: {
+  applicationId: string;
+  document: KycFileMeta | undefined;
+  kind: KycDocumentKind;
+  label: string;
+  locale: "ru" | "en";
+}) {
   if (!document) {
     return (
       <div className="rounded-qidra border border-dashed border-qidra-grayMedium p-4">
@@ -202,6 +207,18 @@ function DocumentBlock({ document, label, locale }: { document: FileMeta | undef
       <p className="mt-1 text-14 text-qidra-grayBlue">
         {document.type} / {formatFileSize(document.size, locale)}
       </p>
+      {document.storagePath ? (
+        <a
+          className="mt-4 inline-flex h-10 items-center justify-center rounded-qidra border border-qidra-dark bg-qidra-dark px-4 text-14 font-medium text-white transition-colors hover:bg-qidra-grayBlueDark"
+          href={`/api/admin/kyc/${applicationId}/documents/${kind}?lang=${locale}`}
+          rel="noreferrer"
+          target="_blank"
+        >
+          {locale === "ru" ? "Открыть документ" : "Open document"}
+        </a>
+      ) : (
+        <p className="mt-3 text-14 text-qidra-grayBlue">{locale === "ru" ? "Файл был отправлен до включения хранения. Попросите участника обновить документ." : "This file was submitted before storage was enabled. Ask the participant to upload it again."}</p>
+      )}
     </div>
   );
 }
@@ -261,32 +278,4 @@ function formatFileSize(size: number, locale: "ru" | "en") {
     style: "unit",
     unit: "megabyte"
   }).format(size / 1024 / 1024);
-}
-
-function readKycDocuments(value: unknown): KycDocuments {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
-
-  const documents = value as Record<string, unknown>;
-
-  return {
-    identityDocument: readFileMeta(documents.identityDocument),
-    addressProof: readFileMeta(documents.addressProof),
-    submittedAt: typeof documents.submittedAt === "string" ? documents.submittedAt : undefined
-  };
-}
-
-function readFileMeta(value: unknown): FileMeta | undefined {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
-
-  const file = value as Record<string, unknown>;
-
-  if (typeof file.name !== "string" || typeof file.size !== "number" || typeof file.type !== "string") {
-    return undefined;
-  }
-
-  return {
-    name: file.name,
-    size: file.size,
-    type: file.type
-  };
 }
