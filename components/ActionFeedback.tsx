@@ -14,6 +14,10 @@ export type FeedbackMessage = {
   dismissLabel?: string;
 };
 
+type FeedbackPlacement = "top-right" | "center";
+
+const storedFeedbackKey = "qidra:feedback";
+
 const toneDot: Record<FeedbackTone, string> = {
   info: "bg-qidra-accent",
   success: "bg-qidra-green",
@@ -21,8 +25,12 @@ const toneDot: Record<FeedbackTone, string> = {
   error: "bg-qidra-red"
 };
 
-export function FeedbackPopup({ feedback, onClose }: { feedback: FeedbackMessage; onClose: () => void }) {
+export function FeedbackPopup({ feedback, onClose, placement = "top-right" }: { feedback: FeedbackMessage; onClose: () => void; placement?: FeedbackPlacement }) {
   const tone = feedback.tone ?? "success";
+  const wrapperClass =
+    placement === "center"
+      ? "fixed inset-0 z-50 grid place-items-center bg-qidra-dark/20 px-4"
+      : "fixed inset-x-4 top-4 z-50 mx-auto max-w-md md:inset-x-auto md:right-6";
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -36,8 +44,8 @@ export function FeedbackPopup({ feedback, onClose }: { feedback: FeedbackMessage
   }, [onClose]);
 
   return (
-    <div aria-atomic="true" aria-live="polite" className="fixed inset-x-4 top-4 z-50 mx-auto max-w-md md:inset-x-auto md:right-6" role={tone === "error" ? "alert" : "status"}>
-      <div className="surface border-qidra-grayLight bg-white p-5 shadow-qidra">
+    <div aria-atomic="true" aria-live="polite" className={wrapperClass} role={tone === "error" ? "alert" : "status"}>
+      <div className="surface w-full max-w-md border-qidra-grayLight bg-white p-5 shadow-qidra">
         <div className="flex items-start gap-4">
           <span aria-hidden="true" className={`mt-2 size-3 shrink-0 rounded-full ${toneDot[tone]}`} />
           <div className="min-w-0 flex-1">
@@ -77,14 +85,27 @@ type FeedbackFormProps = {
   endpoint?: string;
   feedback: FeedbackMessage;
   payload?: "json" | "form-data";
+  popupPlacement?: FeedbackPlacement;
   refreshOnSuccess?: boolean;
+  reloadOnSuccess?: boolean;
   resetOnSubmit?: boolean;
 };
 
-export function FeedbackForm({ children, className = "", endpoint, feedback, payload = "json", refreshOnSuccess = false, resetOnSubmit = false }: FeedbackFormProps) {
+export function FeedbackForm({
+  children,
+  className = "",
+  endpoint,
+  feedback,
+  payload = "json",
+  popupPlacement = "top-right",
+  refreshOnSuccess = false,
+  reloadOnSuccess = false,
+  resetOnSubmit = false
+}: FeedbackFormProps) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
-  const [activeFeedback, setActiveFeedback] = useState(feedback);
+  const [initialStoredFeedback] = useState<FeedbackMessage | null>(() => readStoredFeedback(feedback));
+  const [open, setOpen] = useState(Boolean(initialStoredFeedback));
+  const [activeFeedback, setActiveFeedback] = useState(initialStoredFeedback ?? feedback);
   const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -113,16 +134,28 @@ export function FeedbackForm({ children, className = "", endpoint, feedback, pay
                 body: JSON.stringify(Object.fromEntries(formData.entries()))
               });
         const data = (await response.json().catch(() => ({}))) as { title?: string; message?: string };
-
-        setActiveFeedback({
+        const nextFeedback = {
           ...feedback,
           title: data.title ?? feedback.title,
           text: data.message ?? feedback.text,
           tone: response.ok ? feedback.tone : "error"
-        });
+        };
+
+        setActiveFeedback(nextFeedback);
 
         if (!response.ok) {
           setOpen(true);
+          return;
+        }
+
+        if (reloadOnSuccess) {
+          if (storeFeedback(nextFeedback)) {
+            window.location.reload();
+          } else {
+            setOpen(true);
+            router.refresh();
+          }
+
           return;
         }
       } catch {
@@ -159,9 +192,42 @@ export function FeedbackForm({ children, className = "", endpoint, feedback, pay
       <form aria-busy={submitting} className={className} onSubmit={handleSubmit}>
         {children}
       </form>
-      {open ? <FeedbackPopup feedback={activeFeedback} onClose={() => setOpen(false)} /> : null}
+      {open ? <FeedbackPopup feedback={activeFeedback} onClose={() => setOpen(false)} placement={popupPlacement} /> : null}
     </>
   );
+}
+
+function readStoredFeedback(fallback: FeedbackMessage) {
+  if (typeof window === "undefined") return null;
+
+  const stored = readStoredFeedbackValue();
+
+  if (!stored) return null;
+
+  try {
+    return JSON.parse(stored) as FeedbackMessage;
+  } catch {
+    return fallback;
+  }
+}
+
+function readStoredFeedbackValue() {
+  try {
+    const stored = window.sessionStorage?.getItem(storedFeedbackKey) ?? null;
+    window.sessionStorage?.removeItem(storedFeedbackKey);
+    return stored;
+  } catch {
+    return null;
+  }
+}
+
+function storeFeedback(feedback: FeedbackMessage) {
+  try {
+    window.sessionStorage?.setItem(storedFeedbackKey, JSON.stringify(feedback));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 type FeedbackButtonProps = ComponentProps<typeof Button> & {
