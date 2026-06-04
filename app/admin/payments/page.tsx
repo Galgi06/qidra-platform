@@ -69,6 +69,7 @@ export default async function AdminPaymentsPage({ searchParams }: { searchParams
                       </div>
                       {payment.status === "PENDING" ? (
                         <div className="flex flex-col gap-2 sm:flex-row">
+                          <TronGridCheckForm endpoint={`/api/admin/payments/${payment.id}/trongrid?lang=${locale}`} locale={locale} />
                           <PaymentActionForm action="confirm" endpoint={`/api/admin/payments/${payment.id}?lang=${locale}`} locale={locale} />
                           <PaymentActionForm action="reject" endpoint={`/api/admin/payments/${payment.id}?lang=${locale}`} locale={locale} />
                         </div>
@@ -102,6 +103,30 @@ export default async function AdminPaymentsPage({ searchParams }: { searchParams
       </main>
       <Footer locale={locale} />
     </>
+  );
+}
+
+function TronGridCheckForm({ endpoint, locale }: { endpoint: string; locale: "ru" | "en" }) {
+  return (
+    <FeedbackForm
+      className="contents"
+      endpoint={endpoint}
+      feedback={{
+        title: locale === "ru" ? "Платеж подтвержден TronGrid" : "Payment confirmed by TronGrid",
+        text: locale === "ru" ? "Hash, адрес и сумма совпали. Баланс участника обновлён." : "Hash, address and amount matched. The participant balance was updated.",
+        buttonLabel: locale === "ru" ? "Понятно" : "Got it",
+        dismissLabel: locale === "ru" ? "Закрыть уведомление" : "Close notification",
+        tone: "success"
+      }}
+      refreshOnSuccess
+    >
+      <button
+        className="inline-flex h-10 items-center justify-center rounded-qidra border border-qidra-accent bg-white px-4 text-14 font-medium text-qidra-accent transition-colors hover:bg-qidra-accent hover:text-white"
+        type="submit"
+      >
+        {locale === "ru" ? "Проверить TronGrid" : "Check TronGrid"}
+      </button>
+    </FeedbackForm>
   );
 }
 

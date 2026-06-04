@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/Input";
 import { requireAuth } from "@/lib/access";
 import { getLocale, type SearchParams, withLocale } from "@/lib/i18n";
 import { prisma } from "@/lib/prisma";
+import { getPublicTronPaymentConfig } from "@/lib/trongrid";
 
 export default async function WalletPage({ searchParams }: { searchParams?: SearchParams }) {
   const locale = await getLocale(searchParams);
@@ -24,6 +25,7 @@ export default async function WalletPage({ searchParams }: { searchParams?: Sear
       }
     }
   });
+  const tronPayment = getPublicTronPaymentConfig();
   const availableUsdt = wallet?.availableUsdt ?? 0;
   const pendingUsdt = wallet?.pendingUsdt ?? 0;
 
@@ -40,8 +42,8 @@ export default async function WalletPage({ searchParams }: { searchParams?: Sear
               </h1>
               <p className="mt-4 max-w-3xl text-20 text-qidra-grayBlue">
                 {isRu
-                  ? "Создавайте заявки на пополнение и отслеживайте статус операций после сверки платежа."
-                  : "Create deposit requests and track operation statuses after payment reconciliation."}
+                  ? "Отправляйте USDT в сети TRC20, добавляйте transaction hash и отслеживайте статус операции после проверки сети."
+                  : "Send USDT on TRC20, add the transaction hash and track the operation status after network verification."}
               </p>
             </div>
             <Tabs
@@ -71,8 +73,8 @@ export default async function WalletPage({ searchParams }: { searchParams?: Sear
                   title: isRu ? "Заявка на пополнение создана" : "Deposit request created",
                   text:
                     isRu
-                      ? "Transaction hash принят. Сумма появится в доступном балансе после проверки платежа."
-                      : "The transaction hash was received. The amount will move to available balance after payment review.",
+                      ? "Transaction hash принят. Если перевод найден в сети, баланс обновится автоматически."
+                      : "The transaction hash was received. If the transfer is found on-chain, the balance will update automatically.",
                   buttonLabel: isRu ? "Понятно" : "Got it",
                   dismissLabel: isRu ? "Закрыть уведомление" : "Close notification",
                   tone: "success"
@@ -80,9 +82,24 @@ export default async function WalletPage({ searchParams }: { searchParams?: Sear
                 resetOnSubmit
               >
                 <h2 className="text-[32px] font-medium leading-tight tracking-[0] text-qidra-dark">{isRu ? "Создать пополнение" : "Create deposit"}</h2>
+                {tronPayment.walletConfigured ? (
+                  <div className="grid gap-2 rounded-qidra border border-qidra-grayLight bg-qidra-grayLight p-4">
+                    <p className="text-14 font-medium text-qidra-dark">{isRu ? "Адрес Qidra для USDT TRC20" : "Qidra USDT TRC20 address"}</p>
+                    <code className="break-all rounded-qidra bg-white px-3 py-2 text-14 text-qidra-dark">{tronPayment.walletAddress}</code>
+                    <p className="text-12 text-qidra-grayBlue">
+                      {isRu ? "Отправляйте только USDT в сети TRC20." : "Send only USDT on the TRC20 network."}
+                    </p>
+                  </div>
+                ) : (
+                  <NotificationCard
+                    title={isRu ? "Адрес приёма скоро будет подключён" : "Receiving address will be connected soon"}
+                    text={isRu ? "Перед реальным пополнением администратор добавит адрес Qidra для USDT TRC20." : "Before real deposits, an administrator will add the Qidra USDT TRC20 address."}
+                    tone="warning"
+                  />
+                )}
                 <NotificationCard
                   title={isRu ? "Перед отправкой" : "Before submitting"}
-                  text={isRu ? "Проверьте сумму и transaction hash. После отправки операция появится на проверке." : "Check the amount and transaction hash. After submission, the operation will appear under review."}
+                  text={isRu ? "Проверьте сеть, адрес, сумму и transaction hash перед отправкой." : "Check the network, address, amount and transaction hash before submitting."}
                 />
                 <Input label="Transaction hash" name="txHash" placeholder="TRC20 transaction hash" required />
                 <Input label="Amount USDT" name="amount" inputMode="decimal" placeholder="1000" required />

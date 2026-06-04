@@ -30,6 +30,8 @@ http://localhost:8091
 
 Copy `.env.example` to `.env` and set production values before connecting a real database or OAuth providers.
 
+For TRC20 deposits, set `QIDRA_TRON_WALLET_ADDRESS` and `TRONGRID_API_KEY`. The app uses TronGrid to verify USDT transfers before moving funds into an available balance.
+
 ## Security Notes
 
 - Do not commit production secrets.
