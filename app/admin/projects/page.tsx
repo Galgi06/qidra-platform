@@ -2,13 +2,14 @@ import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { FeedbackForm } from "@/components/ActionFeedback";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
-import { ProjectCard } from "@/components/ProjectCard";
-import { Button } from "@/components/ui/Button";
+import { Button, ButtonLink } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { ProgressBar } from "@/components/ui/ProgressBar";
+import { ProjectStatusBadge } from "@/components/ui/ProjectStatusBadge";
 import { Select } from "@/components/ui/Select";
 import { requireAdmin } from "@/lib/access";
-import { getLocale, t, type SearchParams, withLocale } from "@/lib/i18n";
-import { getAdminProjects } from "@/lib/project-catalog";
+import { getLocale, t, type Locale, type SearchParams, withLocale } from "@/lib/i18n";
+import { getAdminProjects, type CatalogProject } from "@/lib/project-catalog";
 
 export default async function AdminProjectsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const locale = await getLocale(searchParams);
@@ -96,9 +97,9 @@ export default async function AdminProjectsPage({ searchParams }: { searchParams
               </Button>
             </FeedbackForm>
 
-            <div className="grid gap-6 lg:grid-cols-2">
+            <div className="grid gap-5">
               {projects.map((project) => (
-                <ProjectCard key={project.slug} project={project} locale={locale} />
+                <AdminProjectPanel key={project.id} project={project} locale={locale} />
               ))}
             </div>
           </div>
@@ -107,4 +108,157 @@ export default async function AdminProjectsPage({ searchParams }: { searchParams
       <Footer locale={locale} />
     </>
   );
+}
+
+function AdminProjectPanel({ project, locale }: { project: CatalogProject; locale: Locale }) {
+  const isRu = locale === "ru";
+  const progress = project.targetUsdt > 0 ? Math.round((project.fundedUsdt / project.targetUsdt) * 100) : 0;
+
+  return (
+    <article className="surface grid gap-6 p-6 sm:p-7">
+      <div className="grid gap-5 lg:grid-cols-[1fr_auto] lg:items-start">
+        <div className="grid gap-3">
+          <ProjectStatusBadge status={project.status} locale={locale} />
+          <div>
+            <h2 className="text-[28px] font-medium leading-tight tracking-[0] text-qidra-dark sm:text-[34px]">{project.title[locale]}</h2>
+            <p className="mt-2 max-w-4xl text-16 text-qidra-grayBlue">{project.summary[locale]}</p>
+          </div>
+        </div>
+        <ButtonLink href={withLocale(`/projects/${project.slug}`, locale)} size="sm" variant="outline">
+          {isRu ? "Открыть страницу" : "Open page"}
+        </ButtonLink>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr] lg:items-end">
+        <div className="grid gap-2">
+          <ProgressBar value={progress} />
+          <div className="flex flex-wrap justify-between gap-2 text-14 text-qidra-grayBlue">
+            <span>{formatUsdt(project.fundedUsdt)}</span>
+            <span>{formatUsdt(project.targetUsdt)}</span>
+          </div>
+        </div>
+        <dl className="grid gap-3 text-14 sm:grid-cols-3">
+          <ProjectFact label={isRu ? "Структура" : "Structure"} value={project.structure} />
+          <ProjectFact label={isRu ? "Локация" : "Location"} value={project.location} />
+          <ProjectFact label={isRu ? "Риск" : "Risk"} value={project.riskLevel} />
+        </dl>
+      </div>
+
+      <div className="grid gap-6 border-t border-qidra-grayLight pt-6 lg:grid-cols-[0.7fr_1.3fr]">
+        <StatusForm project={project} locale={locale} />
+        <DocumentForm projectId={project.id} locale={locale} />
+      </div>
+
+      <div className="grid gap-3 border-t border-qidra-grayLight pt-6">
+        <h3 className="text-18 font-medium text-qidra-dark">{isRu ? "Документы проекта" : "Project documents"}</h3>
+        {project.documents.length ? (
+          <div className="grid gap-2">
+            {project.documents.map((document) => (
+              <a
+                key={document.href}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-qidra border border-qidra-grayLight px-4 py-3 text-14 transition-colors hover:border-qidra-accent hover:text-qidra-accent"
+                href={document.href}
+                rel="noreferrer"
+                target={document.href.startsWith("http") ? "_blank" : undefined}
+              >
+                <span className="font-medium text-qidra-dark">{document.title[locale]}</span>
+                <span className="text-qidra-grayBlue">{document.kind}</span>
+              </a>
+            ))}
+          </div>
+        ) : (
+          <p className="text-14 text-qidra-grayBlue">{isRu ? "Документы ещё не добавлены." : "No documents added yet."}</p>
+        )}
+      </div>
+    </article>
+  );
+}
+
+function StatusForm({ project, locale }: { project: CatalogProject; locale: Locale }) {
+  return (
+    <FeedbackForm
+      className="grid gap-3"
+      endpoint={`/api/admin/projects/${project.id}/status?lang=${locale}`}
+      feedback={{
+        title: locale === "ru" ? "Статус проекта обновлён" : "Project status updated",
+        text:
+          locale === "ru"
+            ? "Изменение сохранено. Публичный каталог обновится после перезагрузки страницы."
+            : "The change was saved. The public catalog will update after the page refreshes.",
+        buttonLabel: locale === "ru" ? "Понятно" : "Got it",
+        dismissLabel: locale === "ru" ? "Закрыть уведомление" : "Close notification",
+        tone: "success"
+      }}
+      refreshOnSuccess
+    >
+      <Select
+        label={locale === "ru" ? "Статус публикации" : "Publication status"}
+        name="status"
+        defaultValue={project.status.toUpperCase()}
+        options={[
+          { value: "DRAFT", label: locale === "ru" ? "Черновик" : "Draft" },
+          { value: "REVIEW", label: locale === "ru" ? "Проверка" : "Review" },
+          { value: "ACTIVE", label: locale === "ru" ? "Опубликован" : "Published" },
+          { value: "FUNDED", label: locale === "ru" ? "Собран" : "Funded" },
+          { value: "PAUSED", label: locale === "ru" ? "Пауза" : "Paused" },
+          { value: "CLOSED", label: locale === "ru" ? "Закрыт" : "Closed" }
+        ]}
+      />
+      <Button className="w-full sm:w-fit" size="sm" type="submit">
+        {locale === "ru" ? "Сохранить статус" : "Save status"}
+      </Button>
+    </FeedbackForm>
+  );
+}
+
+function DocumentForm({ projectId, locale }: { projectId: string; locale: Locale }) {
+  return (
+    <FeedbackForm
+      className="grid gap-4"
+      endpoint={`/api/admin/projects/${projectId}/documents?lang=${locale}`}
+      feedback={{
+        title: locale === "ru" ? "Документ добавлен" : "Document added",
+        text: locale === "ru" ? "Документ сохранён и будет виден на странице проекта." : "The document was saved and will be visible on the project page.",
+        buttonLabel: locale === "ru" ? "Понятно" : "Got it",
+        dismissLabel: locale === "ru" ? "Закрыть уведомление" : "Close notification",
+        tone: "success"
+      }}
+      refreshOnSuccess
+      resetOnSubmit
+    >
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Input label={locale === "ru" ? "Документ RU" : "Document RU"} name="titleRu" required />
+        <Input label={locale === "ru" ? "Документ EN" : "Document EN"} name="titleEn" required />
+        <Select
+          label={locale === "ru" ? "Тип" : "Type"}
+          name="kind"
+          defaultValue="PROJECT"
+          options={[
+            { value: "PROJECT", label: locale === "ru" ? "Проект" : "Project" },
+            { value: "LEGAL", label: locale === "ru" ? "Юридический" : "Legal" },
+            { value: "COMPLIANCE", label: "Compliance" },
+            { value: "REPORT", label: locale === "ru" ? "Отчёт" : "Report" },
+            { value: "CONTRACT", label: locale === "ru" ? "Договор" : "Contract" }
+          ]}
+        />
+        <Input label={locale === "ru" ? "Ссылка на файл" : "File link"} name="fileUrl" placeholder="/assets/documents/project.pdf" required />
+      </div>
+      <Button className="w-full sm:w-fit" size="sm" type="submit">
+        {locale === "ru" ? "Добавить документ" : "Add document"}
+      </Button>
+    </FeedbackForm>
+  );
+}
+
+function ProjectFact({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-qidra-grayBlue">{label}</dt>
+      <dd className="mt-1 font-medium text-qidra-dark">{value}</dd>
+    </div>
+  );
+}
+
+function formatUsdt(value: number) {
+  return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(value)} USDT`;
 }
