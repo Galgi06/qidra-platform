@@ -74,13 +74,14 @@ export default async function WalletPage({ searchParams }: { searchParams?: Sear
                   title: isRu ? "Заявка на пополнение создана" : "Deposit request created",
                   text:
                     isRu
-                      ? "Transaction hash принят. Если перевод найден в сети, баланс обновится автоматически."
-                      : "The transaction hash was received. If the transfer is found on-chain, the balance will update automatically.",
+                      ? "Transaction hash принят. Страница обновится, и заявка появится в истории операций."
+                      : "The transaction hash was received. The page will refresh and the request will appear in the transaction history.",
                   buttonLabel: isRu ? "Понятно" : "Got it",
                   dismissLabel: isRu ? "Закрыть уведомление" : "Close notification",
                   tone: "success"
                 }}
-                resetOnSubmit
+                popupPlacement="center"
+                reloadOnSuccess
               >
                 <h2 className="text-[32px] font-medium leading-tight tracking-[0] text-qidra-dark">{isRu ? "Создать пополнение" : "Create deposit"}</h2>
                 {tronPayment.walletConfigured ? (
@@ -98,7 +99,9 @@ export default async function WalletPage({ searchParams }: { searchParams?: Sear
                 />
                 <Input label="Transaction hash" name="txHash" placeholder="TRC20 transaction hash" required />
                 <Input label="Amount USDT" name="amount" inputMode="decimal" placeholder="1000" required />
-                <Button type="submit">{isRu ? "Создать заявку" : "Create request"}</Button>
+                <Button disabled={!tronPayment.walletConfigured} type="submit">
+                  {isRu ? "Создать заявку" : "Create request"}
+                </Button>
               </FeedbackForm>
 
               <section className="grid content-start gap-4">
@@ -112,7 +115,7 @@ export default async function WalletPage({ searchParams }: { searchParams?: Sear
                       <WalletOperationItem
                         key={transaction.id}
                         title={transactionTitle(transaction.type, locale)}
-                        meta={`${formatDate(transaction.createdAt, locale)} · ${transaction.txHash ?? ""}`}
+                        meta={formatTransactionMeta(transaction.createdAt, transaction.status, transaction.txHash, locale)}
                         amount={`+${formatUsdt(transaction.amountUsdt)}`}
                         tone={paymentTone(transaction.status)}
                       />
@@ -157,6 +160,16 @@ function transactionTitle(type: string, locale: "ru" | "en") {
   if (type === "RETURN") return locale === "ru" ? "Возврат" : "Return";
   if (type === "ADJUSTMENT") return locale === "ru" ? "Корректировка" : "Adjustment";
   return locale === "ru" ? "Пополнение" : "Deposit";
+}
+
+function paymentStatusLabel(status: string, locale: "ru" | "en") {
+  if (status === "CONFIRMED") return locale === "ru" ? "Подтверждено" : "Confirmed";
+  if (status === "REJECTED") return locale === "ru" ? "Отклонено" : "Rejected";
+  return locale === "ru" ? "На проверке" : "Under review";
+}
+
+function formatTransactionMeta(date: Date, status: string, txHash: string | null, locale: "ru" | "en") {
+  return [formatDate(date, locale), paymentStatusLabel(status, locale), txHash].filter(Boolean).join(" / ");
 }
 
 function formatUsdt(value: { toString(): string } | number) {
