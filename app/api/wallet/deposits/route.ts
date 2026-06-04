@@ -176,13 +176,17 @@ export async function POST(request: NextRequest) {
   });
 }
 
-function mismatchReason(reason: "amount" | "contract" | "recipient", localeRu: boolean) {
+function mismatchReason(reason: "amount" | "contract" | "recipient" | "source", localeRu: boolean) {
   if (reason === "amount") {
     return localeRu ? "Сумма в сети не совпадает с указанной суммой." : "The on-chain amount does not match the submitted amount.";
   }
 
   if (reason === "recipient") {
     return localeRu ? "Перевод отправлен не на ваш личный адрес Qidra." : "The transfer was not sent to your personal Qidra address.";
+  }
+
+  if (reason === "source") {
+    return localeRu ? "Источник перевода не совпадает с ожидаемым адресом." : "The transfer source does not match the expected address.";
   }
 
   return localeRu ? "Hash относится не к USDT TRC20." : "The hash does not belong to USDT TRC20.";

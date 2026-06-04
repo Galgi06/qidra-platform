@@ -34,7 +34,7 @@ export type TronVerificationResult =
   | { status: "configured"; verified: true; transfer: VerifiedTronTransfer }
   | { status: "unconfigured"; verified: false }
   | { status: "not_found"; verified: false }
-  | { status: "mismatch"; verified: false; reason: "amount" | "contract" | "recipient"; transfer: VerifiedTronTransfer }
+  | { status: "mismatch"; verified: false; reason: "amount" | "contract" | "recipient" | "source"; transfer: VerifiedTronTransfer }
   | { status: "network_error"; verified: false };
 
 export type TronDepositScanResult =
@@ -96,6 +96,43 @@ export async function verifyTrc20Deposit(txHash: string, expectedAmount: Prisma.
 
     if (transfer.toAddress !== recipientAddress) {
       return { status: "mismatch", verified: false, reason: "recipient", transfer };
+    }
+
+    if (!transfer.amountUsdt.equals(expectedAmount)) {
+      return { status: "mismatch", verified: false, reason: "amount", transfer };
+    }
+
+    return { status: "configured", verified: true, transfer };
+  } catch {
+    return { status: "network_error", verified: false };
+  }
+}
+
+export async function verifyTrc20Withdrawal(txHash: string, expectedAmount: Prisma.Decimal, expectedRecipientAddress?: string | null): Promise<TronVerificationResult> {
+  const config = getTronPaymentConfig();
+  const recipientAddress = expectedRecipientAddress?.trim();
+
+  if (!config.apiKey || !config.walletAddress || !recipientAddress) {
+    return { status: "unconfigured", verified: false };
+  }
+
+  try {
+    const transfer = await findTrc20Transfer(txHash, recipientAddress);
+
+    if (!transfer) {
+      return { status: "not_found", verified: false };
+    }
+
+    if (transfer.contractAddress !== config.usdtContractAddress) {
+      return { status: "mismatch", verified: false, reason: "contract", transfer };
+    }
+
+    if (transfer.toAddress !== recipientAddress) {
+      return { status: "mismatch", verified: false, reason: "recipient", transfer };
+    }
+
+    if (transfer.fromAddress !== config.walletAddress) {
+      return { status: "mismatch", verified: false, reason: "source", transfer };
     }
 
     if (!transfer.amountUsdt.equals(expectedAmount)) {

@@ -5,6 +5,7 @@ import { z } from "zod";
 import { canAccessAdmin } from "@/lib/auth";
 import { authOptions } from "@/lib/next-auth";
 import { prisma } from "@/lib/prisma";
+import { verifyTrc20Withdrawal } from "@/lib/trongrid";
 
 const paymentActionSchema = z.object({
   action: z.enum(["confirm", "reject"]),
@@ -145,6 +146,57 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         { status: 409 }
       );
     }
+
+    const verification = await verifyTrc20Withdrawal(outgoingTxHash, transaction.amountUsdt, transaction.destinationAddress);
+
+    if (verification.status === "unconfigured") {
+      return NextResponse.json(
+        {
+          title: localeRu ? "Автопроверка вывода не настроена" : "Withdrawal auto verification is not configured",
+          message:
+            localeRu
+              ? "Для подтверждения вывода нужны TRONGRID_API_KEY и QIDRA_TRON_WALLET_ADDRESS в переменных окружения."
+              : "TRONGRID_API_KEY and QIDRA_TRON_WALLET_ADDRESS environment variables are required before confirming withdrawals."
+        },
+        { status: 503 }
+      );
+    }
+
+    if (verification.status === "not_found") {
+      return NextResponse.json(
+        {
+          title: localeRu ? "Hash отправки не найден" : "Outgoing hash not found",
+          message:
+            localeRu
+              ? "Система не нашла подтверждённый USDT TRC20-перевод с этим hash на адрес получателя."
+              : "The system did not find a confirmed USDT TRC20 transfer with this hash to the recipient address."
+        },
+        { status: 404 }
+      );
+    }
+
+    if (verification.status === "network_error") {
+      return NextResponse.json(
+        {
+          title: localeRu ? "Проверка временно недоступна" : "Verification is temporarily unavailable",
+          message:
+            localeRu
+              ? "Не удалось безопасно сверить вывод через сеть TRON. Повторите проверку позже."
+              : "Could not safely verify the withdrawal through the TRON network. Try again later."
+        },
+        { status: 503 }
+      );
+    }
+
+    if (verification.status === "mismatch") {
+      return NextResponse.json(
+        {
+          title: localeRu ? "Вывод не совпадает" : "Withdrawal does not match",
+          message: withdrawalMismatchReason(verification.reason, localeRu)
+        },
+        { status: 400 }
+      );
+    }
   }
 
   await prisma.$transaction(async (tx) => {
@@ -201,6 +253,22 @@ function paymentAuditAction(type: TransactionType, status: PaymentStatus) {
   const normalizedStatus = status === PaymentStatus.CONFIRMED ? "confirm" : "reject";
 
   return `payment.${normalizedType}.${normalizedStatus}`;
+}
+
+function withdrawalMismatchReason(reason: "amount" | "contract" | "recipient" | "source", localeRu: boolean) {
+  if (reason === "amount") {
+    return localeRu ? "Сумма в сети отличается от суммы заявки на вывод." : "The on-chain amount differs from the withdrawal request amount.";
+  }
+
+  if (reason === "recipient") {
+    return localeRu ? "Перевод отправлен не на адрес получателя из заявки." : "The transfer was not sent to the request recipient address.";
+  }
+
+  if (reason === "source") {
+    return localeRu ? "Перевод отправлен не с кошелька Qidra." : "The transfer was not sent from the Qidra wallet.";
+  }
+
+  return localeRu ? "Hash относится не к USDT TRC20." : "The hash does not belong to USDT TRC20.";
 }
 
 function walletUpdateForAction(type: TransactionType, status: PaymentStatus, amountUsdt: Prisma.Decimal) {

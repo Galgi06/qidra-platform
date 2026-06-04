@@ -146,8 +146,8 @@ export default async function AdminPaymentsPage({ searchParams }: { searchParams
                 title={locale === "ru" ? "Чеклист подтверждения" : "Confirmation checklist"}
                 text={
                   locale === "ru"
-                    ? "Для пополнений используйте автоматическую проверку платежа. Для выводов подтверждайте статус только после фактической отправки USDT и внесения hash отправки."
-                    : "Use automatic payment verification for deposits. Confirm withdrawals only after USDT is actually sent and the outgoing hash is entered."
+                    ? "Для пополнений используйте автоматическую проверку платежа. Для выводов вносите hash отправки: Qidra сверит сеть, сумму, получателя и кошелек отправителя."
+                    : "Use automatic payment verification for deposits. For withdrawals, enter the outgoing hash: Qidra will match the network, amount, recipient and sender wallet."
                 }
               />
             </div>
