@@ -1,4 +1,4 @@
-import { PaymentStatus, TransactionType } from "@prisma/client";
+import { PaymentStatus, Prisma, TransactionType } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
@@ -117,27 +117,78 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     await tx.wallet.update({
       where: { id: transaction.walletId },
-      data:
-        nextStatus === PaymentStatus.CONFIRMED
-          ? {
-              availableUsdt: { increment: transaction.amountUsdt },
-              pendingUsdt: { decrement: transaction.amountUsdt }
-            }
-          : {
-              pendingUsdt: { decrement: transaction.amountUsdt }
-            }
+      data: walletUpdateForAction(transaction.type, nextStatus, transaction.amountUsdt)
     });
   });
 
   return NextResponse.json({
-    title: parsed.data.action === "confirm" ? (localeRu ? "Платеж подтвержден" : "Payment confirmed") : localeRu ? "Платеж отклонен" : "Payment rejected",
-    message:
-      parsed.data.action === "confirm"
-        ? localeRu
-          ? "Сумма переведена в доступный баланс участника."
-          : "The amount was moved to the participant's available balance."
-        : localeRu
-          ? "Сумма снята с ожидающего баланса участника."
-          : "The amount was removed from the participant's pending balance."
+    title: responseTitle(transaction.type, nextStatus, localeRu),
+    message: responseMessage(transaction.type, nextStatus, localeRu)
   });
+}
+
+function walletUpdateForAction(type: TransactionType, status: PaymentStatus, amountUsdt: Prisma.Decimal) {
+  if (type === TransactionType.WITHDRAWAL) {
+    if (status === PaymentStatus.CONFIRMED) {
+      return {
+        pendingUsdt: { decrement: amountUsdt }
+      };
+    }
+
+    return {
+      availableUsdt: { increment: amountUsdt },
+      pendingUsdt: { decrement: amountUsdt }
+    };
+  }
+
+  if (status === PaymentStatus.CONFIRMED) {
+    return {
+      availableUsdt: { increment: amountUsdt },
+      pendingUsdt: { decrement: amountUsdt }
+    };
+  }
+
+  return {
+    pendingUsdt: { decrement: amountUsdt }
+  };
+}
+
+function responseTitle(type: TransactionType, status: PaymentStatus, localeRu: boolean) {
+  if (type === TransactionType.WITHDRAWAL && status === PaymentStatus.CONFIRMED) {
+    return localeRu ? "Вывод подтвержден" : "Withdrawal confirmed";
+  }
+
+  if (type === TransactionType.WITHDRAWAL) {
+    return localeRu ? "Вывод отклонен" : "Withdrawal rejected";
+  }
+
+  return status === PaymentStatus.CONFIRMED
+    ? localeRu
+      ? "Платеж подтвержден"
+      : "Payment confirmed"
+    : localeRu
+      ? "Платеж отклонен"
+      : "Payment rejected";
+}
+
+function responseMessage(type: TransactionType, status: PaymentStatus, localeRu: boolean) {
+  if (type === TransactionType.WITHDRAWAL && status === PaymentStatus.CONFIRMED) {
+    return localeRu
+      ? "Сумма окончательно списана с ожидающего баланса участника."
+      : "The amount was permanently deducted from the participant's pending balance.";
+  }
+
+  if (type === TransactionType.WITHDRAWAL) {
+    return localeRu
+      ? "Сумма возвращена в доступный баланс участника."
+      : "The amount was returned to the participant's available balance.";
+  }
+
+  return status === PaymentStatus.CONFIRMED
+    ? localeRu
+      ? "Сумма переведена в доступный баланс участника."
+      : "The amount was moved to the participant's available balance."
+    : localeRu
+      ? "Сумма снята с ожидающего баланса участника."
+      : "The amount was removed from the participant's pending balance.";
 }

@@ -53,8 +53,8 @@ export default async function AdminPaymentsPage({ searchParams }: { searchParams
                   <article key={payment.id} className="grid gap-4 rounded-qidra bg-white p-4 shadow-[0_0_0_1px_rgba(18,20,23,0.08)]">
                     <WalletOperationItem
                       title={operationTitle(payment.type, locale)}
-                      meta={`${payment.wallet.user.name || payment.wallet.user.email} · ${payment.txHash ?? ""}`}
-                      amount={`+${formatUsdt(payment.amountUsdt)}`}
+                      meta={operationMeta(payment.wallet.user.name || payment.wallet.user.email, payment.type, payment.txHash, payment.destinationAddress)}
+                      amount={formatOperationAmount(payment.type, payment.amountUsdt)}
                       tone={paymentTone(payment.status)}
                     />
                     {payment.type === "DEPOSIT" ? (
@@ -62,6 +62,14 @@ export default async function AdminPaymentsPage({ searchParams }: { searchParams
                         <p className="text-14 text-qidra-grayBlue">{locale === "ru" ? "Личный адрес участника" : "Participant personal address"}</p>
                         <code className="mt-2 block break-all rounded-qidra bg-white px-3 py-2 text-12 text-qidra-dark">
                           {payment.wallet.trc20Address || (locale === "ru" ? "Адрес ещё не выдан" : "Address not issued yet")}
+                        </code>
+                      </div>
+                    ) : null}
+                    {payment.type === "WITHDRAWAL" ? (
+                      <div className="rounded-qidra border border-qidra-grayLight bg-qidra-grayLight p-4">
+                        <p className="text-14 text-qidra-grayBlue">{locale === "ru" ? "Адрес получателя" : "Recipient address"}</p>
+                        <code className="mt-2 block break-all rounded-qidra bg-white px-3 py-2 text-12 text-qidra-dark">
+                          {payment.destinationAddress || (locale === "ru" ? "Адрес не указан" : "Address not provided")}
                         </code>
                       </div>
                     ) : null}
@@ -78,8 +86,8 @@ export default async function AdminPaymentsPage({ searchParams }: { searchParams
                       {payment.status === "PENDING" ? (
                         <div className="flex flex-col gap-2 sm:flex-row">
                           {payment.type === "DEPOSIT" ? <TronGridCheckForm endpoint={`/api/admin/payments/${payment.id}/trongrid?lang=${locale}`} locale={locale} /> : null}
-                          {payment.type !== "DEPOSIT" ? <PaymentActionForm action="confirm" endpoint={`/api/admin/payments/${payment.id}?lang=${locale}`} locale={locale} /> : null}
-                          <PaymentActionForm action="reject" endpoint={`/api/admin/payments/${payment.id}?lang=${locale}`} locale={locale} />
+                          {payment.type !== "DEPOSIT" ? <PaymentActionForm action="confirm" endpoint={`/api/admin/payments/${payment.id}?lang=${locale}`} locale={locale} type={payment.type} /> : null}
+                          <PaymentActionForm action="reject" endpoint={`/api/admin/payments/${payment.id}?lang=${locale}`} locale={locale} type={payment.type} />
                         </div>
                       ) : (
                         <span className="rounded-full bg-qidra-grayLight px-3 py-1 text-12 font-medium text-qidra-grayBlue">
@@ -101,8 +109,8 @@ export default async function AdminPaymentsPage({ searchParams }: { searchParams
                 title={locale === "ru" ? "Чеклист подтверждения" : "Confirmation checklist"}
                 text={
                   locale === "ru"
-                    ? "Сверьте сеть, сумму и transaction hash перед сменой статуса. Подтверждение переводит сумму в доступный баланс участника."
-                    : "Match network, amount and transaction hash before changing status. Confirmation moves the amount to the participant's available balance."
+                    ? "Для пополнений используйте автоматическую проверку платежа. Для выводов подтверждайте статус только после фактической отправки USDT на адрес получателя."
+                    : "Use automatic payment verification for deposits. Confirm withdrawals only after USDT is actually sent to the recipient address."
                 }
               />
             </div>
@@ -138,22 +146,31 @@ function TronGridCheckForm({ endpoint, locale }: { endpoint: string; locale: "ru
   );
 }
 
-function PaymentActionForm({ action, endpoint, locale }: { action: "confirm" | "reject"; endpoint: string; locale: "ru" | "en" }) {
+function PaymentActionForm({ action, endpoint, locale, type }: { action: "confirm" | "reject"; endpoint: string; locale: "ru" | "en"; type: string }) {
   const confirm = action === "confirm";
+  const withdrawal = type === "WITHDRAWAL";
 
   return (
     <FeedbackForm
       className="contents"
       endpoint={endpoint}
       feedback={{
-        title: confirm ? (locale === "ru" ? "Платеж подтвержден" : "Payment confirmed") : locale === "ru" ? "Платеж отклонен" : "Payment rejected",
+        title: paymentActionTitle(confirm, withdrawal, locale),
         text: confirm
-          ? locale === "ru"
-            ? "Сумма переведена в доступный баланс участника."
-            : "The amount was moved to the participant's available balance."
+          ? withdrawal
+            ? locale === "ru"
+              ? "Сумма окончательно списана с ожидающего баланса участника."
+              : "The amount was permanently deducted from the participant's pending balance."
+            : locale === "ru"
+              ? "Сумма переведена в доступный баланс участника."
+              : "The amount was moved to the participant's available balance."
           : locale === "ru"
-            ? "Сумма снята с ожидающего баланса участника."
-            : "The amount was removed from the participant's pending balance.",
+            ? withdrawal
+              ? "Сумма возвращена в доступный баланс участника."
+              : "Сумма снята с ожидающего баланса участника."
+            : withdrawal
+              ? "The amount was returned to the participant's available balance."
+              : "The amount was removed from the participant's pending balance.",
         buttonLabel: locale === "ru" ? "Понятно" : "Got it",
         dismissLabel: locale === "ru" ? "Закрыть уведомление" : "Close notification",
         tone: confirm ? "success" : "warning"
@@ -199,6 +216,23 @@ function paymentTone(status: string) {
   if (status === "CONFIRMED") return "success";
   if (status === "REJECTED") return "error";
   return "pending";
+}
+
+function paymentActionTitle(confirm: boolean, withdrawal: boolean, locale: "ru" | "en") {
+  if (confirm && withdrawal) return locale === "ru" ? "Вывод подтвержден" : "Withdrawal confirmed";
+  if (!confirm && withdrawal) return locale === "ru" ? "Вывод отклонен" : "Withdrawal rejected";
+  if (confirm) return locale === "ru" ? "Платеж подтвержден" : "Payment confirmed";
+  return locale === "ru" ? "Платеж отклонен" : "Payment rejected";
+}
+
+function operationMeta(userLabel: string, type: string, txHash: string | null, destinationAddress: string | null) {
+  const reference = type === "WITHDRAWAL" ? destinationAddress : txHash;
+  return [userLabel, reference].filter(Boolean).join(" · ");
+}
+
+function formatOperationAmount(type: string, value: { toString(): string }) {
+  const sign = type === "WITHDRAWAL" || type === "INVESTMENT" ? "-" : "+";
+  return `${sign}${formatUsdt(value)}`;
 }
 
 function formatUsdt(value: { toString(): string }) {

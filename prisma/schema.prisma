@@ -123,17 +123,18 @@ model Wallet {
 }
 
 model WalletTransaction {
-  id            String               @id @default(cuid())
-  walletId      String
-  type          TransactionType
-  status        PaymentStatus        @default(PENDING)
-  amountUsdt    Decimal              @db.Decimal(18, 6)
-  txHash        String?
-  note          String?
-  createdAt     DateTime             @default(now())
-  updatedAt     DateTime             @updatedAt
-  wallet        Wallet               @relation(fields: [walletId], references: [id], onDelete: Cascade)
-  paymentReview PaymentConfirmation?
+  id                 String               @id @default(cuid())
+  walletId           String
+  type               TransactionType
+  status             PaymentStatus        @default(PENDING)
+  amountUsdt         Decimal              @db.Decimal(18, 6)
+  txHash             String?
+  destinationAddress String?
+  note               String?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  wallet             Wallet               @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  paymentReview      PaymentConfirmation?
 }
 
 model Project {

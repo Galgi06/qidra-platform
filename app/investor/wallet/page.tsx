@@ -74,49 +74,83 @@ export default async function WalletPage({ searchParams }: { searchParams?: Sear
             </div>
 
             <div className="grid gap-8 lg:grid-cols-[0.85fr_1.15fr]">
-              <FeedbackForm
-                className="grid content-start gap-5 rounded-[20px] bg-white p-6 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] sm:p-8"
-                endpoint={`/api/wallet/deposits?lang=${locale}`}
-                feedback={{
-                  title: isRu ? "Заявка на пополнение создана" : "Deposit request created",
-                  text:
-                    isRu
-                      ? "Transaction hash подтверждён. Страница обновится, и операция появится в истории."
-                      : "The transaction hash was confirmed. The page will refresh and the operation will appear in history.",
-                  buttonLabel: isRu ? "Понятно" : "Got it",
-                  dismissLabel: isRu ? "Закрыть уведомление" : "Close notification",
-                  tone: "success"
-                }}
-                popupPlacement="center"
-                reloadOnSuccess
-              >
-                <h2 className="text-[32px] font-medium leading-tight tracking-[0] text-qidra-dark">{isRu ? "Создать пополнение" : "Create deposit"}</h2>
-                {depositAddress ? (
-                  <WalletDepositAddress address={depositAddress} locale={locale} />
-                ) : (
+              <div className="grid content-start gap-6">
+                <FeedbackForm
+                  className="grid content-start gap-5 rounded-[20px] bg-white p-6 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] sm:p-8"
+                  endpoint={`/api/wallet/deposits?lang=${locale}`}
+                  feedback={{
+                    title: isRu ? "Заявка на пополнение создана" : "Deposit request created",
+                    text:
+                      isRu
+                        ? "Transaction hash подтверждён. Страница обновится, и операция появится в истории."
+                        : "The transaction hash was confirmed. The page will refresh and the operation will appear in history.",
+                    buttonLabel: isRu ? "Понятно" : "Got it",
+                    dismissLabel: isRu ? "Закрыть уведомление" : "Close notification",
+                    tone: "success"
+                  }}
+                  popupPlacement="center"
+                  reloadOnSuccess
+                >
+                  <h2 className="text-[32px] font-medium leading-tight tracking-[0] text-qidra-dark">{isRu ? "Создать пополнение" : "Create deposit"}</h2>
+                  {depositAddress ? (
+                    <WalletDepositAddress address={depositAddress} locale={locale} />
+                  ) : (
+                    <NotificationCard
+                      title={isRu ? "Адрес приёма скоро будет подключён" : "Receiving address will be connected soon"}
+                      text={isRu ? "Система выдаст вам личный адрес USDT TRC20 перед реальным пополнением." : "The system will issue your personal USDT TRC20 address before a real deposit."}
+                      tone="warning"
+                    />
+                  )}
+                  {!tronPayment.verificationConfigured ? (
+                    <NotificationCard
+                      title={isRu ? "Автопроверка временно недоступна" : "Auto verification is temporarily unavailable"}
+                      text={isRu ? "Пополнение будет включено после подключения сервиса проверки платежей." : "Deposits will be enabled after the payment verification service is connected."}
+                      tone="warning"
+                    />
+                  ) : null}
                   <NotificationCard
-                    title={isRu ? "Адрес приёма скоро будет подключён" : "Receiving address will be connected soon"}
-                    text={isRu ? "Система выдаст вам личный адрес USDT TRC20 перед реальным пополнением." : "The system will issue your personal USDT TRC20 address before a real deposit."}
-                    tone="warning"
+                    title={isRu ? "Перед отправкой" : "Before submitting"}
+                    text={isRu ? "Qidra примет только подтверждённый входящий USDT TRC20-перевод на ваш личный адрес и с точно такой же суммой." : "Qidra will accept only a confirmed incoming USDT TRC20 transfer to your personal address with the exact submitted amount."}
                   />
-                )}
-                {!tronPayment.verificationConfigured ? (
+                  <Input label="Transaction hash" name="txHash" placeholder="TRC20 transaction hash" required />
+                  <Input label="Amount USDT" name="amount" inputMode="decimal" placeholder="1000" required defaultValue={prefilledAmount} />
+                  <Button disabled={!depositAddress || !tronPayment.verificationConfigured} type="submit">
+                    {isRu ? "Проверить и пополнить" : "Verify and deposit"}
+                  </Button>
+                </FeedbackForm>
+
+                <FeedbackForm
+                  className="grid content-start gap-5 rounded-[20px] bg-white p-6 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] sm:p-8"
+                  endpoint={`/api/wallet/withdrawals?lang=${locale}`}
+                  feedback={{
+                    title: isRu ? "Заявка на вывод создана" : "Withdrawal request created",
+                    text:
+                      isRu
+                        ? "Сумма переведена в статус проверки. Страница обновится, и операция появится в истории."
+                        : "The amount was moved to review. The page will refresh and the operation will appear in history.",
+                    buttonLabel: isRu ? "Понятно" : "Got it",
+                    dismissLabel: isRu ? "Закрыть уведомление" : "Close notification",
+                    tone: "success"
+                  }}
+                  popupPlacement="center"
+                  reloadOnSuccess
+                >
+                  <h2 className="text-[32px] font-medium leading-tight tracking-[0] text-qidra-dark">{isRu ? "Создать вывод" : "Create withdrawal"}</h2>
                   <NotificationCard
-                    title={isRu ? "Автопроверка временно недоступна" : "Auto verification is temporarily unavailable"}
-                    text={isRu ? "Пополнение будет включено после подключения сервиса проверки платежей." : "Deposits will be enabled after the payment verification service is connected."}
-                    tone="warning"
+                    title={isRu ? "Перед выводом" : "Before withdrawal"}
+                    text={
+                      isRu
+                        ? "Вывод доступен только на USDT TRC20-адрес. Сумма будет переведена в статус проверки до обработки заявки."
+                        : "Withdrawals are available only to a USDT TRC20 address. The amount will move to review until the request is processed."
+                    }
                   />
-                ) : null}
-                <NotificationCard
-                  title={isRu ? "Перед отправкой" : "Before submitting"}
-                  text={isRu ? "Qidra примет только подтверждённый входящий USDT TRC20-перевод на ваш личный адрес и с точно такой же суммой." : "Qidra will accept only a confirmed incoming USDT TRC20 transfer to your personal address with the exact submitted amount."}
-                />
-                <Input label="Transaction hash" name="txHash" placeholder="TRC20 transaction hash" required />
-                <Input label="Amount USDT" name="amount" inputMode="decimal" placeholder="1000" required defaultValue={prefilledAmount} />
-                <Button disabled={!depositAddress || !tronPayment.verificationConfigured} type="submit">
-                  {isRu ? "Проверить и пополнить" : "Verify and deposit"}
-                </Button>
-              </FeedbackForm>
+                  <Input label={isRu ? "Адрес получателя USDT TRC20" : "Recipient USDT TRC20 address"} name="destinationAddress" placeholder="T..." required />
+                  <Input label="Amount USDT" name="amount" inputMode="decimal" placeholder="100" required />
+                  <Button disabled={decimalToNumber(availableUsdt) <= 0} type="submit">
+                    {isRu ? "Отправить заявку на вывод" : "Submit withdrawal request"}
+                  </Button>
+                </FeedbackForm>
+              </div>
 
               <section className="grid content-start gap-4">
                 <div>
@@ -129,7 +163,7 @@ export default async function WalletPage({ searchParams }: { searchParams?: Sear
                       <WalletOperationItem
                         key={transaction.id}
                         title={transactionTitle(transaction.type, locale)}
-                        meta={formatTransactionMeta(transaction.createdAt, transaction.status, transaction.txHash, locale)}
+                        meta={formatTransactionMeta(transaction.createdAt, transaction.status, transaction.txHash ?? transaction.destinationAddress, locale)}
                         amount={formatTransactionAmount(transaction.type, transaction.amountUsdt)}
                         tone={paymentTone(transaction.status, transaction.type)}
                       />
@@ -188,7 +222,7 @@ function formatTransactionMeta(date: Date, status: string, txHash: string | null
 }
 
 function formatUsdt(value: { toString(): string } | number) {
-  const amount = typeof value === "number" ? value : Number(value.toString());
+  const amount = typeof value === "number" ? value : decimalToNumber(value);
   return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(amount)} USDT`;
 }
 
@@ -217,4 +251,8 @@ function normalizeDepositAmount(value: string | undefined) {
   }
 
   return normalized;
+}
+
+function decimalToNumber(value: { toString(): string }) {
+  return Number(value.toString());
 }
