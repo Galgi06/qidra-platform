@@ -122,6 +122,12 @@ export function FeedbackForm({
 
       try {
         const formData = new FormData(form);
+        const submitter = (event.nativeEvent as SubmitEvent).submitter;
+
+        if ((submitter instanceof HTMLButtonElement || submitter instanceof HTMLInputElement) && submitter.name) {
+          formData.set(submitter.name, submitter.value);
+        }
+
         const response =
           payload === "form-data"
             ? await fetch(endpoint, {

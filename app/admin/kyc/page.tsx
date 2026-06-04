@@ -3,10 +3,23 @@ import { FeedbackForm } from "@/components/ActionFeedback";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { NotificationCard } from "@/components/NotificationCard";
+import { Button } from "@/components/ui/Button";
 import { ProjectStatusBadge, type BadgeStatus } from "@/components/ui/ProjectStatusBadge";
 import { requireAdmin } from "@/lib/access";
 import { getLocale, t, type SearchParams, withLocale } from "@/lib/i18n";
 import { prisma } from "@/lib/prisma";
+
+type FileMeta = {
+  name: string;
+  size: number;
+  type: string;
+};
+
+type KycDocuments = {
+  addressProof?: FileMeta;
+  identityDocument?: FileMeta;
+  submittedAt?: string;
+};
 
 export default async function AdminKycPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const locale = await getLocale(searchParams);
@@ -47,33 +60,72 @@ export default async function AdminKycPage({ searchParams }: { searchParams: Pro
         <section className="section">
           <div className="container-qidra grid gap-4">
             {applications.length ? (
-              applications.map((item) => (
-                <div key={item.id} className="surface grid gap-4 p-6 md:grid-cols-[1.1fr_1fr_1fr_auto] md:items-center">
-                  <div>
-                    <p className="text-14 text-qidra-grayBlue">{locale === "ru" ? "Участник" : "Participant"}</p>
-                    <p className="mt-1 text-18 font-medium text-qidra-dark">{item.user.name || item.user.email}</p>
-                    <p className="mt-1 text-14 text-qidra-grayBlue">{formatDate(item.createdAt, locale)}</p>
-                  </div>
-                  <div>
-                    <p className="text-14 text-qidra-grayBlue">{locale === "ru" ? "Локация" : "Location"}</p>
-                    <p className="mt-1 text-18 text-qidra-grayBlue">{formatLocation(item.user.investorProfile?.country, item.user.investorProfile?.city, locale)}</p>
-                  </div>
-                  <div>
-                    <p className="text-14 text-qidra-grayBlue">{locale === "ru" ? "Профессия и средства" : "Occupation and funds"}</p>
-                    <p className="mt-1 text-18 text-qidra-grayBlue">{item.occupation || (locale === "ru" ? "Не указано" : "Not provided")}</p>
-                    <p className="mt-1 text-14 text-qidra-grayBlue">{sourceLabel(item.sourceOfFunds, locale)}</p>
-                  </div>
-                  <div className="grid gap-3">
-                    <ProjectStatusBadge status={statusToBadge(item.status)} locale={locale} />
-                    {item.status === "SUBMITTED" ? (
-                      <div className="flex flex-col gap-2 sm:flex-row">
-                        <KycActionForm action="approve" endpoint={`/api/admin/kyc/${item.id}?lang=${locale}`} locale={locale} />
-                        <KycActionForm action="reject" endpoint={`/api/admin/kyc/${item.id}?lang=${locale}`} locale={locale} />
+              applications.map((item) => {
+                const profile = item.user.investorProfile;
+                const documents = readKycDocuments(item.documents);
+
+                return (
+                  <div key={item.id} className="surface grid gap-6 p-6">
+                    <div className="grid gap-4 md:grid-cols-[1fr_auto] md:items-start">
+                      <div>
+                        <p className="text-14 text-qidra-grayBlue">{locale === "ru" ? "Участник" : "Participant"}</p>
+                        <h2 className="mt-1 text-[26px] font-medium leading-tight tracking-[0] text-qidra-dark">{item.user.name || item.user.email}</h2>
+                        <p className="mt-2 text-16 text-qidra-grayBlue">{item.user.email}</p>
+                      </div>
+                      <div className="grid gap-2 md:justify-items-end">
+                        <ProjectStatusBadge status={statusToBadge(item.status)} locale={locale} />
+                        <p className="text-14 text-qidra-grayBlue">
+                          {locale === "ru" ? "Отправлено" : "Submitted"}: {formatDateTime(item.createdAt, locale)}
+                        </p>
+                        {item.reviewedAt ? (
+                          <p className="text-14 text-qidra-grayBlue">
+                            {locale === "ru" ? "Проверено" : "Reviewed"}: {formatDateTime(item.reviewedAt, locale)}
+                          </p>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                      <InfoBlock label={locale === "ru" ? "Телефон" : "Phone"} value={profile?.phone} locale={locale} />
+                      <InfoBlock label={locale === "ru" ? "Дата рождения" : "Date of birth"} value={profile?.dateOfBirth ? formatDate(profile.dateOfBirth, locale) : null} locale={locale} />
+                      <InfoBlock label={locale === "ru" ? "Страна и город" : "Country and city"} value={formatLocation(profile?.country, profile?.city, locale)} locale={locale} />
+                      <InfoBlock label={locale === "ru" ? "Гражданство" : "Citizenship"} value={profile?.citizenship} locale={locale} />
+                      <InfoBlock label={locale === "ru" ? "Адрес" : "Address"} value={profile?.address} locale={locale} />
+                      <InfoBlock label={locale === "ru" ? "Профессия" : "Occupation"} value={item.occupation} locale={locale} />
+                      <InfoBlock label={locale === "ru" ? "Источник средств" : "Source of funds"} value={sourceLabel(item.sourceOfFunds, locale)} locale={locale} />
+                      <InfoBlock label={locale === "ru" ? "ID заявки" : "Application ID"} value={item.id} locale={locale} compact />
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <DocumentBlock
+                        document={documents.identityDocument}
+                        label={locale === "ru" ? "Документ личности" : "Identity document"}
+                        locale={locale}
+                      />
+                      <DocumentBlock
+                        document={documents.addressProof}
+                        label={locale === "ru" ? "Подтверждение адреса" : "Proof of address"}
+                        locale={locale}
+                      />
+                    </div>
+
+                    {documents.submittedAt ? (
+                      <p className="text-14 text-qidra-grayBlue">
+                        {locale === "ru" ? "Метаданные документов обновлены" : "Document metadata updated"}: {formatIsoDateTime(documents.submittedAt, locale)}
+                      </p>
+                    ) : null}
+
+                    {item.reviewerNote ? (
+                      <div className="rounded-qidra border border-qidra-grayLight bg-qidra-grayLight p-4">
+                        <p className="text-14 font-medium text-qidra-dark">{locale === "ru" ? "Комментарий проверяющего" : "Reviewer note"}</p>
+                        <p className="mt-2 text-16 text-qidra-grayBlue">{item.reviewerNote}</p>
                       </div>
                     ) : null}
+
+                    {item.status === "SUBMITTED" ? <KycActionForm endpoint={`/api/admin/kyc/${item.id}?lang=${locale}`} locale={locale} /> : null}
                   </div>
-                </div>
-              ))
+                );
+              })
             ) : (
               <NotificationCard
                 title={locale === "ru" ? "Очередь пуста" : "Queue is empty"}
@@ -88,46 +140,69 @@ export default async function AdminKycPage({ searchParams }: { searchParams: Pro
   );
 }
 
-function KycActionForm({ action, endpoint, locale }: { action: "approve" | "reject"; endpoint: string; locale: "ru" | "en" }) {
-  const approve = action === "approve";
-
+function KycActionForm({ endpoint, locale }: { endpoint: string; locale: "ru" | "en" }) {
   return (
     <FeedbackForm
-      className="contents"
+      className="grid gap-4 border-t border-qidra-grayLight pt-5"
       endpoint={endpoint}
       feedback={{
-        title: approve ? (locale === "ru" ? "Анкета одобрена" : "Profile approved") : locale === "ru" ? "Анкета отклонена" : "Profile rejected",
-        text: approve
-          ? locale === "ru"
-            ? "Участник теперь может подавать заявки на участие."
-            : "The participant can now submit participation applications."
-          : locale === "ru"
-            ? "Участник увидит статус и сможет обновить анкету."
-            : "The participant will see the status and can update the profile.",
+        title: locale === "ru" ? "Решение сохранено" : "Decision saved",
+        text: locale === "ru" ? "Статус анкеты обновлён, участник увидит результат в кабинете." : "The profile status was updated, and the participant will see the result in the cabinet.",
         buttonLabel: locale === "ru" ? "Понятно" : "Got it",
         dismissLabel: locale === "ru" ? "Закрыть уведомление" : "Close notification",
-        tone: approve ? "success" : "warning"
+        tone: "success"
       }}
+      popupPlacement="center"
       refreshOnSuccess
     >
-      <input name="action" type="hidden" value={action} />
-      <ActionButton confirm={approve} locale={locale} />
+      <label className="grid gap-2 text-14 font-medium text-qidra-dark">
+        {locale === "ru" ? "Комментарий для участника" : "Note for participant"}
+        <textarea
+          className="min-h-24 rounded-qidra border border-transparent bg-qidra-grayLight px-4 py-3 text-16 outline-none transition-colors placeholder:text-qidra-grayMedium focus:border-qidra-accent"
+          maxLength={500}
+          name="note"
+          placeholder={locale === "ru" ? "Например: укажите, что нужно исправить при отказе" : "For example: explain what should be corrected on rejection"}
+        />
+      </label>
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <Button name="action" size="sm" type="submit" value="approve">
+          {locale === "ru" ? "Одобрить анкету" : "Approve profile"}
+        </Button>
+        <Button name="action" size="sm" type="submit" value="reject" variant="outline">
+          {locale === "ru" ? "Отклонить анкету" : "Reject profile"}
+        </Button>
+      </div>
     </FeedbackForm>
   );
 }
 
-function ActionButton({ confirm, locale }: { confirm: boolean; locale: "ru" | "en" }) {
+function InfoBlock({ label, value, locale, compact = false }: { label: string; value: string | null | undefined; locale: "ru" | "en"; compact?: boolean }) {
   return (
-    <button
-      className={`inline-flex h-10 items-center justify-center rounded-qidra border px-4 text-14 font-medium transition-colors ${
-        confirm
-          ? "border-qidra-accent bg-qidra-accent text-white hover:bg-qidra-accent80"
-          : "border-qidra-grayMedium bg-transparent text-qidra-dark hover:border-qidra-red hover:text-qidra-red"
-      }`}
-      type="submit"
-    >
-      {confirm ? (locale === "ru" ? "Одобрить" : "Approve") : locale === "ru" ? "Отклонить" : "Reject"}
-    </button>
+    <div className="rounded-qidra border border-qidra-grayLight bg-white p-4">
+      <p className="text-14 text-qidra-grayBlue">{label}</p>
+      <p className={`mt-2 break-words font-medium text-qidra-dark ${compact ? "text-12" : "text-16"}`}>{value || (locale === "ru" ? "Не указано" : "Not provided")}</p>
+    </div>
+  );
+}
+
+function DocumentBlock({ document, label, locale }: { document: FileMeta | undefined; label: string; locale: "ru" | "en" }) {
+  if (!document) {
+    return (
+      <div className="rounded-qidra border border-dashed border-qidra-grayMedium p-4">
+        <p className="text-14 text-qidra-grayBlue">{label}</p>
+        <p className="mt-2 text-16 font-medium text-qidra-dark">{locale === "ru" ? "Файл не приложен" : "File not attached"}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-qidra border border-qidra-grayLight bg-qidra-grayLight p-4">
+      <p className="text-14 text-qidra-grayBlue">{label}</p>
+      <p className="mt-2 break-words text-16 font-medium text-qidra-dark">{document.name}</p>
+      <p className="mt-1 text-14 text-qidra-grayBlue">
+        {document.type} / {formatFileSize(document.size, locale)}
+      </p>
+    </div>
   );
 }
 
@@ -162,4 +237,56 @@ function formatDate(date: Date, locale: "ru" | "en") {
     month: "short",
     year: "numeric"
   }).format(date);
+}
+
+function formatDateTime(date: Date, locale: "ru" | "en") {
+  return new Intl.DateTimeFormat(locale === "ru" ? "ru-RU" : "en-US", {
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    month: "short",
+    year: "numeric"
+  }).format(date);
+}
+
+function formatIsoDateTime(value: string, locale: "ru" | "en") {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return formatDateTime(date, locale);
+}
+
+function formatFileSize(size: number, locale: "ru" | "en") {
+  return new Intl.NumberFormat(locale === "ru" ? "ru-RU" : "en-US", {
+    maximumFractionDigits: 1,
+    style: "unit",
+    unit: "megabyte"
+  }).format(size / 1024 / 1024);
+}
+
+function readKycDocuments(value: unknown): KycDocuments {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+
+  const documents = value as Record<string, unknown>;
+
+  return {
+    identityDocument: readFileMeta(documents.identityDocument),
+    addressProof: readFileMeta(documents.addressProof),
+    submittedAt: typeof documents.submittedAt === "string" ? documents.submittedAt : undefined
+  };
+}
+
+function readFileMeta(value: unknown): FileMeta | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+
+  const file = value as Record<string, unknown>;
+
+  if (typeof file.name !== "string" || typeof file.size !== "number" || typeof file.type !== "string") {
+    return undefined;
+  }
+
+  return {
+    name: file.name,
+    size: file.size,
+    type: file.type
+  };
 }
