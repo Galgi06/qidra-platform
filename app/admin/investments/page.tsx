@@ -54,7 +54,10 @@ export default async function AdminInvestmentsPage({ searchParams }: { searchPar
             {requests.length ? (
               requests.map((request) => {
                 const latestKycStatus = request.user.kycApplications[0]?.status;
-                const hasEnoughBalance = Boolean(request.user.wallet?.availableUsdt.gte(request.amountUsdt));
+                const availableUsdt = Number(request.user.wallet?.availableUsdt.toString() ?? 0);
+                const reservedUsdt = Number(request.reservedUsdt.toString());
+                const amountUsdt = Number(request.amountUsdt.toString());
+                const hasEnoughBalance = availableUsdt + reservedUsdt >= amountUsdt;
                 const canConfirm = latestKycStatus === "APPROVED" && hasEnoughBalance;
 
                 return (
@@ -69,7 +72,10 @@ export default async function AdminInvestmentsPage({ searchParams }: { searchPar
                   <div className="grid gap-1 text-14">
                     <p className="font-medium text-qidra-dark">{locale === "ru" ? "KYC" : "KYC"}: {kycStatusLabel(latestKycStatus, locale)}</p>
                     <p className={hasEnoughBalance ? "text-qidra-green" : "text-qidra-red"}>
-                      {locale === "ru" ? "Баланс" : "Balance"}: {formatUsdt(request.user.wallet?.availableUsdt ?? 0)}
+                      {locale === "ru" ? "Свободно" : "Available"}: {formatUsdt(request.user.wallet?.availableUsdt ?? 0)}
+                    </p>
+                    <p className="text-qidra-grayBlue">
+                      {locale === "ru" ? "Резерв заявки" : "Application reserve"}: {formatUsdt(request.reservedUsdt)}
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
@@ -109,11 +115,11 @@ function InvestmentActionForm({ action, disabled = false, endpoint, locale }: { 
         title: confirm ? (locale === "ru" ? "Заявка подтверждена" : "Application confirmed") : locale === "ru" ? "Заявка отклонена" : "Application rejected",
         text: confirm
           ? locale === "ru"
-            ? "Сумма списана с доступного баланса участника."
-            : "The amount was deducted from the participant's available balance."
+            ? "Зарезервированная сумма переведена в участие по проекту."
+            : "The reserved amount was moved into project participation."
           : locale === "ru"
-            ? "Участник увидит обновлённый статус в кабинете."
-            : "The participant will see the updated status in the cabinet.",
+            ? "Участник увидит обновлённый статус в профиле участника."
+            : "The participant will see the updated status in the participant profile.",
         buttonLabel: locale === "ru" ? "Понятно" : "Got it",
         dismissLabel: locale === "ru" ? "Закрыть уведомление" : "Close notification",
         tone: confirm ? "success" : "warning"

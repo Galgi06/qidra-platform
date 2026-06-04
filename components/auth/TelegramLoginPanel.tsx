@@ -83,8 +83,8 @@ export function TelegramLoginPanel({ botUsername, locale, nextPath }: { botUsern
           <h1 className="subtitle-28">{isRu ? "Вход через Telegram" : "Telegram sign-in"}</h1>
           <p className="mt-3 text-16 text-qidra-grayBlue">
             {isRu
-              ? "Подтвердите вход в Telegram. После подтверждения Qidra откроет ваш кабинет."
-              : "Confirm the login in Telegram. After confirmation, Qidra will open your cabinet."}
+              ? "Подтвердите вход в Telegram. После подтверждения Qidra откроет ваш профиль участника."
+              : "Confirm the login in Telegram. After confirmation, Qidra will open your participant profile."}
           </p>
         </div>
         <div ref={containerRef} className="flex min-h-12 justify-center" />

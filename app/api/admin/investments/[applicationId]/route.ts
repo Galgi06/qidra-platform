@@ -1,4 +1,4 @@
-import { InvestmentStatus, KycStatus, PaymentStatus, TransactionType } from "@prisma/client";
+import { InvestmentStatus, KycStatus, PaymentStatus, Prisma, TransactionType } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
@@ -102,7 +102,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       );
     }
 
-    if (!wallet || wallet.availableUsdt.lt(application.amountUsdt)) {
+    const reservedUsdt = application.reservedUsdt;
+    const reserveGapUsdt = application.amountUsdt.minus(reservedUsdt);
+    const amountFromAvailableUsdt = reserveGapUsdt.gt(0) ? reserveGapUsdt : new Prisma.Decimal(0);
+
+    if (!wallet || wallet.availableUsdt.lt(amountFromAvailableUsdt)) {
       return NextResponse.json(
         {
           title: localeRu ? "Недостаточно баланса" : "Insufficient balance",
@@ -120,13 +124,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         where: { id: application.id },
         data: {
           status: InvestmentStatus.CONFIRMED,
+          reservedUsdt: 0,
           adminNote: parsed.data.note
         }
       }),
       prisma.wallet.update({
         where: { id: wallet.id },
         data: {
-          availableUsdt: { decrement: application.amountUsdt }
+          availableUsdt: { decrement: amountFromAvailableUsdt },
+          reservedUsdt: { decrement: reservedUsdt }
         }
       }),
       prisma.walletTransaction.create({
@@ -155,19 +161,31 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     return NextResponse.json({
       title: localeRu ? "Заявка подтверждена" : "Application confirmed",
-      message: localeRu ? "Сумма списана с доступного баланса участника." : "The amount was deducted from the participant's available balance."
+      message: localeRu ? "Зарезервированная сумма переведена в участие по проекту." : "The reserved amount was moved into project participation."
     });
   }
 
-  await prisma.$transaction([
-    prisma.investmentApplication.update({
+  await prisma.$transaction(async (tx) => {
+    if (application.user.wallet && application.reservedUsdt.gt(0)) {
+      await tx.wallet.update({
+        where: { id: application.user.wallet.id },
+        data: {
+          availableUsdt: { increment: application.reservedUsdt },
+          reservedUsdt: { decrement: application.reservedUsdt }
+        }
+      });
+    }
+
+    await tx.investmentApplication.update({
       where: { id: application.id },
       data: {
         status: InvestmentStatus.REJECTED,
+        reservedUsdt: 0,
         adminNote: parsed.data.note
       }
-    }),
-    prisma.adminAuditLog.create({
+    });
+
+    await tx.adminAuditLog.create({
       data: {
         actorId: session?.user?.id,
         action: "investment.reject",
@@ -179,11 +197,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           note: parsed.data.note
         }
       }
-    })
-  ]);
+    });
+  });
 
   return NextResponse.json({
     title: localeRu ? "Заявка отклонена" : "Application rejected",
-    message: localeRu ? "Участник увидит обновлённый статус в кабинете." : "The participant will see the updated status in the cabinet."
+    message: localeRu ? "Участник увидит обновлённый статус в профиле участника." : "The participant will see the updated status in the participant profile."
   });
 }

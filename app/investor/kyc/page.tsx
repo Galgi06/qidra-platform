@@ -45,8 +45,8 @@ export default async function KycPage({ searchParams }: { searchParams?: SearchP
       : "You can now submit participation applications."
     : submitted
       ? isRu
-        ? "Команда Qidra проверяет данные. Если потребуется уточнение, уведомление появится в кабинете."
-        : "The Qidra team is reviewing your details. If clarification is needed, a notification will appear in your cabinet."
+        ? "Команда Qidra проверяет данные. Если потребуется уточнение, уведомление появится в профиле участника."
+        : "The Qidra team is reviewing your details. If clarification is needed, a notification will appear in your participant profile."
       : rejected
         ? application?.reviewerNote || (isRu ? "Обновите данные и отправьте анкету повторно." : "Update your details and submit the profile again.")
         : isRu
@@ -90,8 +90,8 @@ export default async function KycPage({ searchParams }: { searchParams?: SearchP
                 title: isRu ? "Анкета отправлена" : "Profile submitted",
                 text:
                   isRu
-                    ? "Профиль и документы отправлены команде Qidra. Статус появится в кабинете после проверки."
-                    : "Your profile and documents were sent to the Qidra team. The status will appear in your cabinet after review.",
+                    ? "Профиль и документы отправлены команде Qidra. Статус появится в профиле участника после проверки."
+                    : "Your profile and documents were sent to the Qidra team. The status will appear in your participant profile after review.",
                 buttonLabel: isRu ? "Понятно" : "Got it",
                 dismissLabel: isRu ? "Закрыть уведомление" : "Close notification",
                 tone: "success"

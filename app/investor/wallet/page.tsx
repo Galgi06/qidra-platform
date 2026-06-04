@@ -33,6 +33,7 @@ export default async function WalletPage({ searchParams }: { searchParams?: Sear
   const depositAddress = wallet?.trc20Address ?? issuedWallet.trc20Address;
   const availableUsdt = wallet?.availableUsdt ?? 0;
   const pendingUsdt = wallet?.pendingUsdt ?? 0;
+  const reservedUsdt = wallet?.reservedUsdt ?? 0;
   const prefilledAmount = normalizeDepositAmount(searchParamString(params?.amount));
 
   return (
@@ -42,14 +43,14 @@ export default async function WalletPage({ searchParams }: { searchParams?: Sear
         <section className="bg-qidra-grayLight px-5 py-10 sm:px-8 lg:px-11 lg:py-14">
           <div className="mx-auto grid max-w-[1840px] gap-8">
             <div>
-              <p className="text-14 font-medium uppercase text-qidra-accent">{isRu ? "Кабинет участника" : "Participant cabinet"}</p>
+              <p className="text-14 font-medium uppercase text-qidra-accent">{isRu ? "Профиль участника" : "Participant profile"}</p>
               <h1 className="mt-3 max-w-4xl text-[42px] font-medium leading-tight tracking-[0] text-qidra-dark sm:text-[56px]">
                 {isRu ? "Кошелек USDT TRC20" : "USDT TRC20 wallet"}
               </h1>
               <p className="mt-4 max-w-3xl text-20 text-qidra-grayBlue">
                 {isRu
-                  ? "Отправляйте USDT в сети TRC20 и добавляйте transaction hash. Qidra автоматически проверит перевод через TronGrid перед зачислением."
-                  : "Send USDT on TRC20 and add the transaction hash. Qidra will automatically verify the transfer through TronGrid before crediting it."}
+                  ? "Отправляйте USDT в сети TRC20 и добавляйте transaction hash. Qidra автоматически проверит перевод перед зачислением."
+                  : "Send USDT on TRC20 and add the transaction hash. Qidra will automatically verify the transfer before crediting it."}
               </p>
             </div>
             <Tabs
@@ -65,8 +66,9 @@ export default async function WalletPage({ searchParams }: { searchParams?: Sear
 
         <section className="px-5 py-12 sm:px-8 lg:px-11 lg:py-16">
           <div className="mx-auto grid max-w-[1840px] gap-8">
-            <div className="grid gap-5 md:grid-cols-3">
+            <div className="grid gap-5 md:grid-cols-4">
               <BalanceCard label={isRu ? "Доступный баланс" : "Available balance"} value={formatUsdt(availableUsdt)} tone="dark" />
+              <BalanceCard label={isRu ? "Зарезервировано" : "Reserved"} value={formatUsdt(reservedUsdt)} tone="accent" />
               <BalanceCard label={isRu ? "На проверке" : "Under review"} value={formatUsdt(pendingUsdt)} tone="accent" />
               <BalanceCard label={isRu ? "Сеть" : "Network"} value="USDT TRC20" tone="light" />
             </div>
@@ -79,8 +81,8 @@ export default async function WalletPage({ searchParams }: { searchParams?: Sear
                   title: isRu ? "Заявка на пополнение создана" : "Deposit request created",
                   text:
                     isRu
-                      ? "Transaction hash подтверждён через TronGrid. Страница обновится, и операция появится в истории."
-                      : "The transaction hash was confirmed through TronGrid. The page will refresh and the operation will appear in history.",
+                      ? "Transaction hash подтверждён. Страница обновится, и операция появится в истории."
+                      : "The transaction hash was confirmed. The page will refresh and the operation will appear in history.",
                   buttonLabel: isRu ? "Понятно" : "Got it",
                   dismissLabel: isRu ? "Закрыть уведомление" : "Close notification",
                   tone: "success"
@@ -101,7 +103,7 @@ export default async function WalletPage({ searchParams }: { searchParams?: Sear
                 {!tronPayment.verificationConfigured ? (
                   <NotificationCard
                     title={isRu ? "Автопроверка временно недоступна" : "Auto verification is temporarily unavailable"}
-                    text={isRu ? "Пополнение будет включено после подключения TronGrid API key." : "Deposits will be enabled after the TronGrid API key is connected."}
+                    text={isRu ? "Пополнение будет включено после подключения сервиса проверки платежей." : "Deposits will be enabled after the payment verification service is connected."}
                     tone="warning"
                   />
                 ) : null}
@@ -128,8 +130,8 @@ export default async function WalletPage({ searchParams }: { searchParams?: Sear
                         key={transaction.id}
                         title={transactionTitle(transaction.type, locale)}
                         meta={formatTransactionMeta(transaction.createdAt, transaction.status, transaction.txHash, locale)}
-                        amount={`+${formatUsdt(transaction.amountUsdt)}`}
-                        tone={paymentTone(transaction.status)}
+                        amount={formatTransactionAmount(transaction.type, transaction.amountUsdt)}
+                        tone={paymentTone(transaction.status, transaction.type)}
                       />
                     ))}
                   </div>
@@ -160,10 +162,11 @@ function BalanceCard({ label, value, tone }: { label: string; value: string; ton
   );
 }
 
-function paymentTone(status: string) {
-  if (status === "CONFIRMED") return "success";
+function paymentTone(status: string, type: string) {
   if (status === "REJECTED") return "error";
-  return "pending";
+  if (status !== "CONFIRMED") return "pending";
+  if (type === "INVESTMENT" || type === "WITHDRAWAL") return "neutral";
+  return "success";
 }
 
 function transactionTitle(type: string, locale: "ru" | "en") {
@@ -187,6 +190,11 @@ function formatTransactionMeta(date: Date, status: string, txHash: string | null
 function formatUsdt(value: { toString(): string } | number) {
   const amount = typeof value === "number" ? value : Number(value.toString());
   return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(amount)} USDT`;
+}
+
+function formatTransactionAmount(type: string, value: { toString(): string }) {
+  const sign = type === "INVESTMENT" || type === "WITHDRAWAL" ? "-" : "+";
+  return `${sign}${formatUsdt(value)}`;
 }
 
 function formatDate(date: Date, locale: "ru" | "en") {

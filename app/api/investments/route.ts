@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
 
   const wallet = await prisma.wallet.findUnique({
     where: { userId },
-    select: { availableUsdt: true }
+    select: { id: true, availableUsdt: true }
   });
   const activeApplication = await prisma.investmentApplication.findFirst({
     where: {
@@ -110,23 +110,17 @@ export async function POST(request: NextRequest) {
       projectId: project.id,
       status: InvestmentStatus.PENDING
     },
-    orderBy: { createdAt: "desc" }
+    orderBy: { createdAt: "desc" },
+    select: { id: true, reservedUsdt: true }
   });
-  const reservedApplications = await prisma.investmentApplication.aggregate({
-    _sum: { amountUsdt: true },
-    where: {
-      userId,
-      status: InvestmentStatus.PENDING,
-      NOT: activeApplication ? { id: activeApplication.id } : undefined
-    }
-  });
-  const availableUsdt = wallet?.availableUsdt ?? new Prisma.Decimal(0);
-  const reservedUsdt = reservedApplications._sum.amountUsdt ?? new Prisma.Decimal(0);
+  const zeroUsdt = new Prisma.Decimal(0);
+  const availableUsdt = wallet?.availableUsdt ?? zeroUsdt;
+  const activeReservedUsdt = activeApplication?.reservedUsdt ?? zeroUsdt;
   const requestedUsdt = new Prisma.Decimal(parsed.data.amount);
-  const rawFreeUsdt = availableUsdt.minus(reservedUsdt);
-  const freeUsdt = rawFreeUsdt.gt(0) ? rawFreeUsdt : new Prisma.Decimal(0);
+  const rawFreeUsdt = availableUsdt.plus(activeReservedUsdt);
+  const freeUsdt = rawFreeUsdt.gt(0) ? rawFreeUsdt : zeroUsdt;
 
-  if (freeUsdt.lt(requestedUsdt)) {
+  if (!wallet || freeUsdt.lt(requestedUsdt)) {
     const shortfallUsdt = requestedUsdt.minus(freeUsdt);
 
     return NextResponse.json(
@@ -143,36 +137,84 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  await prisma.$transaction(async (tx) => {
-    const applicationData = {
-      amountUsdt: parsed.data.amount,
-      termsAcceptedAt: new Date(),
-      contractAcceptedAt: new Date()
-    };
+  try {
+    await prisma.$transaction(async (tx) => {
+      const reserveDeltaUsdt = requestedUsdt.minus(activeReservedUsdt);
 
-    if (activeApplication) {
-      await tx.investmentApplication.update({
-        where: { id: activeApplication.id },
-        data: applicationData
+      if (reserveDeltaUsdt.gt(0)) {
+        const reserved = await tx.wallet.updateMany({
+          where: {
+            id: wallet.id,
+            availableUsdt: { gte: reserveDeltaUsdt }
+          },
+          data: {
+            availableUsdt: { decrement: reserveDeltaUsdt },
+            reservedUsdt: { increment: reserveDeltaUsdt }
+          }
+        });
+
+        if (reserved.count !== 1) {
+          throw new Error("insufficient_available_balance");
+        }
+      }
+
+      if (reserveDeltaUsdt.lt(0)) {
+        const releaseUsdt = reserveDeltaUsdt.abs();
+        await tx.wallet.update({
+          where: { id: wallet.id },
+          data: {
+            availableUsdt: { increment: releaseUsdt },
+            reservedUsdt: { decrement: releaseUsdt }
+          }
+        });
+      }
+
+      const applicationData = {
+        amountUsdt: requestedUsdt,
+        reservedUsdt: requestedUsdt,
+        termsAcceptedAt: new Date(),
+        contractAcceptedAt: new Date()
+      };
+
+      if (activeApplication) {
+        await tx.investmentApplication.update({
+          where: { id: activeApplication.id },
+          data: applicationData
+        });
+        return;
+      }
+
+      await tx.investmentApplication.create({
+        data: {
+          userId,
+          projectId: project.id,
+          status: InvestmentStatus.PENDING,
+          ...applicationData
+        }
       });
-      return;
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message === "insufficient_available_balance") {
+      return NextResponse.json(
+        {
+          title: localeRu ? "Недостаточно доступного баланса" : "Insufficient available balance",
+          message:
+            localeRu
+              ? "Баланс изменился во время отправки заявки. Обновите страницу и проверьте доступную сумму."
+              : "The balance changed while submitting the application. Refresh the page and check the available amount."
+        },
+        { status: 409 }
+      );
     }
 
-    await tx.investmentApplication.create({
-      data: {
-        userId,
-        projectId: project.id,
-        status: InvestmentStatus.PENDING,
-        ...applicationData
-      }
-    });
-  });
+    throw error;
+  }
 
   return NextResponse.json({
     title: localeRu ? "Заявка создана" : "Application created",
     message:
       localeRu
-        ? "Мы приняли заявку на участие. Статус появится в кабинете после проверки профиля и условий."
-        : "We received your participation application. The status will appear in your cabinet after profile and terms review."
+        ? "Мы приняли заявку на участие. Статус появится в профиле участника после проверки профиля и условий."
+        : "We received your participation application. The status will appear in your participant profile after profile and terms review."
   });
 }

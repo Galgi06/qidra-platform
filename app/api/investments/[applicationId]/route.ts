@@ -51,7 +51,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     where: {
       id: applicationId,
       userId
-    }
+    },
+    include: { user: { include: { wallet: true } } }
   });
 
   if (!application) {
@@ -74,12 +75,27 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     );
   }
 
-  await prisma.investmentApplication.update({
-    where: { id: application.id },
-    data: {
-      status: InvestmentStatus.CANCELLED,
-      adminNote: localeRu ? "Отменено участником" : "Cancelled by participant"
+  await prisma.$transaction(async (tx) => {
+    const reservedUsdt = application.reservedUsdt;
+
+    if (application.user.wallet && reservedUsdt.gt(0)) {
+      await tx.wallet.update({
+        where: { id: application.user.wallet.id },
+        data: {
+          availableUsdt: { increment: reservedUsdt },
+          reservedUsdt: { decrement: reservedUsdt }
+        }
+      });
     }
+
+    await tx.investmentApplication.update({
+      where: { id: application.id },
+      data: {
+        status: InvestmentStatus.CANCELLED,
+        reservedUsdt: 0,
+        adminNote: localeRu ? "Отменено участником" : "Cancelled by participant"
+      }
+    });
   });
 
   return NextResponse.json({

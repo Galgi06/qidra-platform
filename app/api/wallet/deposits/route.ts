@@ -100,8 +100,8 @@ export async function POST(request: NextRequest) {
         title: localeRu ? "Автопроверка не подключена" : "Auto verification is not connected",
         message:
           localeRu
-            ? "Пополнение временно недоступно: не настроен TronGrid API key."
-            : "Deposits are temporarily unavailable: TronGrid API key is not configured."
+            ? "Пополнение временно недоступно: сервис проверки платежей ещё не подключён."
+            : "Deposits are temporarily unavailable: the payment verification service is not connected yet."
       },
       { status: 503 }
     );
@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
   if (verification.status === "network_error") {
     return NextResponse.json(
       {
-        title: localeRu ? "TronGrid временно недоступен" : "TronGrid is temporarily unavailable",
+        title: localeRu ? "Проверка временно недоступна" : "Verification is temporarily unavailable",
         message:
           localeRu
             ? "Мы не можем безопасно подтвердить платёж прямо сейчас. Подождите несколько минут и отправьте hash повторно."
@@ -126,8 +126,8 @@ export async function POST(request: NextRequest) {
         title: localeRu ? "Платеж не найден" : "Payment not found",
         message:
           localeRu
-            ? "TronGrid не нашёл подтверждённый входящий USDT TRC20-перевод с этим hash на ваш личный адрес. Проверьте hash или повторите позже, если перевод только что отправлен."
-            : "TronGrid did not find a confirmed incoming USDT TRC20 transfer with this hash to your personal address. Check the hash or retry later if the transfer was just sent."
+            ? "Система не нашла подтверждённый входящий USDT TRC20-перевод с этим hash на ваш личный адрес. Проверьте hash или повторите позже, если перевод только что отправлен."
+            : "The system did not find a confirmed incoming USDT TRC20 transfer with this hash to your personal address. Check the hash or retry later if the transfer was just sent."
       },
       { status: 404 }
     );
@@ -190,28 +190,28 @@ function mismatchReason(reason: "amount" | "contract" | "recipient", localeRu: b
 
 function depositNote(status: string, localeRu: boolean) {
   if (status === "configured") return "TronGrid auto verification";
-  if (status === "not_found") return localeRu ? "Hash не найден в TronGrid, требуется проверка" : "Hash not found in TronGrid, review required";
-  if (status === "network_error") return localeRu ? "TronGrid временно недоступен, требуется проверка" : "TronGrid temporarily unavailable, review required";
+  if (status === "not_found") return localeRu ? "Hash не найден сервисом проверки, требуется проверка" : "Hash not found by verification service, review required";
+  if (status === "network_error") return localeRu ? "Сервис проверки временно недоступен, требуется проверка" : "Verification service temporarily unavailable, review required";
   return localeRu ? "Заявка на пополнение USDT TRC20" : "USDT TRC20 deposit request";
 }
 
 function depositMessage(status: string, localeRu: boolean) {
   if (status === "configured") {
     return localeRu
-      ? "Платеж найден в TronGrid. Сумма уже добавлена в доступный баланс."
-      : "The payment was found in TronGrid. The amount was added to the available balance.";
+      ? "Платеж найден и подтверждён. Сумма уже добавлена в доступный баланс."
+      : "The payment was found and confirmed. The amount was added to the available balance.";
   }
 
   if (status === "not_found") {
     return localeRu
-      ? "Hash принят. Мы пока не нашли подтверждённый перевод в TronGrid, статус останется на проверке."
-      : "The hash was received. We did not find a confirmed TronGrid transfer yet, so the status remains under review.";
+      ? "Hash принят. Мы пока не нашли подтверждённый перевод, статус останется на проверке."
+      : "The hash was received. We did not find a confirmed transfer yet, so the status remains under review.";
   }
 
   if (status === "network_error") {
     return localeRu
-      ? "Hash принят. TronGrid временно недоступен, статус останется на проверке."
-      : "The hash was received. TronGrid is temporarily unavailable, so the status remains under review.";
+      ? "Hash принят. Сервис проверки временно недоступен, статус останется на проверке."
+      : "The hash was received. The verification service is temporarily unavailable, so the status remains under review.";
   }
 
   return localeRu

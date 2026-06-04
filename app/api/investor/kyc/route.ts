@@ -262,7 +262,7 @@ export async function POST(request: NextRequest) {
     title: localeRu ? "Анкета отправлена" : "Profile submitted",
     message:
       localeRu
-        ? "Профиль и документы отправлены команде Qidra. Статус появится в кабинете после проверки."
-        : "Your profile and documents were sent to the Qidra team. The status will appear in your cabinet after review."
+        ? "Профиль и документы отправлены команде Qidra. Статус появится в профиле участника после проверки."
+        : "Your profile and documents were sent to the Qidra team. The status will appear in your participant profile after review."
   });
 }

@@ -140,7 +140,7 @@ function KycActionForm({ endpoint, locale }: { endpoint: string; locale: "ru" | 
       endpoint={endpoint}
       feedback={{
         title: locale === "ru" ? "Решение сохранено" : "Decision saved",
-        text: locale === "ru" ? "Статус анкеты обновлён, участник увидит результат в кабинете." : "The profile status was updated, and the participant will see the result in the cabinet.",
+        text: locale === "ru" ? "Статус анкеты обновлён, участник увидит результат в профиле участника." : "The profile status was updated, and the participant will see the result in the participant profile.",
         buttonLabel: locale === "ru" ? "Понятно" : "Got it",
         dismissLabel: locale === "ru" ? "Закрыть уведомление" : "Close notification",
         tone: "success"

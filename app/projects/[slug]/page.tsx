@@ -87,8 +87,8 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                 title={isRu ? "Открытая отчётность" : "Open reporting"}
                 text={
                   isRu
-                    ? "После публикации проект сопровождается обновлениями, статусами и документами в кабинете участника."
-                    : "After publication, the project is supported with updates, statuses and documents in the participant cabinet."
+                    ? "После публикации проект сопровождается обновлениями, статусами и документами в профиле участника."
+                    : "After publication, the project is supported with updates, statuses and documents in the participant profile."
                 }
               />
             </div>

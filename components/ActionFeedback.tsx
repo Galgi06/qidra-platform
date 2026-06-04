@@ -103,10 +103,23 @@ export function FeedbackForm({
   resetOnSubmit = false
 }: FeedbackFormProps) {
   const router = useRouter();
-  const [initialStoredFeedback] = useState<FeedbackMessage | null>(() => readStoredFeedback(feedback));
-  const [open, setOpen] = useState(Boolean(initialStoredFeedback));
-  const [activeFeedback, setActiveFeedback] = useState(initialStoredFeedback ?? feedback);
+  const [storedFeedbackFallback] = useState(feedback);
+  const [open, setOpen] = useState(false);
+  const [activeFeedback, setActiveFeedback] = useState(feedback);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    const storedFeedback = readStoredFeedback(storedFeedbackFallback);
+
+    if (storedFeedback) {
+      const timeoutId = window.setTimeout(() => {
+        setActiveFeedback(storedFeedback);
+        setOpen(true);
+      }, 0);
+
+      return () => window.clearTimeout(timeoutId);
+    }
+  }, [storedFeedbackFallback]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

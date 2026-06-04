@@ -28,7 +28,7 @@ export const dictionary = {
       projects: "Проекты",
       faq: "FAQ",
       legal: "Документы",
-      investor: "Кабинет",
+      investor: "Профиль",
       admin: "Админ",
       signUp: "Регистрация",
       signIn: "Вход"
@@ -61,7 +61,7 @@ export const dictionary = {
       projects: "Projects",
       faq: "FAQ",
       legal: "Documents",
-      investor: "Cabinet",
+      investor: "Profile",
       admin: "Admin",
       signUp: "Registration",
       signIn: "Sign in"

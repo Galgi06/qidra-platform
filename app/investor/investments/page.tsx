@@ -22,13 +22,15 @@ export default async function InvestmentsPage({ searchParams }: { searchParams?:
   });
   const wallet = await prisma.wallet.findUnique({
     where: { userId },
-    select: { availableUsdt: true }
+    select: { availableUsdt: true, reservedUsdt: true }
   });
   const pendingTotal = applications
     .filter((application) => application.status === "PENDING")
     .reduce((total, application) => total + Number(application.amountUsdt.toString()), 0);
   const availableUsdt = Number(wallet?.availableUsdt.toString() ?? 0);
-  const freeUsdt = Math.max(availableUsdt - pendingTotal, 0);
+  const reservedUsdt = Number(wallet?.reservedUsdt.toString() ?? 0);
+  const freeUsdt = Math.max(availableUsdt, 0);
+  const unbackedPendingUsdt = Math.max(pendingTotal - reservedUsdt - availableUsdt, 0);
 
   return (
     <>
@@ -37,7 +39,7 @@ export default async function InvestmentsPage({ searchParams }: { searchParams?:
         <section className="bg-qidra-grayLight px-5 py-10 sm:px-8 lg:px-11 lg:py-14">
           <div className="mx-auto grid max-w-[1840px] gap-8">
             <div>
-              <p className="text-14 font-medium uppercase text-qidra-accent">{isRu ? "Кабинет участника" : "Participant cabinet"}</p>
+              <p className="text-14 font-medium uppercase text-qidra-accent">{isRu ? "Профиль участника" : "Participant profile"}</p>
               <h1 className="mt-3 max-w-4xl text-[42px] font-medium leading-tight tracking-[0] text-qidra-dark sm:text-[56px]">
                 {isRu ? "Моё участие" : "My participation"}
               </h1>
@@ -61,16 +63,15 @@ export default async function InvestmentsPage({ searchParams }: { searchParams?:
         <section className="px-5 py-12 sm:px-8 lg:px-11 lg:py-16">
           <div className="mx-auto grid max-w-[1840px] gap-5">
             <div className="grid gap-4 md:grid-cols-3">
-              <SummaryCard label={isRu ? "Доступный баланс" : "Available balance"} value={formatUsdt(availableUsdt)} />
-              <SummaryCard label={isRu ? "В заявках на проверке" : "Pending applications"} value={formatUsdt(pendingTotal)} />
-              <SummaryCard label={isRu ? "Свободно для новых заявок" : "Free for new applications"} value={formatUsdt(freeUsdt)} tone={freeUsdt > 0 ? "success" : "warning"} />
+              <SummaryCard label={isRu ? "Доступно для новых заявок" : "Available for new applications"} value={formatUsdt(freeUsdt)} />
+              <SummaryCard label={isRu ? "Зарезервировано" : "Reserved"} value={formatUsdt(reservedUsdt)} />
+              <SummaryCard label={isRu ? "Заявки на проверке" : "Pending applications"} value={formatUsdt(pendingTotal)} tone={unbackedPendingUsdt > 0 ? "warning" : "success"} />
             </div>
             {applications.length ? (
               <div className="grid gap-4">
                 {applications.map((application) => {
-                  const amount = Number(application.amountUsdt.toString());
-                  const balanceWarning = application.status === "PENDING" && pendingTotal > availableUsdt;
-                  const shortfall = Math.max(pendingTotal - availableUsdt, 0);
+                  const balanceWarning = application.status === "PENDING" && unbackedPendingUsdt > 0;
+                  const shortfall = unbackedPendingUsdt;
 
                   return (
                   <article key={application.id} className="rounded-[20px] bg-white p-6 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] sm:p-8">
@@ -101,8 +102,8 @@ export default async function InvestmentsPage({ searchParams }: { searchParams?:
                           <p className="text-16 font-medium text-qidra-dark">{isRu ? "Недостаточно баланса для подтверждения" : "Insufficient balance for confirmation"}</p>
                           <p className="mt-1 text-14 text-qidra-grayBlue">
                             {isRu
-                              ? `На балансе ${formatUsdt(availableUsdt)}, на проверке заявок на ${formatUsdt(pendingTotal)}. Пополните ${formatUsdt(shortfall)} или отмените лишнюю заявку.`
-                              : `Balance is ${formatUsdt(availableUsdt)}, pending applications total ${formatUsdt(pendingTotal)}. Top up ${formatUsdt(shortfall)} or cancel an extra application.`}
+                              ? `Доступно ${formatUsdt(availableUsdt)}, зарезервировано ${formatUsdt(reservedUsdt)}, заявки на проверке ${formatUsdt(pendingTotal)}. Пополните ${formatUsdt(shortfall)} или отмените лишнюю заявку.`
+                              : `Available ${formatUsdt(availableUsdt)}, reserved ${formatUsdt(reservedUsdt)}, pending applications ${formatUsdt(pendingTotal)}. Top up ${formatUsdt(shortfall)} or cancel an extra application.`}
                           </p>
                         </div>
                         <ButtonLink href={withLocale(`/investor/wallet?amount=${formatAmountForInput(shortfall)}`, locale)} size="sm">

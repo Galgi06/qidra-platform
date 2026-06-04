@@ -38,7 +38,7 @@ export default async function InvestorPage({ searchParams }: { searchParams?: Se
               <div className="flex items-start gap-4 sm:gap-5">
                 <UserAvatar name={userName} />
                 <div>
-                  <p className="text-14 font-medium uppercase text-qidra-accent">{isRu ? "Кабинет участника" : "Participant cabinet"}</p>
+                  <p className="text-14 font-medium uppercase text-qidra-accent">{isRu ? "Профиль участника" : "Participant profile"}</p>
                   <h1 className="mt-3 text-[36px] font-medium leading-tight tracking-[0] text-qidra-dark sm:text-[48px]">{userName}</h1>
                   {displayEmail ? <p className="mt-2 text-16 text-qidra-grayBlue">{displayEmail}</p> : null}
                 </div>

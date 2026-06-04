@@ -128,8 +128,8 @@ export function InvestmentApplicationForm({
         text:
           data.message ??
           (isRu
-            ? "Мы приняли заявку на участие. Статус появится в кабинете после рассмотрения."
-            : "We received your participation application. The status will appear in your cabinet after review."),
+            ? "Мы приняли заявку на участие. Статус появится в профиле участника после рассмотрения."
+            : "We received your participation application. The status will appear in your participant profile after review."),
         tone: "success"
       });
       router.refresh();

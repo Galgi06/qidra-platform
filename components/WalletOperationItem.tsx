@@ -3,13 +3,14 @@ type WalletOperationItemProps = {
   amount: string;
   meta?: string;
   status?: string;
-  tone?: "pending" | "success" | "error";
+  tone?: "pending" | "success" | "error" | "neutral";
 };
 
 const toneClass: Record<NonNullable<WalletOperationItemProps["tone"]>, string> = {
   pending: "text-qidra-accent",
   success: "text-qidra-green",
-  error: "text-qidra-red"
+  error: "text-qidra-red",
+  neutral: "text-qidra-dark"
 };
 
 export function WalletOperationItem({ title, amount, meta, status, tone = "pending" }: WalletOperationItemProps) {

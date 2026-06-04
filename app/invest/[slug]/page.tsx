@@ -32,20 +32,12 @@ export default async function InvestPage({ params, searchParams }: { params: Pro
         status: "PENDING"
       },
       orderBy: { createdAt: "desc" },
-      select: { id: true }
+      select: { id: true, reservedUsdt: true }
     })
   ]);
-  const reservedApplications = await prisma.investmentApplication.aggregate({
-    _sum: { amountUsdt: true },
-    where: {
-      userId,
-      status: "PENDING",
-      NOT: activeApplication ? { id: activeApplication.id } : undefined
-    }
-  });
   const availableUsdt = Number(wallet?.availableUsdt?.toString() ?? 0);
-  const reservedUsdt = Number(reservedApplications._sum.amountUsdt?.toString() ?? 0);
-  const freeUsdt = Math.max(availableUsdt - reservedUsdt, 0);
+  const activeReservedUsdt = Number(activeApplication?.reservedUsdt?.toString() ?? 0);
+  const freeUsdt = Math.max(availableUsdt + activeReservedUsdt, 0);
   const kycApproved = latestKyc?.status === "APPROVED";
 
   return (
