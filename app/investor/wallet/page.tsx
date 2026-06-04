@@ -43,8 +43,8 @@ export default async function WalletPage({ searchParams }: { searchParams?: Sear
               </h1>
               <p className="mt-4 max-w-3xl text-20 text-qidra-grayBlue">
                 {isRu
-                  ? "Отправляйте USDT в сети TRC20, добавляйте transaction hash и отслеживайте статус операции после проверки сети."
-                  : "Send USDT on TRC20, add the transaction hash and track the operation status after network verification."}
+                  ? "Отправляйте USDT в сети TRC20 и добавляйте transaction hash. Qidra автоматически проверит перевод через TronGrid перед зачислением."
+                  : "Send USDT on TRC20 and add the transaction hash. Qidra will automatically verify the transfer through TronGrid before crediting it."}
               </p>
             </div>
             <Tabs
@@ -74,8 +74,8 @@ export default async function WalletPage({ searchParams }: { searchParams?: Sear
                   title: isRu ? "Заявка на пополнение создана" : "Deposit request created",
                   text:
                     isRu
-                      ? "Transaction hash принят. Страница обновится, и заявка появится в истории операций."
-                      : "The transaction hash was received. The page will refresh and the request will appear in the transaction history.",
+                      ? "Transaction hash подтверждён через TronGrid. Страница обновится, и операция появится в истории."
+                      : "The transaction hash was confirmed through TronGrid. The page will refresh and the operation will appear in history.",
                   buttonLabel: isRu ? "Понятно" : "Got it",
                   dismissLabel: isRu ? "Закрыть уведомление" : "Close notification",
                   tone: "success"
@@ -95,12 +95,12 @@ export default async function WalletPage({ searchParams }: { searchParams?: Sear
                 )}
                 <NotificationCard
                   title={isRu ? "Перед отправкой" : "Before submitting"}
-                  text={isRu ? "Проверьте сеть, адрес, сумму и transaction hash перед отправкой." : "Check the network, address, amount and transaction hash before submitting."}
+                  text={isRu ? "Qidra примет только подтверждённый входящий USDT TRC20-перевод на указанный адрес и с точно такой же суммой." : "Qidra will accept only a confirmed incoming USDT TRC20 transfer to the shown address with the exact submitted amount."}
                 />
                 <Input label="Transaction hash" name="txHash" placeholder="TRC20 transaction hash" required />
                 <Input label="Amount USDT" name="amount" inputMode="decimal" placeholder="1000" required />
                 <Button disabled={!tronPayment.walletConfigured} type="submit">
-                  {isRu ? "Создать заявку" : "Create request"}
+                  {isRu ? "Проверить и пополнить" : "Verify and deposit"}
                 </Button>
               </FeedbackForm>
 

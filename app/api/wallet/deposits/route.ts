@@ -13,7 +13,7 @@ const depositSchema = z.object({
     .transform((value) => value.replace(",", ".").replace(/\s/g, ""))
     .refine((value) => /^\d+(\.\d{1,6})?$/.test(value), "invalid")
     .refine((value) => new Prisma.Decimal(value).gt(0), "positive"),
-  txHash: z.string().trim().min(16).max(160)
+  txHash: z.string().trim().regex(/^[a-fA-F0-9]{64}$/)
 });
 
 type SessionUser = {
@@ -47,19 +47,18 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         title: localeRu ? "Проверьте данные" : "Check the details",
-        message: localeRu ? "Укажите сумму больше 0 и корректный transaction hash." : "Enter an amount greater than 0 and a valid transaction hash."
+        message: localeRu ? "Укажите сумму больше 0 и полный TRON transaction hash из 64 символов." : "Enter an amount greater than 0 and the full 64-character TRON transaction hash."
       },
       { status: 400 }
     );
   }
 
-  const txHash = parsed.data.txHash;
+  const txHash = parsed.data.txHash.toLowerCase();
   const amountUsdt = new Prisma.Decimal(parsed.data.amount);
   const duplicate = await prisma.walletTransaction.findFirst({
     where: {
       txHash,
-      type: TransactionType.DEPOSIT,
-      status: { in: [PaymentStatus.PENDING, PaymentStatus.CONFIRMED] }
+      type: TransactionType.DEPOSIT
     }
   });
 
@@ -69,14 +68,53 @@ export async function POST(request: NextRequest) {
         title: localeRu ? "Hash уже отправлен" : "Hash already submitted",
         message:
           localeRu
-            ? "Эта операция уже находится на проверке или была подтверждена."
-            : "This transaction is already under review or has been confirmed."
+            ? "Этот transaction hash уже был отправлен в Qidra. Повторное использование hash невозможно."
+            : "This transaction hash has already been submitted to Qidra. Hash reuse is not allowed."
       },
       { status: 409 }
     );
   }
 
   const verification = await verifyTrc20Deposit(txHash, amountUsdt);
+
+  if (verification.status === "unconfigured") {
+    return NextResponse.json(
+      {
+        title: localeRu ? "Автопроверка не подключена" : "Auto verification is not connected",
+        message:
+          localeRu
+            ? "Пополнение временно недоступно: не настроены TronGrid API key или адрес приёма Qidra."
+            : "Deposits are temporarily unavailable: TronGrid API key or Qidra receiving address is not configured."
+      },
+      { status: 503 }
+    );
+  }
+
+  if (verification.status === "network_error") {
+    return NextResponse.json(
+      {
+        title: localeRu ? "TronGrid временно недоступен" : "TronGrid is temporarily unavailable",
+        message:
+          localeRu
+            ? "Мы не можем безопасно подтвердить платёж прямо сейчас. Подождите несколько минут и отправьте hash повторно."
+            : "We cannot safely verify the payment right now. Wait a few minutes and submit the hash again."
+      },
+      { status: 503 }
+    );
+  }
+
+  if (verification.status === "not_found") {
+    return NextResponse.json(
+      {
+        title: localeRu ? "Платеж не найден" : "Payment not found",
+        message:
+          localeRu
+            ? "TronGrid не нашёл подтверждённый входящий USDT TRC20-перевод с этим hash на адрес Qidra. Проверьте hash или повторите позже, если перевод только что отправлен."
+            : "TronGrid did not find a confirmed incoming USDT TRC20 transfer with this hash to the Qidra address. Check the hash or retry later if the transfer was just sent."
+      },
+      { status: 404 }
+    );
+  }
 
   if (verification.status === "mismatch") {
     const reason =
@@ -102,13 +140,12 @@ export async function POST(request: NextRequest) {
   }
 
   await prisma.$transaction(async (tx) => {
-    const verified = verification.verified;
     const wallet = await tx.wallet.upsert({
       where: { userId },
-      update: verified ? { availableUsdt: { increment: amountUsdt } } : { pendingUsdt: { increment: amountUsdt } },
+      update: { availableUsdt: { increment: amountUsdt } },
       create: {
         userId,
-        ...(verified ? { availableUsdt: amountUsdt } : { pendingUsdt: amountUsdt })
+        availableUsdt: amountUsdt
       }
     });
 
@@ -116,27 +153,25 @@ export async function POST(request: NextRequest) {
       data: {
         walletId: wallet.id,
         type: TransactionType.DEPOSIT,
-        status: verified ? PaymentStatus.CONFIRMED : PaymentStatus.PENDING,
+        status: PaymentStatus.CONFIRMED,
         amountUsdt,
         txHash,
         note: depositNote(verification.status, localeRu)
       }
     });
 
-    if (verified) {
-      await tx.paymentConfirmation.create({
-        data: {
-          transactionId: transaction.id,
-          status: PaymentStatus.CONFIRMED,
-          reviewedAt: new Date(),
-          note: "TronGrid auto verification"
-        }
-      });
-    }
+    await tx.paymentConfirmation.create({
+      data: {
+        transactionId: transaction.id,
+        status: PaymentStatus.CONFIRMED,
+        reviewedAt: new Date(),
+        note: "TronGrid auto verification"
+      }
+    });
   });
 
   return NextResponse.json({
-    title: verification.verified ? (localeRu ? "Платеж подтвержден" : "Payment confirmed") : localeRu ? "Заявка на пополнение создана" : "Deposit request created",
+    title: localeRu ? "Платеж подтвержден" : "Payment confirmed",
     message: depositMessage(verification.status, localeRu)
   });
 }
