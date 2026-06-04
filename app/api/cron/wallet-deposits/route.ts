@@ -10,14 +10,14 @@ export async function POST(request: NextRequest) {
 }
 
 async function runCronSync(request: NextRequest) {
-  const secret = process.env.QIDRA_WALLET_SYNC_SECRET;
+  const secret = process.env.CRON_SECRET || process.env.QIDRA_WALLET_SYNC_SECRET;
   const authorization = request.headers.get("authorization");
 
   if (!secret || authorization !== `Bearer ${secret}`) {
     return NextResponse.json(
       {
         title: "Access denied",
-        message: "Wallet deposit sync requires a valid bearer secret."
+        message: "Wallet deposit sync requires a valid bearer secret. Set CRON_SECRET or QIDRA_WALLET_SYNC_SECRET."
       },
       { status: 401 }
     );
@@ -31,7 +31,7 @@ async function runCronSync(request: NextRequest) {
     return NextResponse.json(
       {
         title: "Payment verification is not configured",
-        message: "Add the payment verification API key before running wallet deposit sync.",
+        message: "Add TRONGRID_API_KEY before running wallet deposit sync.",
         result
       },
       { status: 503 }
