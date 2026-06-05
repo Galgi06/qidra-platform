@@ -1,20 +1,27 @@
+import Link from "next/link";
+import type { ReactNode } from "react";
+import { KycStatus, Prisma, Role } from "@prisma/client";
 import { AdminTabs } from "@/components/AdminTabs";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { FeedbackForm } from "@/components/ActionFeedback";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
+import { NotificationCard } from "@/components/NotificationCard";
 import { UserAvatar } from "@/components/UserAvatar";
+import { Button } from "@/components/ui/Button";
+import { Select } from "@/components/ui/Select";
 import { requireAdmin } from "@/lib/access";
 import { canManageManagers } from "@/lib/auth";
 import { getLocale, t, type SearchParams, withLocale } from "@/lib/i18n";
 import { prisma } from "@/lib/prisma";
-import { Button } from "@/components/ui/Button";
-import { Select } from "@/components/ui/Select";
 
 export default async function AdminUsersPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
-  const locale = await getLocale(searchParams);
+  const params = await searchParams;
+  const locale = await getLocale(params);
   const session = await requireAdmin(locale, "/admin/users");
   const canManageRoles = canManageManagers(session.user?.role as "ADMIN" | "SUPER_ADMIN" | "guest" | undefined);
+  const roleFilter = parseRole(searchParamString(params.role));
+  const kycFilter = parseKycFilter(searchParamString(params.kyc));
   const users = await prisma.user.findMany({
     include: {
       wallet: true,
@@ -29,7 +36,15 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
       }
     },
     orderBy: { createdAt: "desc" },
-    take: 100
+    take: 500
+  });
+  const stats = buildUserStats(users);
+  const filteredUsers = users.filter((user) => {
+    const latestKycStatus = user.kycApplications[0]?.status;
+    const roleMatches = roleFilter ? user.role === roleFilter : true;
+    const kycMatches = kycFilter ? (kycFilter === "NOT_SUBMITTED" ? !latestKycStatus : latestKycStatus === kycFilter) : true;
+
+    return roleMatches && kycMatches;
   });
 
   return (
@@ -58,54 +73,172 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
         <section className="section">
           <div className="container-qidra grid gap-8">
             <AdminTabs activePath="/admin/users" locale={locale} />
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[980px] border-collapse text-left">
-              <thead>
-                <tr className="border-b border-qidra-grayLight text-14 font-medium text-qidra-grayBlue">
-                  <th className="py-4">{locale === "ru" ? "Пользователь" : "User"}</th>
-                  <th className="py-4">{locale === "ru" ? "Роль" : "Role"}</th>
-                  <th className="py-4">{locale === "ru" ? "Профиль" : "Profile"}</th>
-                  <th className="py-4">{locale === "ru" ? "Баланс" : "Balance"}</th>
-                  <th className="py-4">{locale === "ru" ? "Заявки" : "Applications"}</th>
-                  <th className="py-4">{locale === "ru" ? "Доступ" : "Access"}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {users.map((user) => (
-                  <tr key={user.email} className="border-b border-qidra-grayLight">
-                    <td className="py-5 pr-6">
-                      <div className="flex items-center gap-3">
-                        <UserAvatar name={user.name || user.email} />
-                        <div>
-                          <p className="text-16 font-medium text-qidra-dark">{user.name || (locale === "ru" ? "Без имени" : "No name")}</p>
-                          <p className="text-14 text-qidra-grayBlue">{user.email}</p>
-                          <p className="mt-1 text-12 text-qidra-grayBlue">{formatDate(user.createdAt, locale)}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="py-5 pr-6 text-16 text-qidra-grayBlue">{roleLabel(user.role, locale)}</td>
-                    <td className="py-5 pr-6 text-16 text-qidra-grayBlue">{profileStatus(user.kycApplications[0]?.status, locale)}</td>
-                    <td className="py-5 pr-6 text-16 font-medium text-qidra-dark">{formatUsdt(user.wallet?.availableUsdt ?? 0)}</td>
-                    <td className="py-5 pr-6 text-16 text-qidra-grayBlue">{user._count.investments}</td>
-                    <td className="py-5">
-                      {canManageRoles && user.id !== session.user?.id ? (
-                        <RoleForm currentRole={user.role} endpoint={`/api/admin/users/${user.id}/role?lang=${locale}`} locale={locale} />
-                      ) : (
-                        <span className="text-14 text-qidra-grayBlue">
-                          {user.id === session.user?.id ? (locale === "ru" ? "Ваш аккаунт" : "Your account") : locale === "ru" ? "Только просмотр" : "View only"}
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              </table>
-            </div>
+            <UsersDashboard locale={locale} stats={stats} />
+            <UsersFilters kycFilter={kycFilter} locale={locale} roleFilter={roleFilter} stats={stats} />
+            {filteredUsers.length ? (
+              <div className="overflow-x-auto rounded-qidra bg-white p-2 shadow-[0_0_0_1px_rgba(18,20,23,0.08)]">
+                <table className="w-full min-w-[980px] border-collapse text-left">
+                  <thead>
+                    <tr className="border-b border-qidra-grayLight text-14 font-medium text-qidra-grayBlue">
+                      <th className="py-4 pl-4">{locale === "ru" ? "Пользователь" : "User"}</th>
+                      <th className="py-4">{locale === "ru" ? "Роль" : "Role"}</th>
+                      <th className="py-4">{locale === "ru" ? "Профиль" : "Profile"}</th>
+                      <th className="py-4">{locale === "ru" ? "Баланс" : "Balance"}</th>
+                      <th className="py-4">{locale === "ru" ? "Заявки" : "Applications"}</th>
+                      <th className="py-4">{locale === "ru" ? "Доступ" : "Access"}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredUsers.map((user) => (
+                      <tr key={user.email} className="border-b border-qidra-grayLight last:border-b-0">
+                        <td className="py-5 pl-4 pr-6">
+                          <div className="flex items-center gap-3">
+                            <UserAvatar name={user.name || user.email} />
+                            <div>
+                              <p className="text-16 font-medium text-qidra-dark">{user.name || (locale === "ru" ? "Без имени" : "No name")}</p>
+                              <p className="text-14 text-qidra-grayBlue">{user.email}</p>
+                              <p className="mt-1 text-12 text-qidra-grayBlue">{formatDate(user.createdAt, locale)}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-5 pr-6 text-16 text-qidra-grayBlue">{roleLabel(user.role, locale)}</td>
+                        <td className="py-5 pr-6 text-16 text-qidra-grayBlue">{profileStatus(user.kycApplications[0]?.status, locale)}</td>
+                        <td className="py-5 pr-6 text-16 font-medium text-qidra-dark">{formatUsdt(user.wallet?.availableUsdt ?? 0)}</td>
+                        <td className="py-5 pr-6 text-16 text-qidra-grayBlue">{user._count.investments}</td>
+                        <td className="py-5">
+                          {canManageRoles && user.id !== session.user?.id ? (
+                            <RoleForm currentRole={user.role} endpoint={`/api/admin/users/${user.id}/role?lang=${locale}`} locale={locale} />
+                          ) : (
+                            <span className="text-14 text-qidra-grayBlue">
+                              {user.id === session.user?.id ? (locale === "ru" ? "Ваш аккаунт" : "Your account") : locale === "ru" ? "Только просмотр" : "View only"}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <NotificationCard
+                title={locale === "ru" ? "Пользователи не найдены" : "No users found"}
+                text={locale === "ru" ? "Измените фильтры по роли или статусу профиля." : "Change the role or profile status filters."}
+              />
+            )}
           </div>
         </section>
       </main>
       <Footer locale={locale} />
     </>
+  );
+}
+
+type AdminUserListItem = Prisma.UserGetPayload<{
+  include: {
+    wallet: true;
+    kycApplications: {
+      orderBy: {
+        createdAt: "desc";
+      };
+      take: 1;
+    };
+    _count: {
+      select: {
+        investments: true;
+      };
+    };
+  };
+}>;
+type KycFilter = KycStatus | "NOT_SUBMITTED";
+
+type UserStats = {
+  adminCount: number;
+  approvedKycCount: number;
+  investorCount: number;
+  notSubmittedKycCount: number;
+  pendingKycCount: number;
+  rejectedKycCount: number;
+  superAdminCount: number;
+  totalCount: number;
+};
+
+function UsersDashboard({ locale, stats }: { locale: "ru" | "en"; stats: UserStats }) {
+  return (
+    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <UserStatCard label={locale === "ru" ? "Всего аккаунтов" : "Total accounts"} value={stats.totalCount} />
+      <UserStatCard label={locale === "ru" ? "Участники" : "Participants"} value={stats.investorCount} />
+      <UserStatCard label={locale === "ru" ? "Админы" : "Admins"} tone="accent" value={stats.adminCount + stats.superAdminCount} />
+      <UserStatCard label={locale === "ru" ? "KYC на проверке" : "KYC pending"} tone="accent" value={stats.pendingKycCount} />
+      <UserStatCard label={locale === "ru" ? "KYC одобрен" : "KYC approved"} tone="success" value={stats.approvedKycCount} />
+    </div>
+  );
+}
+
+function UserStatCard({ label, tone = "neutral", value }: { label: string; tone?: "accent" | "neutral" | "success"; value: number }) {
+  const valueClass = tone === "success" ? "text-qidra-green" : tone === "accent" ? "text-qidra-accent" : "text-qidra-dark";
+
+  return (
+    <article className="rounded-qidra bg-white p-5 shadow-[0_0_0_1px_rgba(18,20,23,0.08)]">
+      <p className="text-14 font-medium text-qidra-grayBlue">{label}</p>
+      <p className={`mt-3 text-[32px] font-medium leading-tight tracking-[0] ${valueClass}`}>{formatCount(value)}</p>
+    </article>
+  );
+}
+
+function UsersFilters({ kycFilter, locale, roleFilter, stats }: { kycFilter?: KycFilter; locale: "ru" | "en"; roleFilter?: Role; stats: UserStats }) {
+  return (
+    <div className="grid gap-4 rounded-qidra border border-qidra-grayLight bg-white p-4">
+      <div className="grid gap-2">
+        <p className="text-14 font-medium text-qidra-grayBlue">{locale === "ru" ? "Роль" : "Role"}</p>
+        <div className="flex flex-wrap gap-2">
+          <UserFilterPill active={!roleFilter} href={usersFilterHref(locale, undefined, kycFilter)}>
+            {locale === "ru" ? "Все" : "All"} ({formatCount(stats.totalCount)})
+          </UserFilterPill>
+          <UserFilterPill active={roleFilter === Role.INVESTOR} href={usersFilterHref(locale, Role.INVESTOR, kycFilter)}>
+            {locale === "ru" ? "Участники" : "Participants"} ({formatCount(stats.investorCount)})
+          </UserFilterPill>
+          <UserFilterPill active={roleFilter === Role.ADMIN} href={usersFilterHref(locale, Role.ADMIN, kycFilter)}>
+            {locale === "ru" ? "Админы" : "Admins"} ({formatCount(stats.adminCount)})
+          </UserFilterPill>
+          <UserFilterPill active={roleFilter === Role.SUPER_ADMIN} href={usersFilterHref(locale, Role.SUPER_ADMIN, kycFilter)}>
+            {locale === "ru" ? "Главные админы" : "Super admins"} ({formatCount(stats.superAdminCount)})
+          </UserFilterPill>
+        </div>
+      </div>
+      <div className="grid gap-2">
+        <p className="text-14 font-medium text-qidra-grayBlue">{locale === "ru" ? "Профиль" : "Profile"}</p>
+        <div className="flex flex-wrap gap-2">
+          <UserFilterPill active={!kycFilter} href={usersFilterHref(locale, roleFilter)}>
+            {locale === "ru" ? "Все статусы" : "All statuses"} ({formatCount(stats.totalCount)})
+          </UserFilterPill>
+          <UserFilterPill active={kycFilter === "NOT_SUBMITTED"} href={usersFilterHref(locale, roleFilter, "NOT_SUBMITTED")}>
+            {locale === "ru" ? "Не отправлен" : "Not submitted"} ({formatCount(stats.notSubmittedKycCount)})
+          </UserFilterPill>
+          <UserFilterPill active={kycFilter === KycStatus.SUBMITTED} href={usersFilterHref(locale, roleFilter, KycStatus.SUBMITTED)}>
+            {locale === "ru" ? "На проверке" : "In review"} ({formatCount(stats.pendingKycCount)})
+          </UserFilterPill>
+          <UserFilterPill active={kycFilter === KycStatus.APPROVED} href={usersFilterHref(locale, roleFilter, KycStatus.APPROVED)}>
+            {locale === "ru" ? "Одобрен" : "Approved"} ({formatCount(stats.approvedKycCount)})
+          </UserFilterPill>
+          <UserFilterPill active={kycFilter === KycStatus.REJECTED} href={usersFilterHref(locale, roleFilter, KycStatus.REJECTED)}>
+            {locale === "ru" ? "Нужны правки" : "Needs updates"} ({formatCount(stats.rejectedKycCount)})
+          </UserFilterPill>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function UserFilterPill({ active, children, href }: { active: boolean; children: ReactNode; href: string }) {
+  return (
+    <Link
+      className={`inline-flex h-10 items-center justify-center rounded-qidra border px-4 text-14 font-medium transition-colors ${
+        active ? "border-qidra-dark bg-qidra-dark text-white" : "border-qidra-grayLight bg-white text-qidra-grayBlue hover:border-qidra-accent hover:text-qidra-accent"
+      }`}
+      href={href}
+    >
+      {children}
+    </Link>
   );
 }
 
@@ -166,4 +299,69 @@ function formatDate(date: Date, locale: "ru" | "en") {
     month: "short",
     year: "numeric"
   }).format(date);
+}
+
+function buildUserStats(users: AdminUserListItem[]): UserStats {
+  return users.reduce<UserStats>(
+    (stats, user) => {
+      const kycStatus = user.kycApplications[0]?.status;
+
+      stats.totalCount += 1;
+      if (user.role === Role.INVESTOR) stats.investorCount += 1;
+      if (user.role === Role.ADMIN) stats.adminCount += 1;
+      if (user.role === Role.SUPER_ADMIN) stats.superAdminCount += 1;
+      if (!kycStatus) stats.notSubmittedKycCount += 1;
+      if (kycStatus === KycStatus.SUBMITTED) stats.pendingKycCount += 1;
+      if (kycStatus === KycStatus.APPROVED) stats.approvedKycCount += 1;
+      if (kycStatus === KycStatus.REJECTED) stats.rejectedKycCount += 1;
+
+      return stats;
+    },
+    {
+      adminCount: 0,
+      approvedKycCount: 0,
+      investorCount: 0,
+      notSubmittedKycCount: 0,
+      pendingKycCount: 0,
+      rejectedKycCount: 0,
+      superAdminCount: 0,
+      totalCount: 0
+    }
+  );
+}
+
+function searchParamString(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function parseRole(value: string | undefined) {
+  const normalized = value?.toUpperCase();
+
+  if (normalized === Role.INVESTOR) return Role.INVESTOR;
+  if (normalized === Role.ADMIN) return Role.ADMIN;
+  if (normalized === Role.SUPER_ADMIN) return Role.SUPER_ADMIN;
+  return undefined;
+}
+
+function parseKycFilter(value: string | undefined): KycFilter | undefined {
+  const normalized = value?.toUpperCase();
+
+  if (normalized === "NOT_SUBMITTED") return "NOT_SUBMITTED";
+  if (normalized === KycStatus.SUBMITTED) return KycStatus.SUBMITTED;
+  if (normalized === KycStatus.APPROVED) return KycStatus.APPROVED;
+  if (normalized === KycStatus.REJECTED) return KycStatus.REJECTED;
+  return undefined;
+}
+
+function usersFilterHref(locale: "ru" | "en", role?: Role, kyc?: KycFilter) {
+  const params = new URLSearchParams({ lang: locale });
+
+  if (role) params.set("role", role.toLowerCase());
+  if (kyc) params.set("kyc", kyc.toLowerCase());
+
+  return `/admin/users?${params.toString()}`;
+}
+
+function formatCount(value: number) {
+  return new Intl.NumberFormat("en-US").format(value);
 }
