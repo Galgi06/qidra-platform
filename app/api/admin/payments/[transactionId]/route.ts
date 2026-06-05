@@ -218,10 +218,17 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         }
       });
 
-      await tx.wallet.update({
-        where: { id: transaction.walletId },
+      const walletUpdate = await tx.wallet.updateMany({
+        where: {
+          id: transaction.walletId,
+          pendingUsdt: { gte: transaction.amountUsdt }
+        },
         data: walletUpdateForAction(transaction.type, nextStatus, transaction.amountUsdt)
       });
+
+      if (walletUpdate.count !== 1) {
+        throw new Error("insufficient_pending_balance");
+      }
 
       await tx.adminAuditLog.create({
         data: {
@@ -236,6 +243,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   } catch (error) {
     if (isUniqueTxHashError(error)) {
       return duplicateHashResponse(localeRu);
+    }
+
+    if (error instanceof Error && error.message === "insufficient_pending_balance") {
+      return paymentBalanceChangedResponse(localeRu);
     }
 
     throw error;
@@ -262,6 +273,19 @@ function duplicateHashResponse(localeRu: boolean) {
         localeRu
           ? "Этот transaction hash уже сохранён в другой операции. Повторное использование hash невозможно."
           : "This transaction hash is already saved on another operation. Hash reuse is not allowed."
+    },
+    { status: 409 }
+  );
+}
+
+function paymentBalanceChangedResponse(localeRu: boolean) {
+  return NextResponse.json(
+    {
+      title: localeRu ? "Баланс изменился" : "Balance changed",
+      message:
+        localeRu
+          ? "Ожидающий баланс участника изменился во время обработки. Обновите страницу и проверьте операцию снова."
+          : "The participant pending balance changed during processing. Refresh the page and check the operation again."
     },
     { status: 409 }
   );

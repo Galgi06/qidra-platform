@@ -133,50 +133,77 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     );
   }
 
-  await prisma.$transaction([
-    prisma.walletTransaction.update({
-      where: { id: transaction.id },
-      data: {
-        status: PaymentStatus.CONFIRMED,
-        note: "TronGrid verification"
-      }
-    }),
-    prisma.paymentConfirmation.upsert({
-      where: { transactionId: transaction.id },
-      update: {
-        reviewerId: session?.user?.id,
-        status: PaymentStatus.CONFIRMED,
-        reviewedAt: new Date(),
-        note: "TronGrid verification"
-      },
-      create: {
-        transactionId: transaction.id,
-        reviewerId: session?.user?.id,
-        status: PaymentStatus.CONFIRMED,
-        reviewedAt: new Date(),
-        note: "TronGrid verification"
-      }
-    }),
-    prisma.wallet.update({
-      where: { id: transaction.walletId },
-      data: {
-        availableUsdt: { increment: transaction.amountUsdt },
-        pendingUsdt: { decrement: transaction.amountUsdt }
-      }
-    }),
-    prisma.adminAuditLog.create({
-      data: {
-        actorId: session?.user?.id,
-        action: "payment.trongrid.confirm",
-        entityType: "WalletTransaction",
-        entityId: transaction.id,
-        payload: {
-          amountUsdt: transaction.amountUsdt.toString(),
-          txHash: transaction.txHash
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.walletTransaction.update({
+        where: { id: transaction.id },
+        data: {
+          status: PaymentStatus.CONFIRMED,
+          note: "Automatic TRC20 verification"
         }
+      });
+
+      await tx.paymentConfirmation.upsert({
+        where: { transactionId: transaction.id },
+        update: {
+          reviewerId: session?.user?.id,
+          status: PaymentStatus.CONFIRMED,
+          reviewedAt: new Date(),
+          note: "Automatic TRC20 verification"
+        },
+        create: {
+          transactionId: transaction.id,
+          reviewerId: session?.user?.id,
+          status: PaymentStatus.CONFIRMED,
+          reviewedAt: new Date(),
+          note: "Automatic TRC20 verification"
+        }
+      });
+
+      const walletUpdate = await tx.wallet.updateMany({
+        where: {
+          id: transaction.walletId,
+          pendingUsdt: { gte: transaction.amountUsdt }
+        },
+        data: {
+          availableUsdt: { increment: transaction.amountUsdt },
+          pendingUsdt: { decrement: transaction.amountUsdt }
+        }
+      });
+
+      if (walletUpdate.count !== 1) {
+        throw new Error("insufficient_pending_balance");
       }
-    })
-  ]);
+
+      await tx.adminAuditLog.create({
+        data: {
+          actorId: session?.user?.id,
+          action: "payment.trongrid.confirm",
+          entityType: "WalletTransaction",
+          entityId: transaction.id,
+          payload: {
+            amountUsdt: transaction.amountUsdt.toString(),
+            txHash: transaction.txHash
+          }
+        }
+      });
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message === "insufficient_pending_balance") {
+      return NextResponse.json(
+        {
+          title: localeRu ? "Баланс изменился" : "Balance changed",
+          message:
+            localeRu
+              ? "Ожидающий баланс участника изменился во время проверки. Обновите страницу и проверьте операцию снова."
+              : "The participant pending balance changed during verification. Refresh the page and check the operation again."
+        },
+        { status: 409 }
+      );
+    }
+
+    throw error;
+  }
 
   return NextResponse.json({
     title: localeRu ? "Платеж подтвержден" : "Payment confirmed",
