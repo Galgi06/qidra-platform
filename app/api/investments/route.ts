@@ -181,15 +181,40 @@ export async function POST(request: NextRequest) {
           where: { id: activeApplication.id },
           data: applicationData
         });
+        await tx.adminAuditLog.create({
+          data: {
+            actorId: userId,
+            action: "investment.request.update",
+            entityType: "InvestmentApplication",
+            entityId: activeApplication.id,
+            payload: {
+              amountUsdt: requestedUsdt.toString(),
+              projectId: project.id,
+              reservedDeltaUsdt: reserveDeltaUsdt.toString()
+            }
+          }
+        });
         return;
       }
 
-      await tx.investmentApplication.create({
+      const application = await tx.investmentApplication.create({
         data: {
           userId,
           projectId: project.id,
           status: InvestmentStatus.PENDING,
           ...applicationData
+        }
+      });
+      await tx.adminAuditLog.create({
+        data: {
+          actorId: userId,
+          action: "investment.request.create",
+          entityType: "InvestmentApplication",
+          entityId: application.id,
+          payload: {
+            amountUsdt: requestedUsdt.toString(),
+            projectId: project.id
+          }
         }
       });
     });

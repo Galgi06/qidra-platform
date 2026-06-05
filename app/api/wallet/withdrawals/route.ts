@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
         throw new Error("insufficient_available_balance");
       }
 
-      await tx.walletTransaction.create({
+      const transaction = await tx.walletTransaction.create({
         data: {
           walletId: wallet.id,
           type: TransactionType.WITHDRAWAL,
@@ -123,6 +123,19 @@ export async function POST(request: NextRequest) {
           amountUsdt,
           destinationAddress,
           note: localeRu ? "Заявка на вывод USDT TRC20" : "USDT TRC20 withdrawal request"
+        }
+      });
+
+      await tx.adminAuditLog.create({
+        data: {
+          actorId: userId,
+          action: "payment.withdrawal.request",
+          entityType: "WalletTransaction",
+          entityId: transaction.id,
+          payload: {
+            amountUsdt: amountUsdt.toString(),
+            destinationAddress
+          }
         }
       });
     });

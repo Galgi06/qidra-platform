@@ -96,6 +96,20 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         adminNote: localeRu ? "Отменено участником" : "Cancelled by participant"
       }
     });
+
+    await tx.adminAuditLog.create({
+      data: {
+        actorId: userId,
+        action: "investment.request.cancel",
+        entityType: "InvestmentApplication",
+        entityId: application.id,
+        payload: {
+          amountUsdt: application.amountUsdt.toString(),
+          releasedUsdt: reservedUsdt.toString(),
+          projectId: application.projectId
+        }
+      }
+    });
   });
 
   return NextResponse.json({

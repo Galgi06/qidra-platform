@@ -159,6 +159,20 @@ export async function POST(request: NextRequest) {
           note: "TronGrid auto verification"
         }
       });
+
+      await tx.adminAuditLog.create({
+        data: {
+          actorId: userId,
+          action: "payment.deposit.user_confirmed",
+          entityType: "WalletTransaction",
+          entityId: transaction.id,
+          payload: {
+            amountUsdt: amountUsdt.toString(),
+            txHash,
+            toAddress: personalDepositAddress
+          }
+        }
+      });
     });
   } catch (error) {
     if (isUniqueTxHashError(error)) {

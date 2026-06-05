@@ -12,10 +12,15 @@ const actionLabels: Record<string, Record<Locale, string>> = {
   "kyc.reject": { ru: "Анкета отклонена", en: "KYC rejected" },
   "investment.confirm": { ru: "Заявка участия подтверждена", en: "Participation request confirmed" },
   "investment.reject": { ru: "Заявка участия отклонена", en: "Participation request rejected" },
+  "investment.request.cancel": { ru: "Участник отменил заявку", en: "Participant cancelled request" },
+  "investment.request.create": { ru: "Участник создал заявку", en: "Participant created request" },
+  "investment.request.update": { ru: "Участник обновил заявку", en: "Participant updated request" },
   "payment.deposit.confirm": { ru: "Пополнение подтверждено", en: "Deposit confirmed" },
   "payment.deposit.reject": { ru: "Пополнение отклонено", en: "Deposit rejected" },
+  "payment.deposit.user_confirmed": { ru: "Пополнение подтверждено автоматически", en: "Deposit confirmed automatically" },
   "payment.withdrawal.confirm": { ru: "Вывод подтвержден", en: "Withdrawal confirmed" },
   "payment.withdrawal.reject": { ru: "Вывод отклонен", en: "Withdrawal rejected" },
+  "payment.withdrawal.request": { ru: "Участник запросил вывод", en: "Participant requested withdrawal" },
   "payment.trongrid.confirm": { ru: "Пополнение подтверждено автоматически", en: "Deposit confirmed automatically" },
   "payment.trc20.auto_confirm": { ru: "Пополнение зачислено автоматически", en: "Deposit credited automatically" },
   "payment.trc20.claim_rejected": { ru: "Заявка пополнения отклонена синхронизацией", en: "Deposit claim rejected by sync" },
@@ -180,6 +185,12 @@ function actorName(actor: { email: string; name: string | null } | null, locale:
 
 function entityLabel(entityType: string, locale: Locale) {
   const labels: Record<string, Record<Locale, string>> = {
+    InvestmentApplication: { ru: "Заявка участия", en: "Participation request" },
+    KycApplication: { ru: "KYC", en: "KYC" },
+    Project: { ru: "Проект", en: "Project" },
+    ProjectDocument: { ru: "Документ проекта", en: "Project document" },
+    User: { ru: "Пользователь", en: "User" },
+    WalletTransaction: { ru: "Операция кошелька", en: "Wallet operation" },
     investment: { ru: "Заявка участия", en: "Participation request" },
     kyc: { ru: "KYC", en: "KYC" },
     payment: { ru: "Платеж", en: "Payment" },
