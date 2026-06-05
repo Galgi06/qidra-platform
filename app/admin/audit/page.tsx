@@ -100,7 +100,7 @@ export default async function AdminAuditPage({ searchParams }: { searchParams: P
                     <tr className="border-b border-qidra-grayLight text-14 font-medium text-qidra-grayBlue">
                       <th className="px-5 py-4">{locale === "ru" ? "Дата" : "Date"}</th>
                       <th className="px-5 py-4">{locale === "ru" ? "Действие" : "Action"}</th>
-                      <th className="px-5 py-4">{locale === "ru" ? "Администратор" : "Administrator"}</th>
+                      <th className="px-5 py-4">{locale === "ru" ? "Инициатор" : "Actor"}</th>
                       <th className="px-5 py-4">{locale === "ru" ? "Объект" : "Entity"}</th>
                       <th className="px-5 py-4">{locale === "ru" ? "Детали" : "Details"}</th>
                     </tr>
@@ -115,7 +115,7 @@ export default async function AdminAuditPage({ searchParams }: { searchParams: P
                         </td>
                         <td className="px-5 py-5 align-top">
                           <p className="text-16 font-medium text-qidra-dark">{actorName(log.actor, locale)}</p>
-                          <p className="mt-1 text-12 text-qidra-grayBlue">{log.actor?.role || (locale === "ru" ? "Автоматически" : "Automatic")}</p>
+                          <p className="mt-1 text-12 text-qidra-grayBlue">{actorRoleLabel(log.actor?.role, locale)}</p>
                         </td>
                         <td className="px-5 py-5 align-top">
                           <p className="text-16 font-medium text-qidra-dark">{entityLabel(log.entityType, locale)}</p>
@@ -241,8 +241,8 @@ function PayloadPreview({ payload, locale }: { payload: unknown; locale: Locale 
     <div className="grid gap-2">
       {entries.map(([key, value]) => (
         <div key={key} className="rounded-qidra bg-qidra-grayLight px-3 py-2">
-          <p className="text-12 font-medium text-qidra-grayBlue">{key}</p>
-          <p className="mt-1 max-w-[360px] break-words text-14 text-qidra-dark">{formatPayloadValue(value)}</p>
+          <p className="text-12 font-medium text-qidra-grayBlue">{payloadKeyLabel(key, locale)}</p>
+          <p className="mt-1 max-w-[360px] break-words text-14 text-qidra-dark">{formatPayloadValue(key, value, locale)}</p>
         </div>
       ))}
     </div>
@@ -251,12 +251,42 @@ function PayloadPreview({ payload, locale }: { payload: unknown; locale: Locale 
 
 function payloadEntries(payload: unknown) {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) return [];
-  return Object.entries(payload as Record<string, unknown>).slice(0, 5);
+  return Object.entries(payload as Record<string, unknown>).slice(0, 6);
 }
 
-function formatPayloadValue(value: unknown) {
+function payloadKeyLabel(key: string, locale: Locale) {
+  const labels: Record<string, Record<Locale, string>> = {
+    amountUsdt: { ru: "Сумма", en: "Amount" },
+    destinationAddress: { ru: "Адрес получателя", en: "Recipient address" },
+    from: { ru: "Было", en: "From" },
+    fromAddress: { ru: "Адрес отправителя", en: "Sender address" },
+    note: { ru: "Комментарий", en: "Note" },
+    projectFundedUsdt: { ru: "Собрано по проекту", en: "Project funded" },
+    projectId: { ru: "ID проекта", en: "Project ID" },
+    reservedDeltaUsdt: { ru: "Изменение резерва", en: "Reserve change" },
+    slug: { ru: "Slug", en: "Slug" },
+    status: { ru: "Статус", en: "Status" },
+    to: { ru: "Стало", en: "To" },
+    toAddress: { ru: "Адрес зачисления", en: "Recipient address" },
+    txHash: { ru: "Transaction hash", en: "Transaction hash" },
+    type: { ru: "Тип операции", en: "Operation type" }
+  };
+
+  return labels[key]?.[locale] || key;
+}
+
+function formatPayloadValue(key: string, value: unknown, locale: Locale) {
   if (value === null || value === undefined || value === "") return "-";
-  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return String(value);
+
+  if (typeof value === "string" || typeof value === "number") {
+    if (key.toLowerCase().includes("usdt") && isFiniteNumberLike(value)) {
+      return formatUsdtValue(value);
+    }
+
+    return enumValueLabel(String(value), locale);
+  }
+
+  if (typeof value === "boolean") return value ? (locale === "ru" ? "Да" : "Yes") : locale === "ru" ? "Нет" : "No";
   return JSON.stringify(value);
 }
 
@@ -265,12 +295,19 @@ function actionLabel(action: string, locale: Locale) {
 }
 
 function actionCode(action: string) {
-  return action.replace("trongrid", "auto");
+  return action.replace("trongrid", "trc20");
 }
 
 function actorName(actor: { email: string; name: string | null } | null, locale: Locale) {
   if (!actor) return locale === "ru" ? "Система" : "System";
   return actor.name || actor.email;
+}
+
+function actorRoleLabel(role: string | undefined, locale: Locale) {
+  if (role === "SUPER_ADMIN") return locale === "ru" ? "Главный администратор" : "Super administrator";
+  if (role === "ADMIN") return locale === "ru" ? "Администратор" : "Administrator";
+  if (role === "INVESTOR") return locale === "ru" ? "Участник" : "Participant";
+  return locale === "ru" ? "Система" : "System";
 }
 
 function entityLabel(entityType: string, locale: Locale) {
@@ -337,4 +374,39 @@ function auditFilterHref(locale: Locale, category?: AuditCategory) {
 
 function formatCount(value: number) {
   return new Intl.NumberFormat("en-US").format(value);
+}
+
+function formatUsdtValue(value: string | number) {
+  return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 6 }).format(Number(value))} USDT`;
+}
+
+function isFiniteNumberLike(value: string | number) {
+  return Number.isFinite(Number(value));
+}
+
+function enumValueLabel(value: string, locale: Locale) {
+  const labels: Record<string, Record<Locale, string>> = {
+    ACTIVE: { ru: "Опубликован", en: "Active" },
+    ADMIN: { ru: "Администратор", en: "Administrator" },
+    ADJUSTMENT: { ru: "Корректировка", en: "Adjustment" },
+    APPROVED: { ru: "Одобрено", en: "Approved" },
+    CANCELLED: { ru: "Отменено", en: "Cancelled" },
+    CLOSED: { ru: "Закрыт", en: "Closed" },
+    CONFIRMED: { ru: "Подтверждено", en: "Confirmed" },
+    DEPOSIT: { ru: "Пополнение", en: "Deposit" },
+    DRAFT: { ru: "Черновик", en: "Draft" },
+    FUNDED: { ru: "Собран", en: "Funded" },
+    INVESTMENT: { ru: "Участие", en: "Participation" },
+    INVESTOR: { ru: "Участник", en: "Participant" },
+    PAUSED: { ru: "Пауза", en: "Paused" },
+    PENDING: { ru: "На проверке", en: "Pending" },
+    REJECTED: { ru: "Отклонено", en: "Rejected" },
+    RETURN: { ru: "Возврат", en: "Return" },
+    REVIEW: { ru: "Проверка", en: "Review" },
+    SUBMITTED: { ru: "На проверке", en: "Submitted" },
+    SUPER_ADMIN: { ru: "Главный администратор", en: "Super administrator" },
+    WITHDRAWAL: { ru: "Вывод", en: "Withdrawal" }
+  };
+
+  return labels[value]?.[locale] || value;
 }
