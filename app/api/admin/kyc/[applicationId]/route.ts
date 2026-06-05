@@ -107,6 +107,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           : "The participant can now submit participation applications."
         : localeRu
           ? "Участник увидит статус и сможет обновить анкету."
-          : "The participant will see the status and can update the profile."
+          : "The participant will see the status and can update the profile.",
+    tone: parsed.data.action === "approve" ? "success" : "warning"
   });
 }

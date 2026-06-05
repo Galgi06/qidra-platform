@@ -152,12 +152,12 @@ export function FeedbackForm({
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(Object.fromEntries(formData.entries()))
               });
-        const data = (await response.json().catch(() => ({}))) as { title?: string; message?: string };
+        const data = (await response.json().catch(() => ({}))) as { title?: string; message?: string; tone?: FeedbackTone };
         const nextFeedback = {
           ...feedback,
           title: data.title ?? feedback.title,
           text: data.message ?? feedback.text,
-          tone: response.ok ? feedback.tone : "error"
+          tone: response.ok ? data.tone ?? feedback.tone : "error"
         };
 
         setActiveFeedback(nextFeedback);
