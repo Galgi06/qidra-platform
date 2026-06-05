@@ -1,21 +1,28 @@
+import Link from "next/link";
+import type { ReactNode } from "react";
 import { AdminTabs } from "@/components/AdminTabs";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { FeedbackForm } from "@/components/ActionFeedback";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
+import { NotificationCard } from "@/components/NotificationCard";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { ProgressBar } from "@/components/ui/ProgressBar";
-import { ProjectStatusBadge } from "@/components/ui/ProjectStatusBadge";
+import { ProjectStatusBadge, type BadgeStatus } from "@/components/ui/ProjectStatusBadge";
 import { Select } from "@/components/ui/Select";
 import { requireAdmin } from "@/lib/access";
 import { getLocale, t, type Locale, type SearchParams, withLocale } from "@/lib/i18n";
 import { getAdminProjects, type CatalogProject } from "@/lib/project-catalog";
 
 export default async function AdminProjectsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
-  const locale = await getLocale(searchParams);
+  const params = await searchParams;
+  const locale = await getLocale(params);
   await requireAdmin(locale, "/admin/projects");
+  const statusFilter = parseProjectStatus(searchParamString(params.status));
   const projects = await getAdminProjects();
+  const stats = buildProjectStats(projects);
+  const filteredProjects = statusFilter ? projects.filter((project) => project.status === statusFilter) : projects;
 
   return (
     <>
@@ -43,6 +50,8 @@ export default async function AdminProjectsPage({ searchParams }: { searchParams
         <section className="section">
           <div className="container-qidra grid gap-8">
             <AdminTabs activePath="/admin/projects" locale={locale} />
+            <ProjectsDashboard locale={locale} stats={stats} />
+            <ProjectsFilters locale={locale} stats={stats} statusFilter={statusFilter} />
             <FeedbackForm
               className="grid gap-5 rounded-[20px] bg-white p-6 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] sm:p-8"
               endpoint={`/api/admin/projects?lang=${locale}`}
@@ -100,15 +109,101 @@ export default async function AdminProjectsPage({ searchParams }: { searchParams
             </FeedbackForm>
 
             <div className="grid gap-5">
-              {projects.map((project) => (
-                <AdminProjectPanel key={project.id} project={project} locale={locale} />
-              ))}
+              {filteredProjects.length ? (
+                filteredProjects.map((project) => <AdminProjectPanel key={project.id} project={project} locale={locale} />)
+              ) : (
+                <NotificationCard
+                  title={locale === "ru" ? "Проекты не найдены" : "No projects found"}
+                  text={locale === "ru" ? "Измените фильтр статуса или создайте новый проект." : "Change the status filter or create a new project."}
+                />
+              )}
             </div>
           </div>
         </section>
       </main>
       <Footer locale={locale} />
     </>
+  );
+}
+
+type ProjectFilterStatus = Extract<BadgeStatus, "active" | "closed" | "draft" | "funded" | "paused" | "review">;
+
+type ProjectStats = {
+  activeCount: number;
+  closedCount: number;
+  draftCount: number;
+  fundedCount: number;
+  pausedCount: number;
+  reviewCount: number;
+  totalCount: number;
+  totalFundedUsdt: number;
+  totalTargetUsdt: number;
+};
+
+function ProjectsDashboard({ locale, stats }: { locale: Locale; stats: ProjectStats }) {
+  return (
+    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <ProjectStatCard label={locale === "ru" ? "Всего проектов" : "Total projects"} value={stats.totalCount} />
+      <ProjectStatCard label={locale === "ru" ? "Опубликовано" : "Published"} tone="success" value={stats.activeCount} />
+      <ProjectStatCard label={locale === "ru" ? "На проверке" : "In review"} tone="accent" value={stats.reviewCount} />
+      <ProjectStatCard label={locale === "ru" ? "Черновики" : "Drafts"} value={stats.draftCount} />
+      <ProjectStatCard label={locale === "ru" ? "Собрано" : "Funded"} tone="success" value={formatUsdt(stats.totalFundedUsdt)} />
+    </div>
+  );
+}
+
+function ProjectStatCard({ label, tone = "neutral", value }: { label: string; tone?: "accent" | "neutral" | "success"; value: ReactNode }) {
+  const valueClass = tone === "success" ? "text-qidra-green" : tone === "accent" ? "text-qidra-accent" : "text-qidra-dark";
+
+  return (
+    <article className="rounded-qidra bg-white p-5 shadow-[0_0_0_1px_rgba(18,20,23,0.08)]">
+      <p className="text-14 font-medium text-qidra-grayBlue">{label}</p>
+      <p className={`mt-3 text-[32px] font-medium leading-tight tracking-[0] ${valueClass}`}>{typeof value === "number" ? formatCount(value) : value}</p>
+    </article>
+  );
+}
+
+function ProjectsFilters({ locale, stats, statusFilter }: { locale: Locale; stats: ProjectStats; statusFilter?: ProjectFilterStatus }) {
+  return (
+    <div className="grid gap-2 rounded-qidra border border-qidra-grayLight bg-white p-4">
+      <p className="text-14 font-medium text-qidra-grayBlue">{locale === "ru" ? "Статус проекта" : "Project status"}</p>
+      <div className="flex flex-wrap gap-2">
+        <ProjectFilterPill active={!statusFilter} href={projectFilterHref(locale)}>
+          {locale === "ru" ? "Все" : "All"} ({formatCount(stats.totalCount)})
+        </ProjectFilterPill>
+        <ProjectFilterPill active={statusFilter === "draft"} href={projectFilterHref(locale, "draft")}>
+          {locale === "ru" ? "Черновики" : "Drafts"} ({formatCount(stats.draftCount)})
+        </ProjectFilterPill>
+        <ProjectFilterPill active={statusFilter === "review"} href={projectFilterHref(locale, "review")}>
+          {locale === "ru" ? "Проверка" : "Review"} ({formatCount(stats.reviewCount)})
+        </ProjectFilterPill>
+        <ProjectFilterPill active={statusFilter === "active"} href={projectFilterHref(locale, "active")}>
+          {locale === "ru" ? "Опубликованы" : "Published"} ({formatCount(stats.activeCount)})
+        </ProjectFilterPill>
+        <ProjectFilterPill active={statusFilter === "funded"} href={projectFilterHref(locale, "funded")}>
+          {locale === "ru" ? "Собраны" : "Funded"} ({formatCount(stats.fundedCount)})
+        </ProjectFilterPill>
+        <ProjectFilterPill active={statusFilter === "paused"} href={projectFilterHref(locale, "paused")}>
+          {locale === "ru" ? "Пауза" : "Paused"} ({formatCount(stats.pausedCount)})
+        </ProjectFilterPill>
+        <ProjectFilterPill active={statusFilter === "closed"} href={projectFilterHref(locale, "closed")}>
+          {locale === "ru" ? "Закрыты" : "Closed"} ({formatCount(stats.closedCount)})
+        </ProjectFilterPill>
+      </div>
+    </div>
+  );
+}
+
+function ProjectFilterPill({ active, children, href }: { active: boolean; children: ReactNode; href: string }) {
+  return (
+    <Link
+      className={`inline-flex h-10 items-center justify-center rounded-qidra border px-4 text-14 font-medium transition-colors ${
+        active ? "border-qidra-dark bg-qidra-dark text-white" : "border-qidra-grayLight bg-white text-qidra-grayBlue hover:border-qidra-accent hover:text-qidra-accent"
+      }`}
+      href={href}
+    >
+      {children}
+    </Link>
   );
 }
 
@@ -263,4 +358,60 @@ function ProjectFact({ label, value }: { label: string; value: string }) {
 
 function formatUsdt(value: number) {
   return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(value)} USDT`;
+}
+
+function buildProjectStats(projects: CatalogProject[]): ProjectStats {
+  return projects.reduce<ProjectStats>(
+    (stats, project) => {
+      stats.totalCount += 1;
+      stats.totalFundedUsdt += project.fundedUsdt;
+      stats.totalTargetUsdt += project.targetUsdt;
+
+      if (project.status === "active") stats.activeCount += 1;
+      if (project.status === "closed") stats.closedCount += 1;
+      if (project.status === "draft") stats.draftCount += 1;
+      if (project.status === "funded") stats.fundedCount += 1;
+      if (project.status === "paused") stats.pausedCount += 1;
+      if (project.status === "review") stats.reviewCount += 1;
+
+      return stats;
+    },
+    {
+      activeCount: 0,
+      closedCount: 0,
+      draftCount: 0,
+      fundedCount: 0,
+      pausedCount: 0,
+      reviewCount: 0,
+      totalCount: 0,
+      totalFundedUsdt: 0,
+      totalTargetUsdt: 0
+    }
+  );
+}
+
+function searchParamString(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function parseProjectStatus(value: string | undefined): ProjectFilterStatus | undefined {
+  if (value === "active") return "active";
+  if (value === "closed") return "closed";
+  if (value === "draft") return "draft";
+  if (value === "funded") return "funded";
+  if (value === "paused") return "paused";
+  if (value === "review") return "review";
+  return undefined;
+}
+
+function projectFilterHref(locale: Locale, status?: ProjectFilterStatus) {
+  const params = new URLSearchParams({ lang: locale });
+
+  if (status) params.set("status", status);
+
+  return `/admin/projects?${params.toString()}`;
+}
+
+function formatCount(value: number) {
+  return new Intl.NumberFormat("en-US").format(value);
 }
