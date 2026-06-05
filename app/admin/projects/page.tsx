@@ -1,3 +1,4 @@
+import { AdminTabs } from "@/components/AdminTabs";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { FeedbackForm } from "@/components/ActionFeedback";
 import { Footer } from "@/components/Footer";
@@ -41,6 +42,7 @@ export default async function AdminProjectsPage({ searchParams }: { searchParams
         </section>
         <section className="section">
           <div className="container-qidra grid gap-8">
+            <AdminTabs activePath="/admin/projects" locale={locale} />
             <FeedbackForm
               className="grid gap-5 rounded-[20px] bg-white p-6 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] sm:p-8"
               endpoint={`/api/admin/projects?lang=${locale}`}

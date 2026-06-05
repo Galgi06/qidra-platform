@@ -1,3 +1,4 @@
+import { AdminTabs } from "@/components/AdminTabs";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { FeedbackForm } from "@/components/ActionFeedback";
 import { Footer } from "@/components/Footer";
@@ -55,8 +56,10 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
           </div>
         </section>
         <section className="section">
-          <div className="container-qidra overflow-x-auto">
-            <table className="w-full min-w-[980px] border-collapse text-left">
+          <div className="container-qidra grid gap-8">
+            <AdminTabs activePath="/admin/users" locale={locale} />
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[980px] border-collapse text-left">
               <thead>
                 <tr className="border-b border-qidra-grayLight text-14 font-medium text-qidra-grayBlue">
                   <th className="py-4">{locale === "ru" ? "Пользователь" : "User"}</th>
@@ -96,7 +99,8 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
                   </tr>
                 ))}
               </tbody>
-            </table>
+              </table>
+            </div>
           </div>
         </section>
       </main>

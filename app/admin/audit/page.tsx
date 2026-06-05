@@ -1,8 +1,8 @@
+import { AdminTabs } from "@/components/AdminTabs";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { NotificationCard } from "@/components/NotificationCard";
-import { Tabs } from "@/components/Tabs";
 import { requireAdmin } from "@/lib/access";
 import { getLocale, t, type Locale, type SearchParams, withLocale } from "@/lib/i18n";
 import { prisma } from "@/lib/prisma";
@@ -72,17 +72,7 @@ export default async function AdminAuditPage({ searchParams }: { searchParams: P
 
         <section className="section">
           <div className="container-qidra">
-            <Tabs
-              items={[
-                { label: locale === "ru" ? "Обзор" : "Overview", href: withLocale("/admin", locale) },
-                { label: locale === "ru" ? "Пользователи" : "Users", href: withLocale("/admin/users", locale) },
-                { label: "KYC", href: withLocale("/admin/kyc", locale) },
-                { label: locale === "ru" ? "Проекты" : "Projects", href: withLocale("/admin/projects", locale) },
-                { label: locale === "ru" ? "Платежи" : "Payments", href: withLocale("/admin/payments", locale) },
-                { label: locale === "ru" ? "Журнал" : "Audit", href: withLocale("/admin/audit", locale) }
-              ]}
-              activeHref={withLocale("/admin/audit", locale)}
-            />
+            <AdminTabs activePath="/admin/audit" locale={locale} />
 
             <div className="mt-8">
               {logs.length ? (

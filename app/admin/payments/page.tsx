@@ -1,3 +1,4 @@
+import { AdminTabs } from "@/components/AdminTabs";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { FeedbackForm } from "@/components/ActionFeedback";
 import { Footer } from "@/components/Footer";
@@ -48,108 +49,111 @@ export default async function AdminPaymentsPage({ searchParams }: { searchParams
           </div>
         </section>
         <section className="section">
-          <div className="container-qidra grid gap-8 lg:grid-cols-[1fr_0.46fr]">
-            <div className="grid gap-4">
-              {payments.length ? (
-                payments.map((payment) => (
-                  <article key={payment.id} className="grid gap-4 rounded-qidra bg-white p-4 shadow-[0_0_0_1px_rgba(18,20,23,0.08)]">
-                    <WalletOperationItem
-                      title={operationTitle(payment.type, locale)}
-                      meta={operationMeta(payment.wallet.user.name || payment.wallet.user.email, payment.type, payment.txHash, payment.destinationAddress)}
-                      amount={formatOperationAmount(payment.type, payment.amountUsdt)}
-                      tone={paymentTone(payment.status)}
-                    />
-                    {payment.type === "DEPOSIT" ? (
-                      <div className="rounded-qidra border border-qidra-grayLight bg-qidra-grayLight p-4">
-                        <p className="text-14 text-qidra-grayBlue">{locale === "ru" ? "Личный адрес участника" : "Participant personal address"}</p>
-                        <code className="mt-2 block break-all rounded-qidra bg-white px-3 py-2 text-12 text-qidra-dark">
-                          {payment.wallet.trc20Address || (locale === "ru" ? "Адрес ещё не выдан" : "Address not issued yet")}
-                        </code>
-                      </div>
-                    ) : null}
-                    {payment.type === "WITHDRAWAL" ? (
-                      <div className="grid gap-3 rounded-qidra border border-qidra-grayLight bg-qidra-grayLight p-4">
-                        <div>
-                          <p className="text-14 text-qidra-grayBlue">{locale === "ru" ? "Адрес получателя" : "Recipient address"}</p>
+          <div className="container-qidra grid gap-8">
+            <AdminTabs activePath="/admin/payments" locale={locale} />
+            <div className="grid gap-8 lg:grid-cols-[1fr_0.46fr]">
+              <div className="grid gap-4">
+                {payments.length ? (
+                  payments.map((payment) => (
+                    <article key={payment.id} className="grid gap-4 rounded-qidra bg-white p-4 shadow-[0_0_0_1px_rgba(18,20,23,0.08)]">
+                      <WalletOperationItem
+                        title={operationTitle(payment.type, locale)}
+                        meta={operationMeta(payment.wallet.user.name || payment.wallet.user.email, payment.type, payment.txHash, payment.destinationAddress)}
+                        amount={formatOperationAmount(payment.type, payment.amountUsdt)}
+                        tone={paymentTone(payment.status)}
+                      />
+                      {payment.type === "DEPOSIT" ? (
+                        <div className="rounded-qidra border border-qidra-grayLight bg-qidra-grayLight p-4">
+                          <p className="text-14 text-qidra-grayBlue">{locale === "ru" ? "Личный адрес участника" : "Participant personal address"}</p>
                           <code className="mt-2 block break-all rounded-qidra bg-white px-3 py-2 text-12 text-qidra-dark">
-                            {payment.destinationAddress || (locale === "ru" ? "Адрес не указан" : "Address not provided")}
+                            {payment.wallet.trc20Address || (locale === "ru" ? "Адрес ещё не выдан" : "Address not issued yet")}
                           </code>
                         </div>
-                        {payment.txHash ? (
+                      ) : null}
+                      {payment.type === "WITHDRAWAL" ? (
+                        <div className="grid gap-3 rounded-qidra border border-qidra-grayLight bg-qidra-grayLight p-4">
                           <div>
-                            <p className="text-14 text-qidra-grayBlue">{locale === "ru" ? "Hash отправки" : "Outgoing hash"}</p>
-                            <code className="mt-2 block break-all rounded-qidra bg-white px-3 py-2 text-12 text-qidra-dark">{payment.txHash}</code>
+                            <p className="text-14 text-qidra-grayBlue">{locale === "ru" ? "Адрес получателя" : "Recipient address"}</p>
+                            <code className="mt-2 block break-all rounded-qidra bg-white px-3 py-2 text-12 text-qidra-dark">
+                              {payment.destinationAddress || (locale === "ru" ? "Адрес не указан" : "Address not provided")}
+                            </code>
                           </div>
-                        ) : null}
-                      </div>
-                    ) : null}
-                    <div className="grid gap-3 border-t border-qidra-grayLight pt-4 md:grid-cols-[1fr_auto] md:items-center">
-                      <div>
-                        <p className="text-14 text-qidra-grayBlue">{locale === "ru" ? "Дата" : "Date"}</p>
-                        <p className="mt-1 text-16 font-medium text-qidra-dark">{formatDate(payment.createdAt, locale)}</p>
-                        {payment.paymentReview?.reviewedAt ? (
-                          <p className="mt-1 text-12 text-qidra-grayBlue">
-                            {locale === "ru" ? "Проверено" : "Reviewed"}: {formatDate(payment.paymentReview.reviewedAt, locale)}
-                          </p>
-                        ) : null}
-                      </div>
-                      {payment.status === "PENDING" ? (
-                        <div className="flex flex-col gap-2 sm:flex-row">
-                          {payment.type === "DEPOSIT" ? <TronGridCheckForm endpoint={`/api/admin/payments/${payment.id}/trongrid?lang=${locale}`} locale={locale} /> : null}
-                          {payment.type !== "DEPOSIT" ? <PaymentActionForm action="confirm" endpoint={`/api/admin/payments/${payment.id}?lang=${locale}`} locale={locale} type={payment.type} /> : null}
-                          <PaymentActionForm action="reject" endpoint={`/api/admin/payments/${payment.id}?lang=${locale}`} locale={locale} type={payment.type} />
+                          {payment.txHash ? (
+                            <div>
+                              <p className="text-14 text-qidra-grayBlue">{locale === "ru" ? "Hash отправки" : "Outgoing hash"}</p>
+                              <code className="mt-2 block break-all rounded-qidra bg-white px-3 py-2 text-12 text-qidra-dark">{payment.txHash}</code>
+                            </div>
+                          ) : null}
                         </div>
-                      ) : (
-                        <span className="rounded-full bg-qidra-grayLight px-3 py-1 text-12 font-medium text-qidra-grayBlue">
-                          {statusLabel(payment.status, locale)}
-                        </span>
-                      )}
-                    </div>
-                  </article>
-                ))
-              ) : (
+                      ) : null}
+                      <div className="grid gap-3 border-t border-qidra-grayLight pt-4 md:grid-cols-[1fr_auto] md:items-center">
+                        <div>
+                          <p className="text-14 text-qidra-grayBlue">{locale === "ru" ? "Дата" : "Date"}</p>
+                          <p className="mt-1 text-16 font-medium text-qidra-dark">{formatDate(payment.createdAt, locale)}</p>
+                          {payment.paymentReview?.reviewedAt ? (
+                            <p className="mt-1 text-12 text-qidra-grayBlue">
+                              {locale === "ru" ? "Проверено" : "Reviewed"}: {formatDate(payment.paymentReview.reviewedAt, locale)}
+                            </p>
+                          ) : null}
+                        </div>
+                        {payment.status === "PENDING" ? (
+                          <div className="flex flex-col gap-2 sm:flex-row">
+                            {payment.type === "DEPOSIT" ? <TronGridCheckForm endpoint={`/api/admin/payments/${payment.id}/trongrid?lang=${locale}`} locale={locale} /> : null}
+                            {payment.type !== "DEPOSIT" ? <PaymentActionForm action="confirm" endpoint={`/api/admin/payments/${payment.id}?lang=${locale}`} locale={locale} type={payment.type} /> : null}
+                            <PaymentActionForm action="reject" endpoint={`/api/admin/payments/${payment.id}?lang=${locale}`} locale={locale} type={payment.type} />
+                          </div>
+                        ) : (
+                          <span className="rounded-full bg-qidra-grayLight px-3 py-1 text-12 font-medium text-qidra-grayBlue">
+                            {statusLabel(payment.status, locale)}
+                          </span>
+                        )}
+                      </div>
+                    </article>
+                  ))
+                ) : (
+                  <NotificationCard
+                    title={locale === "ru" ? "Платежей пока нет" : "No payments yet"}
+                    text={locale === "ru" ? "Новые операции появятся здесь после отправки transaction hash участником." : "New operations will appear here after a participant submits a transaction hash."}
+                  />
+                )}
+              </div>
+              <div className="space-y-4">
+                <FeedbackForm
+                  className="grid gap-3 rounded-qidra bg-qidra-grayLight p-4"
+                  endpoint={`/api/admin/payments/sync-trc20?lang=${locale}`}
+                  feedback={{
+                    title: locale === "ru" ? "Входящие переводы синхронизированы" : "Incoming transfers synced",
+                    text:
+                      locale === "ru"
+                        ? "Система проверила личные USDT TRC20-адреса участников и зачислила новые подтверждённые переводы."
+                        : "The system scanned participant personal USDT TRC20 addresses and credited new confirmed transfers.",
+                    buttonLabel: locale === "ru" ? "Понятно" : "Got it",
+                    dismissLabel: locale === "ru" ? "Закрыть уведомление" : "Close notification",
+                    tone: "success"
+                  }}
+                  popupPlacement="center"
+                  refreshOnSuccess
+                >
+                  <input name="limitPerWallet" type="hidden" value="100" />
+                  <div>
+                    <p className="text-16 font-medium text-qidra-dark">{locale === "ru" ? "Автосверка входящих" : "Incoming auto-reconciliation"}</p>
+                    <p className="mt-2 text-14 text-qidra-grayBlue">
+                      {locale === "ru"
+                        ? "Проверяет подтверждённые USDT TRC20-переводы на личные адреса участников и зачисляет только новые операции."
+                        : "Scans confirmed USDT TRC20 transfers to participant personal addresses and credits only new operations."}
+                    </p>
+                  </div>
+                  <Button type="submit">{locale === "ru" ? "Синхронизировать входящие" : "Sync incoming transfers"}</Button>
+                </FeedbackForm>
                 <NotificationCard
-                  title={locale === "ru" ? "Платежей пока нет" : "No payments yet"}
-                  text={locale === "ru" ? "Новые операции появятся здесь после отправки transaction hash участником." : "New operations will appear here after a participant submits a transaction hash."}
-                />
-              )}
-            </div>
-            <div className="space-y-4">
-              <FeedbackForm
-                className="grid gap-3 rounded-qidra bg-qidra-grayLight p-4"
-                endpoint={`/api/admin/payments/sync-trc20?lang=${locale}`}
-                feedback={{
-                  title: locale === "ru" ? "Входящие переводы синхронизированы" : "Incoming transfers synced",
-                  text:
+                  title={locale === "ru" ? "Чеклист подтверждения" : "Confirmation checklist"}
+                  text={
                     locale === "ru"
-                      ? "Система проверила личные USDT TRC20-адреса участников и зачислила новые подтверждённые переводы."
-                      : "The system scanned participant personal USDT TRC20 addresses and credited new confirmed transfers.",
-                  buttonLabel: locale === "ru" ? "Понятно" : "Got it",
-                  dismissLabel: locale === "ru" ? "Закрыть уведомление" : "Close notification",
-                  tone: "success"
-                }}
-                popupPlacement="center"
-                refreshOnSuccess
-              >
-                <input name="limitPerWallet" type="hidden" value="100" />
-                <div>
-                  <p className="text-16 font-medium text-qidra-dark">{locale === "ru" ? "Автосверка входящих" : "Incoming auto-reconciliation"}</p>
-                  <p className="mt-2 text-14 text-qidra-grayBlue">
-                    {locale === "ru"
-                      ? "Проверяет подтверждённые USDT TRC20-переводы на личные адреса участников и зачисляет только новые операции."
-                      : "Scans confirmed USDT TRC20 transfers to participant personal addresses and credits only new operations."}
-                  </p>
-                </div>
-                <Button type="submit">{locale === "ru" ? "Синхронизировать входящие" : "Sync incoming transfers"}</Button>
-              </FeedbackForm>
-              <NotificationCard
-                title={locale === "ru" ? "Чеклист подтверждения" : "Confirmation checklist"}
-                text={
-                  locale === "ru"
-                    ? "Для пополнений используйте автоматическую проверку платежа. Для выводов вносите hash отправки: Qidra сверит сеть, сумму, получателя и кошелек отправителя."
-                    : "Use automatic payment verification for deposits. For withdrawals, enter the outgoing hash: Qidra will match the network, amount, recipient and sender wallet."
-                }
-              />
+                      ? "Для пополнений используйте автоматическую проверку платежа. Для выводов вносите hash отправки: Qidra сверит сеть, сумму, получателя и кошелек отправителя."
+                      : "Use automatic payment verification for deposits. For withdrawals, enter the outgoing hash: Qidra will match the network, amount, recipient and sender wallet."
+                  }
+                />
+              </div>
             </div>
           </div>
         </section>

@@ -1,3 +1,4 @@
+import { AdminTabs } from "@/components/AdminTabs";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { FeedbackForm } from "@/components/ActionFeedback";
 import { Footer } from "@/components/Footer";
@@ -51,6 +52,7 @@ export default async function AdminInvestmentsPage({ searchParams }: { searchPar
         </section>
         <section className="section">
           <div className="container-qidra grid gap-4">
+            <AdminTabs activePath="/admin/investments" locale={locale} />
             {requests.length ? (
               requests.map((request) => {
                 const latestKycStatus = request.user.kycApplications[0]?.status;

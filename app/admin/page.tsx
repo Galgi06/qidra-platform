@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { InvestmentStatus, KycStatus, PaymentStatus, ProjectStatus } from "@prisma/client";
+import { AdminTabs } from "@/components/AdminTabs";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { NotificationCard } from "@/components/NotificationCard";
-import { Tabs } from "@/components/Tabs";
 import { ButtonLink } from "@/components/ui/Button";
 import { requireAdmin } from "@/lib/access";
 import { getLocale, t, type SearchParams, withLocale } from "@/lib/i18n";
@@ -123,17 +123,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
         <section className="section">
           <div className="container-qidra">
-            <Tabs
-              items={[
-                { label: locale === "ru" ? "Обзор" : "Overview", href: withLocale("/admin", locale) },
-                { label: locale === "ru" ? "Пользователи" : "Users", href: withLocale("/admin/users", locale) },
-                { label: "KYC", href: withLocale("/admin/kyc", locale) },
-                { label: locale === "ru" ? "Проекты" : "Projects", href: withLocale("/admin/projects", locale) },
-                { label: locale === "ru" ? "Платежи" : "Payments", href: withLocale("/admin/payments", locale) },
-                { label: locale === "ru" ? "Журнал" : "Audit", href: withLocale("/admin/audit", locale) }
-              ]}
-              activeHref={withLocale("/admin", locale)}
-            />
+            <AdminTabs activePath="/admin" locale={locale} />
             <div className="mt-8 grid gap-4 md:grid-cols-2">
               {sections.map((section) => (
                 <Link key={section.href} href={withLocale(section.href, locale)} className="surface p-6 transition hover:border-qidra-accent">
