@@ -1,3 +1,6 @@
+import Link from "next/link";
+import type { ReactNode } from "react";
+import { InvestmentStatus } from "@prisma/client";
 import { FeedbackForm } from "@/components/ActionFeedback";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
@@ -8,14 +11,15 @@ import { ProjectStatusBadge, type BadgeStatus } from "@/components/ui/ProjectSta
 import { requireAuth } from "@/lib/access";
 import { getLocale, type SearchParams, withLocale } from "@/lib/i18n";
 import { prisma } from "@/lib/prisma";
-import Link from "next/link";
 
 export default async function InvestmentsPage({ searchParams }: { searchParams?: SearchParams }) {
-  const locale = await getLocale(searchParams);
+  const params = await searchParams;
+  const locale = await getLocale(params);
   const session = await requireAuth(locale, "/investor/investments");
   const isRu = locale === "ru";
   const userId = session.user?.id ?? "";
-  const applications = await prisma.investmentApplication.findMany({
+  const statusFilter = parseInvestmentStatus(searchParamString(params?.status));
+  const allApplications = await prisma.investmentApplication.findMany({
     where: { userId },
     include: { project: true },
     orderBy: { createdAt: "desc" }
@@ -24,13 +28,15 @@ export default async function InvestmentsPage({ searchParams }: { searchParams?:
     where: { userId },
     select: { availableUsdt: true, reservedUsdt: true }
   });
-  const pendingTotal = applications
-    .filter((application) => application.status === "PENDING")
+  const applications = statusFilter ? allApplications.filter((application) => application.status === statusFilter) : allApplications;
+  const pendingTotal = allApplications
+    .filter((application) => application.status === InvestmentStatus.PENDING)
     .reduce((total, application) => total + Number(application.amountUsdt.toString()), 0);
   const availableUsdt = Number(wallet?.availableUsdt.toString() ?? 0);
   const reservedUsdt = Number(wallet?.reservedUsdt.toString() ?? 0);
   const freeUsdt = Math.max(availableUsdt, 0);
   const unbackedPendingUsdt = Math.max(pendingTotal - reservedUsdt - availableUsdt, 0);
+  const stats = buildApplicationStats(allApplications);
 
   return (
     <>
@@ -67,66 +73,83 @@ export default async function InvestmentsPage({ searchParams }: { searchParams?:
               <SummaryCard label={isRu ? "Зарезервировано" : "Reserved"} value={formatUsdt(reservedUsdt)} />
               <SummaryCard label={isRu ? "Заявки на проверке" : "Pending applications"} value={formatUsdt(pendingTotal)} tone={unbackedPendingUsdt > 0 ? "warning" : "success"} />
             </div>
+            <InvestmentFilters locale={locale} stats={stats} statusFilter={statusFilter} />
             {applications.length ? (
               <div className="grid gap-4">
                 {applications.map((application) => {
-                  const balanceWarning = application.status === "PENDING" && unbackedPendingUsdt > 0;
-                  const shortfall = unbackedPendingUsdt;
+                  const applicationAmountUsdt = Number(application.amountUsdt.toString());
+                  const applicationReservedUsdt = Number(application.reservedUsdt.toString());
+                  const applicationShortfall = Math.max(applicationAmountUsdt - applicationReservedUsdt - availableUsdt, 0);
+                  const balanceWarning = application.status === InvestmentStatus.PENDING && applicationShortfall > 0;
 
                   return (
-                  <article key={application.id} className="rounded-[20px] bg-white p-6 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] sm:p-8">
-                    <div className="grid gap-5 lg:grid-cols-[1.2fr_0.7fr_0.7fr_auto] lg:items-center">
-                      <div>
-                        <p className="text-14 text-qidra-grayBlue">{formatDate(application.createdAt, locale)}</p>
-                        <Link className="mt-2 block text-[24px] font-medium leading-tight tracking-[0] text-qidra-dark hover:text-qidra-accent" href={withLocale(`/projects/${application.project.slug}`, locale)}>
-                          {locale === "ru" ? application.project.titleRu : application.project.titleEn}
-                        </Link>
-                      </div>
-                      <div>
-                        <p className="text-14 text-qidra-grayBlue">{isRu ? "Сумма" : "Amount"}</p>
-                        <p className="mt-1 text-18 font-medium text-qidra-dark">{formatUsdt(application.amountUsdt)}</p>
-                      </div>
-                      <div>
-                        <p className="text-14 text-qidra-grayBlue">{isRu ? "Статус" : "Status"}</p>
-                        <div className="mt-2">
-                          <ProjectStatusBadge status={investmentStatus(application.status)} locale={locale} />
-                        </div>
-                      </div>
-                      <ButtonLink href={withLocale(`/projects/${application.project.slug}/documents`, locale)} variant="outline" size="sm">
-                        {isRu ? "Документы" : "Documents"}
-                      </ButtonLink>
-                    </div>
-                    {balanceWarning ? (
-                      <div className="mt-5 grid gap-3 rounded-qidra border border-qidra-gold bg-yellow-50 p-4 lg:grid-cols-[1fr_auto_auto] lg:items-center">
+                    <article key={application.id} className="rounded-[20px] bg-white p-6 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] sm:p-8">
+                      <div className="grid gap-5 lg:grid-cols-[1.2fr_0.7fr_0.7fr_0.7fr_auto] lg:items-center">
                         <div>
-                          <p className="text-16 font-medium text-qidra-dark">{isRu ? "Недостаточно баланса для подтверждения" : "Insufficient balance for confirmation"}</p>
-                          <p className="mt-1 text-14 text-qidra-grayBlue">
-                            {isRu
-                              ? `Доступно ${formatUsdt(availableUsdt)}, зарезервировано ${formatUsdt(reservedUsdt)}, заявки на проверке ${formatUsdt(pendingTotal)}. Пополните ${formatUsdt(shortfall)} или отмените лишнюю заявку.`
-                              : `Available ${formatUsdt(availableUsdt)}, reserved ${formatUsdt(reservedUsdt)}, pending applications ${formatUsdt(pendingTotal)}. Top up ${formatUsdt(shortfall)} or cancel an extra application.`}
-                          </p>
+                          <p className="text-14 text-qidra-grayBlue">{formatDate(application.createdAt, locale)}</p>
+                          <Link className="mt-2 block text-[24px] font-medium leading-tight tracking-[0] text-qidra-dark hover:text-qidra-accent" href={withLocale(`/projects/${application.project.slug}`, locale)}>
+                            {locale === "ru" ? application.project.titleRu : application.project.titleEn}
+                          </Link>
                         </div>
-                        <ButtonLink href={withLocale(`/investor/wallet?amount=${formatAmountForInput(shortfall)}`, locale)} size="sm">
-                          {isRu ? "Пополнить разницу" : "Top up difference"}
+                        <div>
+                          <p className="text-14 text-qidra-grayBlue">{isRu ? "Сумма" : "Amount"}</p>
+                          <p className="mt-1 text-18 font-medium text-qidra-dark">{formatUsdt(application.amountUsdt)}</p>
+                        </div>
+                        <div>
+                          <p className="text-14 text-qidra-grayBlue">{isRu ? "Резерв" : "Reserve"}</p>
+                          <p className="mt-1 text-18 font-medium text-qidra-dark">{formatUsdt(application.reservedUsdt)}</p>
+                        </div>
+                        <div>
+                          <p className="text-14 text-qidra-grayBlue">{isRu ? "Статус" : "Status"}</p>
+                          <div className="mt-2">
+                            <ProjectStatusBadge status={investmentStatus(application.status)} locale={locale} />
+                          </div>
+                        </div>
+                        <ButtonLink href={withLocale(`/projects/${application.project.slug}/documents`, locale)} variant="outline" size="sm">
+                          {isRu ? "Документы" : "Documents"}
                         </ButtonLink>
-                        <CancelApplicationForm applicationId={application.id} locale={locale} />
                       </div>
-                    ) : application.status === "PENDING" ? (
-                      <div className="mt-5 flex justify-end">
-                        <CancelApplicationForm applicationId={application.id} locale={locale} />
-                      </div>
-                    ) : null}
-                  </article>
+                      {balanceWarning ? (
+                        <div className="mt-5 grid gap-3 rounded-qidra border border-qidra-gold bg-yellow-50 p-4 lg:grid-cols-[1fr_auto_auto] lg:items-center">
+                          <div>
+                            <p className="text-16 font-medium text-qidra-dark">{isRu ? "Недостаточно средств для этой заявки" : "Insufficient funds for this application"}</p>
+                            <p className="mt-1 text-14 text-qidra-grayBlue">
+                              {isRu
+                                ? `По заявке зарезервировано ${formatUsdt(applicationReservedUsdt)}, свободно ${formatUsdt(availableUsdt)}. Чтобы покрыть сумму ${formatUsdt(applicationAmountUsdt)}, пополните ещё ${formatUsdt(applicationShortfall)} или отмените заявку.`
+                                : `This application has ${formatUsdt(applicationReservedUsdt)} reserved and ${formatUsdt(availableUsdt)} available. To cover ${formatUsdt(applicationAmountUsdt)}, top up ${formatUsdt(applicationShortfall)} or cancel the application.`}
+                            </p>
+                          </div>
+                          <ButtonLink href={withLocale(`/investor/wallet?amount=${formatAmountForInput(applicationShortfall)}`, locale)} size="sm">
+                            {isRu ? "Пополнить разницу" : "Top up difference"}
+                          </ButtonLink>
+                          <CancelApplicationForm applicationId={application.id} locale={locale} />
+                        </div>
+                      ) : application.status === InvestmentStatus.PENDING ? (
+                        <div className="mt-5 flex justify-end">
+                          <CancelApplicationForm applicationId={application.id} locale={locale} />
+                        </div>
+                      ) : null}
+                    </article>
                   );
                 })}
               </div>
             ) : (
               <section className="grid gap-5 rounded-[20px] bg-white p-6 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] sm:p-8 lg:grid-cols-[1fr_auto] lg:items-center">
                 <NotificationCard
-                  title={isRu ? "Заявок пока нет" : "No applications yet"}
-                  text={isRu ? "Выберите проект, изучите документы и отправьте заявку на участие." : "Choose a project, review documents and submit a participation application."}
+                  title={allApplications.length ? (isRu ? "По этому статусу заявок нет" : "No applications with this status") : isRu ? "Заявок пока нет" : "No applications yet"}
+                  text={
+                    allApplications.length
+                      ? isRu
+                        ? "Выберите другой статус или откройте все заявки."
+                        : "Choose another status or open all applications."
+                      : isRu
+                        ? "Выберите проект, изучите документы и отправьте заявку на участие."
+                        : "Choose a project, review documents and submit a participation application."
+                  }
                 />
-                <ButtonLink href={withLocale("/projects", locale)}>{isRu ? "Открыть проекты" : "Open projects"}</ButtonLink>
+                <ButtonLink href={allApplications.length ? investmentFilterHref(locale) : withLocale("/projects", locale)}>
+                  {allApplications.length ? (isRu ? "Все заявки" : "All applications") : isRu ? "Открыть проекты" : "Open projects"}
+                </ButtonLink>
               </section>
             )}
           </div>
@@ -145,6 +168,52 @@ function SummaryCard({ label, tone = "default", value }: { label: string; tone?:
       <p className="text-14 font-medium text-qidra-grayBlue">{label}</p>
       <p className="mt-3 text-[28px] font-medium leading-tight tracking-[0]">{value}</p>
     </article>
+  );
+}
+
+type ApplicationStats = {
+  cancelledCount: number;
+  confirmedCount: number;
+  pendingCount: number;
+  rejectedCount: number;
+  totalCount: number;
+};
+
+function InvestmentFilters({ locale, stats, statusFilter }: { locale: "ru" | "en"; stats: ApplicationStats; statusFilter?: InvestmentStatus }) {
+  return (
+    <div className="grid gap-2 rounded-qidra border border-qidra-grayLight bg-white p-4">
+      <p className="text-14 font-medium text-qidra-grayBlue">{locale === "ru" ? "Статус заявки" : "Application status"}</p>
+      <div className="flex flex-wrap gap-2">
+        <InvestmentFilterPill active={!statusFilter} href={investmentFilterHref(locale)}>
+          {locale === "ru" ? "Все" : "All"} ({formatCount(stats.totalCount)})
+        </InvestmentFilterPill>
+        <InvestmentFilterPill active={statusFilter === InvestmentStatus.PENDING} href={investmentFilterHref(locale, InvestmentStatus.PENDING)}>
+          {locale === "ru" ? "На проверке" : "Pending"} ({formatCount(stats.pendingCount)})
+        </InvestmentFilterPill>
+        <InvestmentFilterPill active={statusFilter === InvestmentStatus.CONFIRMED} href={investmentFilterHref(locale, InvestmentStatus.CONFIRMED)}>
+          {locale === "ru" ? "Подтверждено" : "Confirmed"} ({formatCount(stats.confirmedCount)})
+        </InvestmentFilterPill>
+        <InvestmentFilterPill active={statusFilter === InvestmentStatus.REJECTED} href={investmentFilterHref(locale, InvestmentStatus.REJECTED)}>
+          {locale === "ru" ? "Отклонено" : "Rejected"} ({formatCount(stats.rejectedCount)})
+        </InvestmentFilterPill>
+        <InvestmentFilterPill active={statusFilter === InvestmentStatus.CANCELLED} href={investmentFilterHref(locale, InvestmentStatus.CANCELLED)}>
+          {locale === "ru" ? "Отменено" : "Cancelled"} ({formatCount(stats.cancelledCount)})
+        </InvestmentFilterPill>
+      </div>
+    </div>
+  );
+}
+
+function InvestmentFilterPill({ active, children, href }: { active: boolean; children: ReactNode; href: string }) {
+  return (
+    <Link
+      className={`inline-flex h-10 items-center justify-center rounded-qidra border px-4 text-14 font-medium transition-colors ${
+        active ? "border-qidra-dark bg-qidra-dark text-white" : "border-qidra-grayLight bg-white text-qidra-grayBlue hover:border-qidra-accent hover:text-qidra-accent"
+      }`}
+      href={href}
+    >
+      {children}
+    </Link>
   );
 }
 
@@ -171,8 +240,8 @@ function CancelApplicationForm({ applicationId, locale }: { applicationId: strin
 }
 
 function investmentStatus(status: string): BadgeStatus {
-  if (status === "CONFIRMED") return "confirmed";
-  if (status === "REJECTED" || status === "CANCELLED") return "rejected";
+  if (status === InvestmentStatus.CONFIRMED) return "confirmed";
+  if (status === InvestmentStatus.REJECTED || status === InvestmentStatus.CANCELLED) return "rejected";
   return "pending";
 }
 
@@ -191,4 +260,52 @@ function formatDate(date: Date, locale: "ru" | "en") {
     month: "short",
     year: "numeric"
   }).format(date);
+}
+
+function buildApplicationStats(applications: Array<{ status: InvestmentStatus }>): ApplicationStats {
+  return applications.reduce<ApplicationStats>(
+    (stats, application) => {
+      stats.totalCount += 1;
+
+      if (application.status === InvestmentStatus.PENDING) stats.pendingCount += 1;
+      if (application.status === InvestmentStatus.CONFIRMED) stats.confirmedCount += 1;
+      if (application.status === InvestmentStatus.REJECTED) stats.rejectedCount += 1;
+      if (application.status === InvestmentStatus.CANCELLED) stats.cancelledCount += 1;
+
+      return stats;
+    },
+    {
+      cancelledCount: 0,
+      confirmedCount: 0,
+      pendingCount: 0,
+      rejectedCount: 0,
+      totalCount: 0
+    }
+  );
+}
+
+function searchParamString(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function parseInvestmentStatus(value: string | undefined) {
+  const normalized = value?.toUpperCase();
+
+  if (normalized === InvestmentStatus.PENDING) return InvestmentStatus.PENDING;
+  if (normalized === InvestmentStatus.CONFIRMED) return InvestmentStatus.CONFIRMED;
+  if (normalized === InvestmentStatus.REJECTED) return InvestmentStatus.REJECTED;
+  if (normalized === InvestmentStatus.CANCELLED) return InvestmentStatus.CANCELLED;
+  return undefined;
+}
+
+function investmentFilterHref(locale: "ru" | "en", status?: InvestmentStatus) {
+  const params = new URLSearchParams({ lang: locale });
+
+  if (status) params.set("status", status.toLowerCase());
+
+  return `/investor/investments?${params.toString()}`;
+}
+
+function formatCount(value: number) {
+  return new Intl.NumberFormat("en-US").format(value);
 }
