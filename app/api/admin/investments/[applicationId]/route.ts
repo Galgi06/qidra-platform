@@ -1,4 +1,4 @@
-import { InvestmentStatus, KycStatus, PaymentStatus, Prisma, TransactionType } from "@prisma/client";
+import { InvestmentStatus, KycStatus, PaymentStatus, Prisma, ProjectStatus, TransactionType } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
@@ -119,49 +119,91 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       );
     }
 
-    await prisma.$transaction([
-      prisma.investmentApplication.update({
-        where: { id: application.id },
-        data: {
-          status: InvestmentStatus.CONFIRMED,
-          reservedUsdt: 0,
-          adminNote: parsed.data.note
-        }
-      }),
-      prisma.wallet.update({
-        where: { id: wallet.id },
-        data: {
-          availableUsdt: { decrement: amountFromAvailableUsdt },
-          reservedUsdt: { decrement: reservedUsdt }
-        }
-      }),
-      prisma.walletTransaction.create({
-        data: {
-          walletId: wallet.id,
-          type: TransactionType.INVESTMENT,
-          status: PaymentStatus.CONFIRMED,
-          amountUsdt: application.amountUsdt,
-          note: `${application.project.titleEn} · ${application.id}`
-        }
-      }),
-      prisma.adminAuditLog.create({
-        data: {
-          actorId: session?.user?.id,
-          action: "investment.confirm",
-          entityType: "InvestmentApplication",
-          entityId: application.id,
-          payload: {
-            amountUsdt: application.amountUsdt.toString(),
-            projectId: application.projectId,
-            note: parsed.data.note
+    try {
+      await prisma.$transaction(async (tx) => {
+        const walletUpdate = await tx.wallet.updateMany({
+          where: {
+            id: wallet.id,
+            availableUsdt: { gte: amountFromAvailableUsdt },
+            reservedUsdt: { gte: reservedUsdt }
+          },
+          data: {
+            availableUsdt: { decrement: amountFromAvailableUsdt },
+            reservedUsdt: { decrement: reservedUsdt }
           }
+        });
+
+        if (walletUpdate.count !== 1) {
+          throw new Error("insufficient_wallet_balance");
         }
-      })
-    ]);
+
+        await tx.investmentApplication.update({
+          where: { id: application.id },
+          data: {
+            status: InvestmentStatus.CONFIRMED,
+            reservedUsdt: 0,
+            adminNote: parsed.data.note
+          }
+        });
+
+        await tx.walletTransaction.create({
+          data: {
+            walletId: wallet.id,
+            type: TransactionType.INVESTMENT,
+            status: PaymentStatus.CONFIRMED,
+            amountUsdt: application.amountUsdt,
+            note: `${application.project.titleEn} · ${application.id}`
+          }
+        });
+
+        const nextFundedUsdt = application.project.fundedUsdt.plus(application.amountUsdt);
+
+        await tx.project.update({
+          where: { id: application.projectId },
+          data: {
+            fundedUsdt: { increment: application.amountUsdt },
+            ...(nextFundedUsdt.gte(application.project.targetUsdt) ? { status: ProjectStatus.FUNDED } : {})
+          }
+        });
+
+        await tx.adminAuditLog.create({
+          data: {
+            actorId: session?.user?.id,
+            action: "investment.confirm",
+            entityType: "InvestmentApplication",
+            entityId: application.id,
+            payload: {
+              amountUsdt: application.amountUsdt.toString(),
+              projectFundedUsdt: nextFundedUsdt.toString(),
+              projectId: application.projectId,
+              note: parsed.data.note
+            }
+          }
+        });
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message === "insufficient_wallet_balance") {
+        return NextResponse.json(
+          {
+            title: localeRu ? "Баланс изменился" : "Balance changed",
+            message:
+              localeRu
+                ? "Свободный баланс или резерв участника изменился во время подтверждения. Обновите страницу и проверьте заявку снова."
+                : "The participant available balance or reserve changed during confirmation. Refresh the page and check the request again."
+          },
+          { status: 409 }
+        );
+      }
+
+      throw error;
+    }
 
     return NextResponse.json({
       title: localeRu ? "Заявка подтверждена" : "Application confirmed",
-      message: localeRu ? "Зарезервированная сумма переведена в участие по проекту." : "The reserved amount was moved into project participation."
+      message:
+        localeRu
+          ? "Зарезервированная сумма переведена в участие, а прогресс проекта обновлён."
+          : "The reserved amount was moved into participation and the project progress was updated."
     });
   }
 
