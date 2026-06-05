@@ -128,7 +128,7 @@ model WalletTransaction {
   type               TransactionType
   status             PaymentStatus        @default(PENDING)
   amountUsdt         Decimal              @db.Decimal(18, 6)
-  txHash             String?
+  txHash             String?              @unique
   destinationAddress String?
   note               String?
   createdAt          DateTime             @default(now())
