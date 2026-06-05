@@ -165,7 +165,7 @@ function TronGridCheckForm({ endpoint, locale }: { endpoint: string; locale: "ru
       className="contents"
       endpoint={endpoint}
       feedback={{
-        title: locale === "ru" ? "Платеж подтвержден TronGrid" : "Payment confirmed by TronGrid",
+        title: locale === "ru" ? "Платеж подтвержден" : "Payment confirmed",
         text: locale === "ru" ? "Hash, адрес и сумма совпали. Баланс участника обновлён." : "Hash, address and amount matched. The participant balance was updated.",
         buttonLabel: locale === "ru" ? "Понятно" : "Got it",
         dismissLabel: locale === "ru" ? "Закрыть уведомление" : "Close notification",
@@ -177,7 +177,7 @@ function TronGridCheckForm({ endpoint, locale }: { endpoint: string; locale: "ru
         className="inline-flex h-10 items-center justify-center rounded-qidra border border-qidra-accent bg-white px-4 text-14 font-medium text-qidra-accent transition-colors hover:bg-qidra-accent hover:text-white"
         type="submit"
       >
-        {locale === "ru" ? "Проверить TronGrid" : "Check TronGrid"}
+        {locale === "ru" ? "Проверить перевод" : "Verify transfer"}
       </button>
     </FeedbackForm>
   );

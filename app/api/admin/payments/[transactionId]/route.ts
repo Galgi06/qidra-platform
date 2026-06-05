@@ -81,11 +81,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (transaction.type === TransactionType.DEPOSIT && parsed.data.action === "confirm") {
     return NextResponse.json(
       {
-        title: localeRu ? "Нужна проверка TronGrid" : "TronGrid verification required",
+        title: localeRu ? "Нужна автоматическая проверка" : "Automatic verification required",
         message:
           localeRu
-            ? "Пополнение USDT нельзя подтвердить вручную. Используйте проверку TronGrid, чтобы сверить hash, сумму и личный адрес участника."
-            : "USDT deposits cannot be confirmed manually. Use TronGrid verification to match the hash, amount and participant personal address."
+            ? "Пополнение USDT нельзя подтвердить вручную. Используйте проверку перевода, чтобы сверить hash, сумму и личный адрес участника."
+            : "USDT deposits cannot be confirmed manually. Use transfer verification to match the hash, amount and participant personal address."
       },
       { status: 400 }
     );

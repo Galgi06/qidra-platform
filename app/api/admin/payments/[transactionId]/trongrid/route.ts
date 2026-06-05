@@ -51,7 +51,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json(
       {
         title: localeRu ? "Нельзя проверить" : "Cannot verify",
-        message: localeRu ? "Через TronGrid проверяются только входящие TRC20-пополнения с transaction hash." : "Only incoming TRC20 deposits with a transaction hash can be checked through TronGrid."
+        message: localeRu ? "Автоматически проверяются только входящие TRC20-пополнения с transaction hash." : "Only incoming TRC20 deposits with a transaction hash can be checked automatically."
       },
       { status: 400 }
     );
@@ -85,8 +85,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (verification.status === "unconfigured") {
     return NextResponse.json(
       {
-        title: localeRu ? "TronGrid не настроен" : "TronGrid is not configured",
-        message: localeRu ? "Добавьте TRONGRID_API_KEY в переменные окружения." : "Add TRONGRID_API_KEY to environment variables."
+        title: localeRu ? "Автопроверка не настроена" : "Automatic verification is not configured",
+        message: localeRu ? "Добавьте ключ сервиса проверки в переменные окружения." : "Add the verification service key to environment variables."
       },
       { status: 400 }
     );
@@ -96,7 +96,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json(
       {
         title: localeRu ? "Перевод не найден" : "Transfer not found",
-        message: localeRu ? "В TronGrid пока нет подтверждённого USDT TRC20 перевода с этим hash." : "TronGrid does not yet show a confirmed USDT TRC20 transfer with this hash."
+        message: localeRu ? "Система пока не видит подтверждённый USDT TRC20 перевод с этим hash." : "The system does not yet show a confirmed USDT TRC20 transfer with this hash."
       },
       { status: 404 }
     );
@@ -105,8 +105,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (verification.status === "network_error") {
     return NextResponse.json(
       {
-        title: localeRu ? "TronGrid недоступен" : "TronGrid unavailable",
-        message: localeRu ? "Не удалось связаться с TronGrid. Повторите проверку позже." : "Could not reach TronGrid. Try checking again later."
+        title: localeRu ? "Автопроверка временно недоступна" : "Automatic verification is temporarily unavailable",
+        message: localeRu ? "Не удалось связаться с сервисом проверки. Повторите позже." : "Could not reach the verification service. Try again later."
       },
       { status: 502 }
     );
@@ -179,7 +179,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   ]);
 
   return NextResponse.json({
-    title: localeRu ? "Платеж подтвержден TronGrid" : "Payment confirmed by TronGrid",
+    title: localeRu ? "Платеж подтвержден" : "Payment confirmed",
     message: localeRu ? "Hash, адрес и сумма совпали. Баланс участника обновлён." : "Hash, address and amount matched. The participant balance was updated."
   });
 }

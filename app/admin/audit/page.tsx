@@ -98,7 +98,7 @@ export default async function AdminAuditPage({ searchParams }: { searchParams: P
                           <td className="px-5 py-5 align-top text-14 text-qidra-grayBlue">{formatDateTime(log.createdAt, locale)}</td>
                           <td className="px-5 py-5 align-top">
                             <p className="text-16 font-medium text-qidra-dark">{actionLabel(log.action, locale)}</p>
-                            <p className="mt-1 text-12 text-qidra-grayBlue">{log.action}</p>
+                            <p className="mt-1 text-12 text-qidra-grayBlue">{actionCode(log.action)}</p>
                           </td>
                           <td className="px-5 py-5 align-top">
                             <p className="text-16 font-medium text-qidra-dark">{actorName(log.actor, locale)}</p>
@@ -167,6 +167,10 @@ function formatPayloadValue(value: unknown) {
 
 function actionLabel(action: string, locale: Locale) {
   return actionLabels[action]?.[locale] || action.replace(/\./g, " ");
+}
+
+function actionCode(action: string) {
+  return action.replace("trongrid", "auto");
 }
 
 function actorName(actor: { email: string; name: string | null } | null, locale: Locale) {
