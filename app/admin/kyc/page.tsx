@@ -1,3 +1,6 @@
+import Link from "next/link";
+import type { ReactNode } from "react";
+import { KycStatus, Prisma } from "@prisma/client";
 import { AdminTabs } from "@/components/AdminTabs";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { FeedbackForm } from "@/components/ActionFeedback";
@@ -12,19 +15,31 @@ import { readKycDocuments, type KycDocumentKind, type KycFileMeta } from "@/lib/
 import { prisma } from "@/lib/prisma";
 
 export default async function AdminKycPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
-  const locale = await getLocale(searchParams);
+  const params = await searchParams;
+  const locale = await getLocale(params);
   await requireAdmin(locale, "/admin/kyc");
-  const applications = await prisma.kycApplication.findMany({
-    include: {
-      user: {
-        include: {
-          investorProfile: true
+  const statusFilter = parseKycStatus(searchParamString(params.status));
+  const kycWhere: Prisma.KycApplicationWhereInput = statusFilter ? { status: statusFilter } : {};
+  const [applications, totalCount, draftCount, submittedCount, approvedCount, rejectedCount] = await Promise.all([
+    prisma.kycApplication.findMany({
+      where: kycWhere,
+      include: {
+        user: {
+          include: {
+            investorProfile: true
+          }
         }
-      }
-    },
-    orderBy: { createdAt: "desc" },
-    take: 50
-  });
+      },
+      orderBy: { createdAt: "desc" },
+      take: 80
+    }),
+    prisma.kycApplication.count(),
+    prisma.kycApplication.count({ where: { status: KycStatus.DRAFT } }),
+    prisma.kycApplication.count({ where: { status: KycStatus.SUBMITTED } }),
+    prisma.kycApplication.count({ where: { status: KycStatus.APPROVED } }),
+    prisma.kycApplication.count({ where: { status: KycStatus.REJECTED } })
+  ]);
+  const stats = { approvedCount, draftCount, rejectedCount, submittedCount, totalCount };
 
   return (
     <>
@@ -48,8 +63,10 @@ export default async function AdminKycPage({ searchParams }: { searchParams: Pro
           </div>
         </section>
         <section className="section">
-          <div className="container-qidra grid gap-4">
+          <div className="container-qidra grid gap-8">
             <AdminTabs activePath="/admin/kyc" locale={locale} />
+            <KycDashboard locale={locale} stats={stats} />
+            <KycFilters locale={locale} stats={stats} statusFilter={statusFilter} />
             {applications.length ? (
               applications.map((item) => {
                 const profile = item.user.investorProfile;
@@ -132,6 +149,74 @@ export default async function AdminKycPage({ searchParams }: { searchParams: Pro
       </main>
       <Footer locale={locale} />
     </>
+  );
+}
+
+type KycStats = {
+  approvedCount: number;
+  draftCount: number;
+  rejectedCount: number;
+  submittedCount: number;
+  totalCount: number;
+};
+
+function KycDashboard({ locale, stats }: { locale: "ru" | "en"; stats: KycStats }) {
+  return (
+    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <KycStatCard label={locale === "ru" ? "Всего анкет" : "Total profiles"} value={stats.totalCount} />
+      <KycStatCard label={locale === "ru" ? "На проверке" : "Pending review"} tone="accent" value={stats.submittedCount} />
+      <KycStatCard label={locale === "ru" ? "Одобрено" : "Approved"} tone="success" value={stats.approvedCount} />
+      <KycStatCard label={locale === "ru" ? "Отклонено" : "Rejected"} tone="danger" value={stats.rejectedCount} />
+    </div>
+  );
+}
+
+function KycStatCard({ label, tone = "neutral", value }: { label: string; tone?: "accent" | "danger" | "neutral" | "success"; value: number }) {
+  const valueClass = tone === "success" ? "text-qidra-green" : tone === "danger" ? "text-qidra-red" : tone === "accent" ? "text-qidra-accent" : "text-qidra-dark";
+
+  return (
+    <article className="rounded-qidra bg-white p-5 shadow-[0_0_0_1px_rgba(18,20,23,0.08)]">
+      <p className="text-14 font-medium text-qidra-grayBlue">{label}</p>
+      <p className={`mt-3 text-[32px] font-medium leading-tight tracking-[0] ${valueClass}`}>{formatCount(value)}</p>
+    </article>
+  );
+}
+
+function KycFilters({ locale, stats, statusFilter }: { locale: "ru" | "en"; stats: KycStats; statusFilter?: KycStatus }) {
+  return (
+    <div className="grid gap-2 rounded-qidra border border-qidra-grayLight bg-white p-4">
+      <p className="text-14 font-medium text-qidra-grayBlue">{locale === "ru" ? "Статус анкеты" : "Profile status"}</p>
+      <div className="flex flex-wrap gap-2">
+        <KycFilterPill active={!statusFilter} href={kycFilterHref(locale)}>
+          {locale === "ru" ? "Все" : "All"} ({formatCount(stats.totalCount)})
+        </KycFilterPill>
+        <KycFilterPill active={statusFilter === KycStatus.DRAFT} href={kycFilterHref(locale, KycStatus.DRAFT)}>
+          {locale === "ru" ? "Черновики" : "Drafts"} ({formatCount(stats.draftCount)})
+        </KycFilterPill>
+        <KycFilterPill active={statusFilter === KycStatus.SUBMITTED} href={kycFilterHref(locale, KycStatus.SUBMITTED)}>
+          {locale === "ru" ? "На проверке" : "Pending"} ({formatCount(stats.submittedCount)})
+        </KycFilterPill>
+        <KycFilterPill active={statusFilter === KycStatus.APPROVED} href={kycFilterHref(locale, KycStatus.APPROVED)}>
+          {locale === "ru" ? "Одобрено" : "Approved"} ({formatCount(stats.approvedCount)})
+        </KycFilterPill>
+        <KycFilterPill active={statusFilter === KycStatus.REJECTED} href={kycFilterHref(locale, KycStatus.REJECTED)}>
+          {locale === "ru" ? "Отклонено" : "Rejected"} ({formatCount(stats.rejectedCount)})
+        </KycFilterPill>
+      </div>
+    </div>
+  );
+}
+
+function KycFilterPill({ active, children, href }: { active: boolean; children: ReactNode; href: string }) {
+  return (
+    <Link
+      className={`inline-flex h-10 items-center justify-center rounded-qidra border px-4 text-14 font-medium transition-colors ${
+        active ? "border-qidra-dark bg-qidra-dark text-white" : "border-qidra-grayLight bg-white text-qidra-grayBlue hover:border-qidra-accent hover:text-qidra-accent"
+      }`}
+      href={href}
+    >
+      {children}
+    </Link>
   );
 }
 
@@ -280,4 +365,30 @@ function formatFileSize(size: number, locale: "ru" | "en") {
     style: "unit",
     unit: "megabyte"
   }).format(size / 1024 / 1024);
+}
+
+function searchParamString(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function parseKycStatus(value: string | undefined) {
+  const normalized = value?.toUpperCase();
+
+  if (normalized === KycStatus.DRAFT) return KycStatus.DRAFT;
+  if (normalized === KycStatus.SUBMITTED) return KycStatus.SUBMITTED;
+  if (normalized === KycStatus.APPROVED) return KycStatus.APPROVED;
+  if (normalized === KycStatus.REJECTED) return KycStatus.REJECTED;
+  return undefined;
+}
+
+function kycFilterHref(locale: "ru" | "en", status?: KycStatus) {
+  const params = new URLSearchParams({ lang: locale });
+
+  if (status) params.set("status", status.toLowerCase());
+
+  return `/admin/kyc?${params.toString()}`;
+}
+
+function formatCount(value: number) {
+  return new Intl.NumberFormat("en-US").format(value);
 }
