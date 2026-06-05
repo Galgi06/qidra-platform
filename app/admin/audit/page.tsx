@@ -31,6 +31,8 @@ const actionLabels: Record<string, Record<Locale, string>> = {
   "project.create": { ru: "Проект создан", en: "Project created" },
   "project.document.create": { ru: "Документ проекта добавлен", en: "Project document added" },
   "project.status.update": { ru: "Статус проекта изменен", en: "Project status updated" },
+  "support.message.manager": { ru: "Менеджер ответил в чате", en: "Manager replied in chat" },
+  "support.message.user": { ru: "Участник написал в чат", en: "Participant messaged support" },
   "user.role.update": { ru: "Роль пользователя изменена", en: "User role updated" }
 };
 

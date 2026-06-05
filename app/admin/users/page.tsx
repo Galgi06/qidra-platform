@@ -77,7 +77,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
             <UsersFilters kycFilter={kycFilter} locale={locale} roleFilter={roleFilter} stats={stats} />
             {filteredUsers.length ? (
               <div className="overflow-x-auto rounded-qidra bg-white p-2 shadow-[0_0_0_1px_rgba(18,20,23,0.08)]">
-                <table className="w-full min-w-[980px] border-collapse text-left">
+                <table className="w-full min-w-[1080px] border-collapse text-left">
                   <thead>
                     <tr className="border-b border-qidra-grayLight text-14 font-medium text-qidra-grayBlue">
                       <th className="py-4 pl-4">{locale === "ru" ? "Пользователь" : "User"}</th>
@@ -85,6 +85,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
                       <th className="py-4">{locale === "ru" ? "Профиль" : "Profile"}</th>
                       <th className="py-4">{locale === "ru" ? "Баланс" : "Balance"}</th>
                       <th className="py-4">{locale === "ru" ? "Заявки" : "Applications"}</th>
+                      <th className="py-4">{locale === "ru" ? "Карточка" : "Client card"}</th>
                       <th className="py-4">{locale === "ru" ? "Доступ" : "Access"}</th>
                     </tr>
                   </thead>
@@ -105,6 +106,14 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
                         <td className="py-5 pr-6 text-16 text-qidra-grayBlue">{profileStatus(user.kycApplications[0]?.status, locale)}</td>
                         <td className="py-5 pr-6 text-16 font-medium text-qidra-dark">{formatUsdt(user.wallet?.availableUsdt ?? 0)}</td>
                         <td className="py-5 pr-6 text-16 text-qidra-grayBlue">{user._count.investments}</td>
+                        <td className="py-5 pr-6">
+                          <Link
+                            className="inline-flex h-10 items-center justify-center rounded-qidra border border-qidra-dark px-4 text-14 font-medium text-qidra-dark transition-colors hover:bg-qidra-dark hover:text-white"
+                            href={withLocale(`/admin/users/${user.id}`, locale)}
+                          >
+                            {locale === "ru" ? "Открыть" : "Open"}
+                          </Link>
+                        </td>
                         <td className="py-5">
                           {canManageRoles && user.id !== session.user?.id ? (
                             <RoleForm currentRole={user.role} endpoint={`/api/admin/users/${user.id}/role?lang=${locale}`} locale={locale} />
