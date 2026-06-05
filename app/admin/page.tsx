@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { InvestmentStatus, KycStatus, PaymentStatus, ProjectStatus } from "@prisma/client";
+import { InvestmentStatus, KycStatus, PaymentStatus, ProjectStatus, TransactionType } from "@prisma/client";
 import { AdminTabs } from "@/components/AdminTabs";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { Footer } from "@/components/Footer";
@@ -46,13 +46,16 @@ const sections = [
 export default async function AdminPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const locale = await getLocale(searchParams);
   await requireAdmin(locale, "/admin");
-  const [userCount, pendingKycCount, pendingInvestmentCount, pendingPaymentCount, activeProjectCount, draftProjectCount] = await Promise.all([
+  const [userCount, pendingKycCount, pendingInvestmentCount, pendingPaymentCount, activeProjectCount, draftProjectCount, reviewProjectCount, pendingDepositCount, pendingWithdrawalCount] = await Promise.all([
     prisma.user.count(),
     prisma.kycApplication.count({ where: { status: KycStatus.SUBMITTED } }),
     prisma.investmentApplication.count({ where: { status: InvestmentStatus.PENDING } }),
     prisma.walletTransaction.count({ where: { status: PaymentStatus.PENDING } }),
     prisma.project.count({ where: { status: { in: [ProjectStatus.ACTIVE, ProjectStatus.FUNDED] } } }),
-    prisma.project.count({ where: { status: ProjectStatus.DRAFT } })
+    prisma.project.count({ where: { status: ProjectStatus.DRAFT } }),
+    prisma.project.count({ where: { status: ProjectStatus.REVIEW } }),
+    prisma.walletTransaction.count({ where: { status: PaymentStatus.PENDING, type: TransactionType.DEPOSIT } }),
+    prisma.walletTransaction.count({ where: { status: PaymentStatus.PENDING, type: TransactionType.WITHDRAWAL } })
   ]);
   const metrics = [
     {
@@ -76,6 +79,38 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       note: { ru: `${formatNumber(draftProjectCount)} в черновике`, en: `${formatNumber(draftProjectCount)} in draft` }
     }
   ];
+  const queueItems = [
+    {
+      href: withLocale("/admin/kyc?status=submitted", locale),
+      label: { ru: "KYC на проверке", en: "KYC pending review" },
+      value: pendingKycCount,
+      text: { ru: "Проверить анкеты и документы участников.", en: "Review participant profiles and documents." }
+    },
+    {
+      href: withLocale("/admin/investments?status=pending", locale),
+      label: { ru: "Заявки участия", en: "Participation requests" },
+      value: pendingInvestmentCount,
+      text: { ru: "Принять решение после проверки KYC и баланса.", en: "Decide after KYC and balance checks." }
+    },
+    {
+      href: withLocale("/admin/payments?status=pending", locale),
+      label: { ru: "Платежи на сверке", en: "Payments pending" },
+      value: pendingPaymentCount,
+      text: { ru: `${formatNumber(pendingDepositCount)} пополнений, ${formatNumber(pendingWithdrawalCount)} выводов.`, en: `${formatNumber(pendingDepositCount)} deposits, ${formatNumber(pendingWithdrawalCount)} withdrawals.` }
+    },
+    {
+      href: withLocale("/admin/projects?status=review", locale),
+      label: { ru: "Проекты на проверке", en: "Projects in review" },
+      value: reviewProjectCount,
+      text: { ru: "Подготовить публикацию после юридической проверки.", en: "Prepare publishing after legal review." }
+    },
+    {
+      href: withLocale("/admin/projects?status=draft", locale),
+      label: { ru: "Черновики проектов", en: "Project drafts" },
+      value: draftProjectCount,
+      text: { ru: "Доработать описание, документы и параметры.", en: "Complete descriptions, documents and parameters." }
+    }
+  ];
 
   return (
     <>
@@ -91,8 +126,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             />
             <div className="mt-8 grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
               <div>
-                <p className="text-14 font-medium uppercase text-qidra-accent">Qidra operations</p>
-                <h1 className="mt-4 title-48 text-qidra-dark">Admin panel</h1>
+                <p className="text-14 font-medium uppercase text-qidra-accent">{locale === "ru" ? "Операции Qidra" : "Qidra operations"}</p>
+                <h1 className="mt-4 title-48 text-qidra-dark">{locale === "ru" ? "Операционный центр" : "Operations center"}</h1>
                 <p className="mt-5 max-w-3xl text-20 text-qidra-grayBlue">
                   {locale === "ru"
                     ? "Операционный центр для комплаенса, публикации проектов, KYC и платежной сверки."
@@ -117,6 +152,28 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                   <p className="mt-2 text-14 text-qidra-grayBlue">{item.note[locale]}</p>
                 </div>
               ))}
+            </div>
+            <div className="mt-10">
+              <div className="flex flex-wrap items-end justify-between gap-4">
+                <div>
+                  <h2 className="text-[32px] font-medium leading-tight tracking-[0] text-qidra-dark">{locale === "ru" ? "Что требует внимания" : "Needs attention"}</h2>
+                  <p className="mt-2 text-16 text-qidra-grayBlue">
+                    {locale === "ru" ? "Быстрые переходы в очереди, где нужно решение администратора." : "Fast links to queues that need an administrator decision."}
+                  </p>
+                </div>
+                <ButtonLink href={withLocale("/admin/audit", locale)} size="sm" variant="outline">
+                  {locale === "ru" ? "Открыть журнал" : "Open audit log"}
+                </ButtonLink>
+              </div>
+              <div className="mt-5 grid gap-4 lg:grid-cols-5">
+                {queueItems.map((item) => (
+                  <Link key={item.href} href={item.href} className="rounded-qidra bg-white p-5 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] transition-colors hover:text-qidra-accent">
+                    <p className="text-14 font-medium text-qidra-grayBlue">{item.label[locale]}</p>
+                    <p className="mt-3 text-[32px] font-medium leading-tight tracking-[0] text-qidra-dark">{formatNumber(item.value)}</p>
+                    <p className="mt-2 text-14 text-qidra-grayBlue">{item.text[locale]}</p>
+                  </Link>
+                ))}
+              </div>
             </div>
           </div>
         </section>
