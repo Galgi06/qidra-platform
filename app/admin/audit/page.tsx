@@ -1,3 +1,6 @@
+import Link from "next/link";
+import type { ReactNode } from "react";
+import { Prisma } from "@prisma/client";
 import { AdminTabs } from "@/components/AdminTabs";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { Footer } from "@/components/Footer";
@@ -32,21 +35,35 @@ const actionLabels: Record<string, Record<Locale, string>> = {
 };
 
 export default async function AdminAuditPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
-  const locale = await getLocale(searchParams);
+  const params = await searchParams;
+  const locale = await getLocale(params);
   await requireAdmin(locale, "/admin/audit");
-  const logs = await prisma.adminAuditLog.findMany({
-    include: {
-      actor: {
-        select: {
-          email: true,
-          name: true,
-          role: true
+  const categoryFilter = parseAuditCategory(searchParamString(params.category));
+  const auditWhere = auditCategoryWhere(categoryFilter);
+  const [logs, totalCount, paymentCount, investmentCount, kycCount, projectCount, userCount, systemCount] = await Promise.all([
+    prisma.adminAuditLog.findMany({
+      where: auditWhere,
+      include: {
+        actor: {
+          select: {
+            email: true,
+            name: true,
+            role: true
+          }
         }
-      }
-    },
-    orderBy: { createdAt: "desc" },
-    take: 120
-  });
+      },
+      orderBy: { createdAt: "desc" },
+      take: 160
+    }),
+    prisma.adminAuditLog.count(),
+    prisma.adminAuditLog.count({ where: auditCategoryWhere("payment") }),
+    prisma.adminAuditLog.count({ where: auditCategoryWhere("investment") }),
+    prisma.adminAuditLog.count({ where: auditCategoryWhere("kyc") }),
+    prisma.adminAuditLog.count({ where: auditCategoryWhere("project") }),
+    prisma.adminAuditLog.count({ where: auditCategoryWhere("user") }),
+    prisma.adminAuditLog.count({ where: auditCategoryWhere("system") })
+  ]);
+  const stats = { investmentCount, kycCount, paymentCount, projectCount, systemCount, totalCount, userCount };
 
   return (
     <>
@@ -71,62 +88,145 @@ export default async function AdminAuditPage({ searchParams }: { searchParams: P
         </section>
 
         <section className="section">
-          <div className="container-qidra">
+          <div className="container-qidra grid gap-8">
             <AdminTabs activePath="/admin/audit" locale={locale} />
+            <AuditDashboard locale={locale} stats={stats} />
+            <AuditFilters categoryFilter={categoryFilter} locale={locale} stats={stats} />
 
-            <div className="mt-8">
-              {logs.length ? (
-                <div className="overflow-x-auto rounded-qidra border border-qidra-grayLight bg-white">
-                  <table className="w-full min-w-[1080px] border-collapse text-left">
-                    <thead>
-                      <tr className="border-b border-qidra-grayLight text-14 font-medium text-qidra-grayBlue">
-                        <th className="px-5 py-4">{locale === "ru" ? "Дата" : "Date"}</th>
-                        <th className="px-5 py-4">{locale === "ru" ? "Действие" : "Action"}</th>
-                        <th className="px-5 py-4">{locale === "ru" ? "Администратор" : "Administrator"}</th>
-                        <th className="px-5 py-4">{locale === "ru" ? "Объект" : "Entity"}</th>
-                        <th className="px-5 py-4">{locale === "ru" ? "Детали" : "Details"}</th>
+            {logs.length ? (
+              <div className="overflow-x-auto rounded-qidra border border-qidra-grayLight bg-white">
+                <table className="w-full min-w-[1080px] border-collapse text-left">
+                  <thead>
+                    <tr className="border-b border-qidra-grayLight text-14 font-medium text-qidra-grayBlue">
+                      <th className="px-5 py-4">{locale === "ru" ? "Дата" : "Date"}</th>
+                      <th className="px-5 py-4">{locale === "ru" ? "Действие" : "Action"}</th>
+                      <th className="px-5 py-4">{locale === "ru" ? "Администратор" : "Administrator"}</th>
+                      <th className="px-5 py-4">{locale === "ru" ? "Объект" : "Entity"}</th>
+                      <th className="px-5 py-4">{locale === "ru" ? "Детали" : "Details"}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {logs.map((log) => (
+                      <tr key={log.id} className="border-b border-qidra-grayLight last:border-0">
+                        <td className="px-5 py-5 align-top text-14 text-qidra-grayBlue">{formatDateTime(log.createdAt, locale)}</td>
+                        <td className="px-5 py-5 align-top">
+                          <p className="text-16 font-medium text-qidra-dark">{actionLabel(log.action, locale)}</p>
+                          <p className="mt-1 text-12 text-qidra-grayBlue">{actionCode(log.action)}</p>
+                        </td>
+                        <td className="px-5 py-5 align-top">
+                          <p className="text-16 font-medium text-qidra-dark">{actorName(log.actor, locale)}</p>
+                          <p className="mt-1 text-12 text-qidra-grayBlue">{log.actor?.role || (locale === "ru" ? "Автоматически" : "Automatic")}</p>
+                        </td>
+                        <td className="px-5 py-5 align-top">
+                          <p className="text-16 font-medium text-qidra-dark">{entityLabel(log.entityType, locale)}</p>
+                          <p className="mt-1 max-w-[220px] break-all text-12 text-qidra-grayBlue">{log.entityId || "-"}</p>
+                        </td>
+                        <td className="px-5 py-5 align-top">
+                          <PayloadPreview payload={log.payload} locale={locale} />
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {logs.map((log) => (
-                        <tr key={log.id} className="border-b border-qidra-grayLight last:border-0">
-                          <td className="px-5 py-5 align-top text-14 text-qidra-grayBlue">{formatDateTime(log.createdAt, locale)}</td>
-                          <td className="px-5 py-5 align-top">
-                            <p className="text-16 font-medium text-qidra-dark">{actionLabel(log.action, locale)}</p>
-                            <p className="mt-1 text-12 text-qidra-grayBlue">{actionCode(log.action)}</p>
-                          </td>
-                          <td className="px-5 py-5 align-top">
-                            <p className="text-16 font-medium text-qidra-dark">{actorName(log.actor, locale)}</p>
-                            <p className="mt-1 text-12 text-qidra-grayBlue">{log.actor?.role || (locale === "ru" ? "Автоматически" : "Automatic")}</p>
-                          </td>
-                          <td className="px-5 py-5 align-top">
-                            <p className="text-16 font-medium text-qidra-dark">{entityLabel(log.entityType, locale)}</p>
-                            <p className="mt-1 max-w-[220px] break-all text-12 text-qidra-grayBlue">{log.entityId || "-"}</p>
-                          </td>
-                          <td className="px-5 py-5 align-top">
-                            <PayloadPreview payload={log.payload} locale={locale} />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <NotificationCard
-                  title={locale === "ru" ? "Журнал пока пуст" : "Audit log is empty"}
-                  text={
-                    locale === "ru"
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <NotificationCard
+                title={locale === "ru" ? "Записи не найдены" : "No audit records found"}
+                text={
+                  categoryFilter
+                    ? locale === "ru"
+                      ? "Для выбранной категории пока нет событий. Измените фильтр или вернитесь ко всему журналу."
+                      : "There are no events for the selected category yet. Change the filter or return to the full log."
+                    : locale === "ru"
                       ? "Новые записи появятся после административных решений, автоматических сверок и изменений проектов."
                       : "New entries will appear after administrative decisions, automatic reconciliations and project changes."
-                  }
-                />
-              )}
-            </div>
+                }
+              />
+            )}
           </div>
         </section>
       </main>
       <Footer locale={locale} />
     </>
+  );
+}
+
+type AuditCategory = "investment" | "kyc" | "payment" | "project" | "system" | "user";
+
+type AuditStats = {
+  investmentCount: number;
+  kycCount: number;
+  paymentCount: number;
+  projectCount: number;
+  systemCount: number;
+  totalCount: number;
+  userCount: number;
+};
+
+function AuditDashboard({ locale, stats }: { locale: Locale; stats: AuditStats }) {
+  return (
+    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <AuditStatCard label={locale === "ru" ? "Всего событий" : "Total events"} value={stats.totalCount} />
+      <AuditStatCard label={locale === "ru" ? "Платежи" : "Payments"} tone="accent" value={stats.paymentCount} />
+      <AuditStatCard label={locale === "ru" ? "Заявки" : "Applications"} value={stats.investmentCount} />
+      <AuditStatCard label={locale === "ru" ? "KYC" : "KYC"} value={stats.kycCount} />
+      <AuditStatCard label={locale === "ru" ? "Система" : "System"} tone="success" value={stats.systemCount} />
+    </div>
+  );
+}
+
+function AuditStatCard({ label, tone = "neutral", value }: { label: string; tone?: "accent" | "neutral" | "success"; value: number }) {
+  const valueClass = tone === "success" ? "text-qidra-green" : tone === "accent" ? "text-qidra-accent" : "text-qidra-dark";
+
+  return (
+    <article className="rounded-qidra bg-white p-5 shadow-[0_0_0_1px_rgba(18,20,23,0.08)]">
+      <p className="text-14 font-medium text-qidra-grayBlue">{label}</p>
+      <p className={`mt-3 text-[32px] font-medium leading-tight tracking-[0] ${valueClass}`}>{formatCount(value)}</p>
+    </article>
+  );
+}
+
+function AuditFilters({ categoryFilter, locale, stats }: { categoryFilter?: AuditCategory; locale: Locale; stats: AuditStats }) {
+  return (
+    <div className="grid gap-2 rounded-qidra border border-qidra-grayLight bg-white p-4">
+      <p className="text-14 font-medium text-qidra-grayBlue">{locale === "ru" ? "Категория события" : "Event category"}</p>
+      <div className="flex flex-wrap gap-2">
+        <AuditFilterPill active={!categoryFilter} href={auditFilterHref(locale)}>
+          {locale === "ru" ? "Все" : "All"} ({formatCount(stats.totalCount)})
+        </AuditFilterPill>
+        <AuditFilterPill active={categoryFilter === "payment"} href={auditFilterHref(locale, "payment")}>
+          {locale === "ru" ? "Платежи" : "Payments"} ({formatCount(stats.paymentCount)})
+        </AuditFilterPill>
+        <AuditFilterPill active={categoryFilter === "investment"} href={auditFilterHref(locale, "investment")}>
+          {locale === "ru" ? "Участие" : "Participation"} ({formatCount(stats.investmentCount)})
+        </AuditFilterPill>
+        <AuditFilterPill active={categoryFilter === "kyc"} href={auditFilterHref(locale, "kyc")}>
+          KYC ({formatCount(stats.kycCount)})
+        </AuditFilterPill>
+        <AuditFilterPill active={categoryFilter === "project"} href={auditFilterHref(locale, "project")}>
+          {locale === "ru" ? "Проекты" : "Projects"} ({formatCount(stats.projectCount)})
+        </AuditFilterPill>
+        <AuditFilterPill active={categoryFilter === "user"} href={auditFilterHref(locale, "user")}>
+          {locale === "ru" ? "Пользователи" : "Users"} ({formatCount(stats.userCount)})
+        </AuditFilterPill>
+        <AuditFilterPill active={categoryFilter === "system"} href={auditFilterHref(locale, "system")}>
+          {locale === "ru" ? "Система" : "System"} ({formatCount(stats.systemCount)})
+        </AuditFilterPill>
+      </div>
+    </div>
+  );
+}
+
+function AuditFilterPill({ active, children, href }: { active: boolean; children: ReactNode; href: string }) {
+  return (
+    <Link
+      className={`inline-flex h-10 items-center justify-center rounded-qidra border px-4 text-14 font-medium transition-colors ${
+        active ? "border-qidra-dark bg-qidra-dark text-white" : "border-qidra-grayLight bg-white text-qidra-grayBlue hover:border-qidra-accent hover:text-qidra-accent"
+      }`}
+      href={href}
+    >
+      {children}
+    </Link>
   );
 }
 
@@ -200,4 +300,41 @@ function formatDateTime(date: Date, locale: Locale) {
     month: "short",
     year: "numeric"
   }).format(date);
+}
+
+function searchParamString(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function parseAuditCategory(value: string | undefined): AuditCategory | undefined {
+  if (value === "investment") return "investment";
+  if (value === "kyc") return "kyc";
+  if (value === "payment") return "payment";
+  if (value === "project") return "project";
+  if (value === "system") return "system";
+  if (value === "user") return "user";
+  return undefined;
+}
+
+function auditCategoryWhere(category?: AuditCategory): Prisma.AdminAuditLogWhereInput {
+  if (!category) return {};
+  if (category === "system") return { actorId: null };
+
+  return {
+    action: {
+      startsWith: `${category}.`
+    }
+  };
+}
+
+function auditFilterHref(locale: Locale, category?: AuditCategory) {
+  const params = new URLSearchParams({ lang: locale });
+
+  if (category) params.set("category", category);
+
+  return `/admin/audit?${params.toString()}`;
+}
+
+function formatCount(value: number) {
+  return new Intl.NumberFormat("en-US").format(value);
 }
