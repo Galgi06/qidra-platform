@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { InvestmentStatus, KycStatus, PaymentStatus, ProjectStatus } from "@prisma/client";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
@@ -7,13 +8,7 @@ import { Tabs } from "@/components/Tabs";
 import { ButtonLink } from "@/components/ui/Button";
 import { requireAdmin } from "@/lib/access";
 import { getLocale, t, type SearchParams, withLocale } from "@/lib/i18n";
-
-const metrics = [
-  { label: { ru: "Пользователи", en: "Users" }, value: "128", note: { ru: "17 KYC на проверке", en: "17 pending KYC" } },
-  { label: { ru: "Заявки", en: "Participation requests" }, value: "42", note: { ru: "9 требуют проверки", en: "9 require review" } },
-  { label: { ru: "Платежные операции", en: "Payment operations" }, value: "14", note: { ru: "USDT TRC20", en: "USDT TRC20" } },
-  { label: { ru: "Проекты", en: "Published projects" }, value: "6", note: { ru: "2 в черновике", en: "2 in draft" } }
-];
+import { prisma } from "@/lib/prisma";
 
 const sections = [
   {
@@ -40,12 +35,47 @@ const sections = [
     href: "/admin/payments",
     label: { ru: "Платежи", en: "Payments" },
     text: { ru: "Сверка USDT-операций и статусов заявок.", en: "Reconcile USDT operations and application statuses." }
+  },
+  {
+    href: "/admin/audit",
+    label: { ru: "Журнал действий", en: "Audit log" },
+    text: { ru: "История изменений, проверок и финансовых решений.", en: "History of changes, reviews and financial decisions." }
   }
 ];
 
 export default async function AdminPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const locale = await getLocale(searchParams);
   await requireAdmin(locale, "/admin");
+  const [userCount, pendingKycCount, pendingInvestmentCount, pendingPaymentCount, activeProjectCount, draftProjectCount] = await Promise.all([
+    prisma.user.count(),
+    prisma.kycApplication.count({ where: { status: KycStatus.SUBMITTED } }),
+    prisma.investmentApplication.count({ where: { status: InvestmentStatus.PENDING } }),
+    prisma.walletTransaction.count({ where: { status: PaymentStatus.PENDING } }),
+    prisma.project.count({ where: { status: { in: [ProjectStatus.ACTIVE, ProjectStatus.FUNDED] } } }),
+    prisma.project.count({ where: { status: ProjectStatus.DRAFT } })
+  ]);
+  const metrics = [
+    {
+      label: { ru: "Пользователи", en: "Users" },
+      value: formatNumber(userCount),
+      note: { ru: `${formatNumber(pendingKycCount)} KYC на проверке`, en: `${formatNumber(pendingKycCount)} pending KYC` }
+    },
+    {
+      label: { ru: "Заявки", en: "Participation requests" },
+      value: formatNumber(pendingInvestmentCount),
+      note: { ru: "Ожидают решения", en: "Awaiting decision" }
+    },
+    {
+      label: { ru: "Платежные операции", en: "Payment operations" },
+      value: formatNumber(pendingPaymentCount),
+      note: { ru: "Ожидают сверки", en: "Awaiting reconciliation" }
+    },
+    {
+      label: { ru: "Проекты", en: "Projects" },
+      value: formatNumber(activeProjectCount),
+      note: { ru: `${formatNumber(draftProjectCount)} в черновике`, en: `${formatNumber(draftProjectCount)} in draft` }
+    }
+  ];
 
   return (
     <>
@@ -53,71 +83,76 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       <main>
         <section className="section bg-qidra-grayLight">
           <div className="container-qidra">
-          <Breadcrumbs
-            items={[
-              { label: t(locale, "nav.home"), href: withLocale("/", locale) },
-              { label: "Admin" }
-            ]}
-          />
-          <div className="mt-8 grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
-            <div>
-              <p className="text-14 font-medium uppercase text-qidra-accent">Qidra operations</p>
-              <h1 className="mt-4 title-48 text-qidra-dark">Admin panel</h1>
-              <p className="mt-5 max-w-3xl text-20 text-qidra-grayBlue">
-                {locale === "ru"
-                  ? "Операционный центр для комплаенса, публикации проектов, KYC и платежной сверки."
-                  : "Operations center for compliance, project publishing, KYC and payment reconciliation."}
-              </p>
-            </div>
-            <NotificationCard
-              tone="warning"
-              title={locale === "ru" ? "Напоминание по безопасности" : "Security reminder"}
-              text={
-                locale === "ru"
-                  ? "Используйте роли с минимальными правами и фиксируйте каждую смену статуса перед запуском production-контролей."
-                  : "Use least-privilege manager roles and record every status change before production controls are launched."
-              }
+            <Breadcrumbs
+              items={[
+                { label: t(locale, "nav.home"), href: withLocale("/", locale) },
+                { label: "Admin" }
+              ]}
             />
-          </div>
-          <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {metrics.map((item) => (
-              <div key={item.label.en} className="surface bg-white p-6">
-                <p className="text-14 font-medium text-qidra-grayBlue">{item.label[locale]}</p>
-                <p className="mt-3 subtitle-28 text-qidra-dark">{item.value}</p>
-                <p className="mt-2 text-14 text-qidra-grayBlue">{item.note[locale]}</p>
+            <div className="mt-8 grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
+              <div>
+                <p className="text-14 font-medium uppercase text-qidra-accent">Qidra operations</p>
+                <h1 className="mt-4 title-48 text-qidra-dark">Admin panel</h1>
+                <p className="mt-5 max-w-3xl text-20 text-qidra-grayBlue">
+                  {locale === "ru"
+                    ? "Операционный центр для комплаенса, публикации проектов, KYC и платежной сверки."
+                    : "Operations center for compliance, project publishing, KYC and payment reconciliation."}
+                </p>
               </div>
-            ))}
+              <NotificationCard
+                tone="warning"
+                title={locale === "ru" ? "Напоминание по безопасности" : "Security reminder"}
+                text={
+                  locale === "ru"
+                    ? "Используйте роли с минимальными правами и фиксируйте каждую смену статуса перед запуском production-контролей."
+                    : "Use least-privilege manager roles and record every status change before production controls are launched."
+                }
+              />
+            </div>
+            <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              {metrics.map((item) => (
+                <div key={item.label.en} className="surface bg-white p-6">
+                  <p className="text-14 font-medium text-qidra-grayBlue">{item.label[locale]}</p>
+                  <p className="mt-3 subtitle-28 text-qidra-dark">{item.value}</p>
+                  <p className="mt-2 text-14 text-qidra-grayBlue">{item.note[locale]}</p>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <section className="section">
-        <div className="container-qidra">
-          <Tabs
-            items={[
-              { label: locale === "ru" ? "Обзор" : "Overview", href: withLocale("/admin", locale) },
-              { label: locale === "ru" ? "Пользователи" : "Users", href: withLocale("/admin/users", locale) },
-              { label: "KYC", href: withLocale("/admin/kyc", locale) },
-              { label: locale === "ru" ? "Проекты" : "Projects", href: withLocale("/admin/projects", locale) },
-              { label: locale === "ru" ? "Платежи" : "Payments", href: withLocale("/admin/payments", locale) }
-            ]}
-            activeHref={withLocale("/admin", locale)}
-          />
-          <div className="mt-8 grid gap-4 md:grid-cols-2">
-            {sections.map((section) => (
-              <Link key={section.href} href={withLocale(section.href, locale)} className="surface p-6 transition hover:border-qidra-accent">
-                <p className="text-20 font-medium text-qidra-dark">{section.label[locale]}</p>
-                <p className="mt-3 text-16 text-qidra-grayBlue">{section.text[locale]}</p>
-              </Link>
-            ))}
+        <section className="section">
+          <div className="container-qidra">
+            <Tabs
+              items={[
+                { label: locale === "ru" ? "Обзор" : "Overview", href: withLocale("/admin", locale) },
+                { label: locale === "ru" ? "Пользователи" : "Users", href: withLocale("/admin/users", locale) },
+                { label: "KYC", href: withLocale("/admin/kyc", locale) },
+                { label: locale === "ru" ? "Проекты" : "Projects", href: withLocale("/admin/projects", locale) },
+                { label: locale === "ru" ? "Платежи" : "Payments", href: withLocale("/admin/payments", locale) },
+                { label: locale === "ru" ? "Журнал" : "Audit", href: withLocale("/admin/audit", locale) }
+              ]}
+              activeHref={withLocale("/admin", locale)}
+            />
+            <div className="mt-8 grid gap-4 md:grid-cols-2">
+              {sections.map((section) => (
+                <Link key={section.href} href={withLocale(section.href, locale)} className="surface p-6 transition hover:border-qidra-accent">
+                  <p className="text-20 font-medium text-qidra-dark">{section.label[locale]}</p>
+                  <p className="mt-3 text-16 text-qidra-grayBlue">{section.text[locale]}</p>
+                </Link>
+              ))}
+            </div>
+            <div className="mt-8">
+              <ButtonLink href={withLocale("/admin/projects", locale)}>{locale === "ru" ? "Создать черновик проекта" : "Create project draft"}</ButtonLink>
+            </div>
           </div>
-          <div className="mt-8">
-            <ButtonLink href={withLocale("/admin/projects", locale)}>{locale === "ru" ? "Создать черновик проекта" : "Create project draft"}</ButtonLink>
-          </div>
-        </div>
-      </section>
+        </section>
       </main>
       <Footer locale={locale} />
     </>
   );
+}
+
+function formatNumber(value: number) {
+  return new Intl.NumberFormat("en-US").format(value);
 }
