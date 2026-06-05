@@ -1,3 +1,6 @@
+import Link from "next/link";
+import type { ReactNode } from "react";
+import { InvestmentStatus, Prisma } from "@prisma/client";
 import { AdminTabs } from "@/components/AdminTabs";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { FeedbackForm } from "@/components/ActionFeedback";
@@ -10,24 +13,36 @@ import { getLocale, t, type SearchParams, withLocale } from "@/lib/i18n";
 import { prisma } from "@/lib/prisma";
 
 export default async function AdminInvestmentsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
-  const locale = await getLocale(searchParams);
+  const params = await searchParams;
+  const locale = await getLocale(params);
   await requireAdmin(locale, "/admin/investments");
-  const requests = await prisma.investmentApplication.findMany({
-    include: {
-      project: true,
-      user: {
-        include: {
-          wallet: true,
-          kycApplications: {
-            orderBy: { createdAt: "desc" },
-            take: 1
+  const statusFilter = parseInvestmentStatus(searchParamString(params.status));
+  const applicationWhere: Prisma.InvestmentApplicationWhereInput = statusFilter ? { status: statusFilter } : {};
+  const [requests, totalCount, pendingCount, confirmedCount, rejectedCount, cancelledCount] = await Promise.all([
+    prisma.investmentApplication.findMany({
+      where: applicationWhere,
+      include: {
+        project: true,
+        user: {
+          include: {
+            wallet: true,
+            kycApplications: {
+              orderBy: { createdAt: "desc" },
+              take: 1
+            }
           }
         }
-      }
-    },
-    orderBy: { createdAt: "desc" },
-    take: 50
-  });
+      },
+      orderBy: { createdAt: "desc" },
+      take: 80
+    }),
+    prisma.investmentApplication.count(),
+    prisma.investmentApplication.count({ where: { status: InvestmentStatus.PENDING } }),
+    prisma.investmentApplication.count({ where: { status: InvestmentStatus.CONFIRMED } }),
+    prisma.investmentApplication.count({ where: { status: InvestmentStatus.REJECTED } }),
+    prisma.investmentApplication.count({ where: { status: InvestmentStatus.CANCELLED } })
+  ]);
+  const stats = { cancelledCount, confirmedCount, pendingCount, rejectedCount, totalCount };
 
   return (
     <>
@@ -51,8 +66,10 @@ export default async function AdminInvestmentsPage({ searchParams }: { searchPar
           </div>
         </section>
         <section className="section">
-          <div className="container-qidra grid gap-4">
+          <div className="container-qidra grid gap-8">
             <AdminTabs activePath="/admin/investments" locale={locale} />
+            <InvestmentDashboard locale={locale} stats={stats} />
+            <InvestmentFilters locale={locale} stats={stats} statusFilter={statusFilter} />
             {requests.length ? (
               requests.map((request) => {
                 const latestKycStatus = request.user.kycApplications[0]?.status;
@@ -63,33 +80,56 @@ export default async function AdminInvestmentsPage({ searchParams }: { searchPar
                 const canConfirm = latestKycStatus === "APPROVED" && hasEnoughBalance;
 
                 return (
-                <div key={request.id} className="surface grid gap-4 p-6 lg:grid-cols-[0.7fr_1fr_1fr_0.8fr_0.8fr_auto] lg:items-center">
-                  <div>
-                    <p className="text-16 font-medium text-qidra-dark">{request.id.slice(-8).toUpperCase()}</p>
-                    <p className="mt-1 text-14 text-qidra-grayBlue">{formatDate(request.createdAt, locale)}</p>
-                  </div>
-                  <p className="text-16 text-qidra-grayBlue">{request.user.name || request.user.email}</p>
-                  <p className="text-16 text-qidra-grayBlue">{locale === "ru" ? request.project.titleRu : request.project.titleEn}</p>
-                  <p className="text-16 font-medium text-qidra-dark">{formatUsdt(request.amountUsdt)}</p>
-                  <div className="grid gap-1 text-14">
-                    <p className="font-medium text-qidra-dark">{locale === "ru" ? "KYC" : "KYC"}: {kycStatusLabel(latestKycStatus, locale)}</p>
-                    <p className={hasEnoughBalance ? "text-qidra-green" : "text-qidra-red"}>
-                      {locale === "ru" ? "Свободно" : "Available"}: {formatUsdt(request.user.wallet?.availableUsdt ?? 0)}
-                    </p>
-                    <p className="text-qidra-grayBlue">
-                      {locale === "ru" ? "Резерв заявки" : "Application reserve"}: {formatUsdt(request.reservedUsdt)}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <ProjectStatusBadge status={investmentStatus(request.status)} locale={locale} />
-                    {request.status === "PENDING" ? (
-                      <div className="flex flex-col gap-2 sm:flex-row">
-                        <InvestmentActionForm action="confirm" disabled={!canConfirm} endpoint={`/api/admin/investments/${request.id}?lang=${locale}`} locale={locale} />
-                        <InvestmentActionForm action="reject" endpoint={`/api/admin/investments/${request.id}?lang=${locale}`} locale={locale} />
+                  <div key={request.id} className="surface grid gap-5 p-6">
+                    <div className="grid gap-4 lg:grid-cols-[0.7fr_1fr_1fr_0.8fr_0.9fr_auto] lg:items-center">
+                      <div>
+                        <p className="text-16 font-medium text-qidra-dark">{request.id.slice(-8).toUpperCase()}</p>
+                        <p className="mt-1 text-14 text-qidra-grayBlue">{formatDate(request.createdAt, locale)}</p>
+                      </div>
+                      <div>
+                        <p className="text-14 text-qidra-grayBlue">{locale === "ru" ? "Участник" : "Participant"}</p>
+                        <p className="mt-1 text-16 font-medium text-qidra-dark">{request.user.name || request.user.email}</p>
+                        <p className="mt-1 break-words text-14 text-qidra-grayBlue">{request.user.email}</p>
+                      </div>
+                      <div>
+                        <p className="text-14 text-qidra-grayBlue">{locale === "ru" ? "Проект" : "Project"}</p>
+                        <p className="mt-1 text-16 font-medium text-qidra-dark">{locale === "ru" ? request.project.titleRu : request.project.titleEn}</p>
+                      </div>
+                      <div>
+                        <p className="text-14 text-qidra-grayBlue">{locale === "ru" ? "Сумма" : "Amount"}</p>
+                        <p className="mt-1 text-16 font-medium text-qidra-dark">{formatUsdt(request.amountUsdt)}</p>
+                      </div>
+                      <div className="grid gap-1 text-14">
+                        <p className="font-medium text-qidra-dark">{locale === "ru" ? "KYC" : "KYC"}: {kycStatusLabel(latestKycStatus, locale)}</p>
+                        <p className={hasEnoughBalance ? "text-qidra-green" : "text-qidra-red"}>
+                          {locale === "ru" ? "Свободно" : "Available"}: {formatUsdt(request.user.wallet?.availableUsdt ?? 0)}
+                        </p>
+                        <p className="text-qidra-grayBlue">
+                          {locale === "ru" ? "Резерв заявки" : "Application reserve"}: {formatUsdt(request.reservedUsdt)}
+                        </p>
+                      </div>
+                      <div className="grid gap-3 lg:justify-items-end">
+                        <ProjectStatusBadge status={investmentStatus(request.status)} locale={locale} />
+                        {request.status === "PENDING" ? (
+                          <div className="flex flex-col gap-2 sm:flex-row">
+                            <InvestmentActionForm action="confirm" disabled={!canConfirm} endpoint={`/api/admin/investments/${request.id}?lang=${locale}`} locale={locale} />
+                            <InvestmentActionForm action="reject" endpoint={`/api/admin/investments/${request.id}?lang=${locale}`} locale={locale} />
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                    {request.status === "PENDING" && !canConfirm ? (
+                      <div className="rounded-qidra border border-qidra-gold bg-qidra-accent8 p-4 text-14 text-qidra-dark">
+                        {latestKycStatus !== "APPROVED"
+                          ? locale === "ru"
+                            ? "Подтверждение заблокировано: сначала одобрите KYC участника."
+                            : "Confirmation is blocked: approve the participant KYC first."
+                          : locale === "ru"
+                            ? "Подтверждение заблокировано: свободного баланса и резерва заявки недостаточно для суммы участия."
+                            : "Confirmation is blocked: available balance and application reserve are not enough for the participation amount."}
                       </div>
                     ) : null}
                   </div>
-                </div>
                 );
               })
             ) : (
@@ -103,6 +143,75 @@ export default async function AdminInvestmentsPage({ searchParams }: { searchPar
       </main>
       <Footer locale={locale} />
     </>
+  );
+}
+
+type InvestmentStats = {
+  cancelledCount: number;
+  confirmedCount: number;
+  pendingCount: number;
+  rejectedCount: number;
+  totalCount: number;
+};
+
+function InvestmentDashboard({ locale, stats }: { locale: "ru" | "en"; stats: InvestmentStats }) {
+  return (
+    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <InvestmentStatCard label={locale === "ru" ? "Всего заявок" : "Total applications"} value={stats.totalCount} />
+      <InvestmentStatCard label={locale === "ru" ? "На проверке" : "Pending review"} tone="accent" value={stats.pendingCount} />
+      <InvestmentStatCard label={locale === "ru" ? "Подтверждено" : "Confirmed"} tone="success" value={stats.confirmedCount} />
+      <InvestmentStatCard label={locale === "ru" ? "Отклонено" : "Rejected"} tone="danger" value={stats.rejectedCount} />
+      <InvestmentStatCard label={locale === "ru" ? "Отменено" : "Cancelled"} value={stats.cancelledCount} />
+    </div>
+  );
+}
+
+function InvestmentStatCard({ label, tone = "neutral", value }: { label: string; tone?: "accent" | "danger" | "neutral" | "success"; value: number }) {
+  const valueClass = tone === "success" ? "text-qidra-green" : tone === "danger" ? "text-qidra-red" : tone === "accent" ? "text-qidra-accent" : "text-qidra-dark";
+
+  return (
+    <article className="rounded-qidra bg-white p-5 shadow-[0_0_0_1px_rgba(18,20,23,0.08)]">
+      <p className="text-14 font-medium text-qidra-grayBlue">{label}</p>
+      <p className={`mt-3 text-[32px] font-medium leading-tight tracking-[0] ${valueClass}`}>{formatCount(value)}</p>
+    </article>
+  );
+}
+
+function InvestmentFilters({ locale, stats, statusFilter }: { locale: "ru" | "en"; stats: InvestmentStats; statusFilter?: InvestmentStatus }) {
+  return (
+    <div className="grid gap-2 rounded-qidra border border-qidra-grayLight bg-white p-4">
+      <p className="text-14 font-medium text-qidra-grayBlue">{locale === "ru" ? "Статус заявки" : "Application status"}</p>
+      <div className="flex flex-wrap gap-2">
+        <InvestmentFilterPill active={!statusFilter} href={investmentFilterHref(locale)}>
+          {locale === "ru" ? "Все" : "All"} ({formatCount(stats.totalCount)})
+        </InvestmentFilterPill>
+        <InvestmentFilterPill active={statusFilter === InvestmentStatus.PENDING} href={investmentFilterHref(locale, InvestmentStatus.PENDING)}>
+          {locale === "ru" ? "На проверке" : "Pending"} ({formatCount(stats.pendingCount)})
+        </InvestmentFilterPill>
+        <InvestmentFilterPill active={statusFilter === InvestmentStatus.CONFIRMED} href={investmentFilterHref(locale, InvestmentStatus.CONFIRMED)}>
+          {locale === "ru" ? "Подтверждено" : "Confirmed"} ({formatCount(stats.confirmedCount)})
+        </InvestmentFilterPill>
+        <InvestmentFilterPill active={statusFilter === InvestmentStatus.REJECTED} href={investmentFilterHref(locale, InvestmentStatus.REJECTED)}>
+          {locale === "ru" ? "Отклонено" : "Rejected"} ({formatCount(stats.rejectedCount)})
+        </InvestmentFilterPill>
+        <InvestmentFilterPill active={statusFilter === InvestmentStatus.CANCELLED} href={investmentFilterHref(locale, InvestmentStatus.CANCELLED)}>
+          {locale === "ru" ? "Отменено" : "Cancelled"} ({formatCount(stats.cancelledCount)})
+        </InvestmentFilterPill>
+      </div>
+    </div>
+  );
+}
+
+function InvestmentFilterPill({ active, children, href }: { active: boolean; children: ReactNode; href: string }) {
+  return (
+    <Link
+      className={`inline-flex h-10 items-center justify-center rounded-qidra border px-4 text-14 font-medium transition-colors ${
+        active ? "border-qidra-dark bg-qidra-dark text-white" : "border-qidra-grayLight bg-white text-qidra-grayBlue hover:border-qidra-accent hover:text-qidra-accent"
+      }`}
+      href={href}
+    >
+      {children}
+    </Link>
   );
 }
 
@@ -174,4 +283,30 @@ function formatDate(date: Date, locale: "ru" | "en") {
     month: "short",
     year: "numeric"
   }).format(date);
+}
+
+function searchParamString(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function parseInvestmentStatus(value: string | undefined) {
+  const normalized = value?.toUpperCase();
+
+  if (normalized === InvestmentStatus.PENDING) return InvestmentStatus.PENDING;
+  if (normalized === InvestmentStatus.CONFIRMED) return InvestmentStatus.CONFIRMED;
+  if (normalized === InvestmentStatus.REJECTED) return InvestmentStatus.REJECTED;
+  if (normalized === InvestmentStatus.CANCELLED) return InvestmentStatus.CANCELLED;
+  return undefined;
+}
+
+function investmentFilterHref(locale: "ru" | "en", status?: InvestmentStatus) {
+  const params = new URLSearchParams({ lang: locale });
+
+  if (status) params.set("status", status.toLowerCase());
+
+  return `/admin/investments?${params.toString()}`;
+}
+
+function formatCount(value: number) {
+  return new Intl.NumberFormat("en-US").format(value);
 }
