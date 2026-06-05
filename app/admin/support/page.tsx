@@ -15,7 +15,7 @@ import { prisma } from "@/lib/prisma";
 export default async function AdminSupportPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const params = await searchParams;
   const locale = await getLocale(params);
-  await requireSupportDesk(locale, "/admin/support");
+  const session = await requireSupportDesk(locale, "/admin/support");
   const statusFilter = parseSupportStatus(searchParamString(params.status));
   const isRu = locale === "ru";
   const [threads, managers, stats] = await Promise.all([
@@ -97,7 +97,7 @@ export default async function AdminSupportPage({ searchParams }: { searchParams:
 
         <section className="section">
           <div className="container-qidra grid gap-8">
-            <AdminTabs activePath="/admin/support" locale={locale} />
+            <AdminTabs activePath="/admin/support" locale={locale} role={session.user?.role} />
             <div className="grid gap-4 md:grid-cols-3">
               <StatCard label={isRu ? "Открытые" : "Open"} value={stats.openCount} tone="accent" />
               <StatCard label={isRu ? "Ожидают участника" : "Waiting participant"} value={stats.pendingCount} />

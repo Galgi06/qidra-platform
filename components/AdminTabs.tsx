@@ -13,10 +13,13 @@ const adminSections = [
   { path: "/admin/audit", label: { ru: "Журнал", en: "Audit" } }
 ];
 
-export function AdminTabs({ activePath, locale }: { activePath: string; locale: Locale }) {
+export function AdminTabs({ activePath, locale, role }: { activePath: string; locale: Locale; role?: string }) {
+  const visibleSections =
+    role === "TECH_SUPPORT" || role === "SALES_MANAGER" ? adminSections.filter((section) => section.path === "/admin/support") : adminSections;
+
   return (
     <Tabs
-      items={adminSections.map((section) => ({
+      items={visibleSections.map((section) => ({
         label: section.label[locale],
         href: withLocale(section.path, locale)
       }))}
