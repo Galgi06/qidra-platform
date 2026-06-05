@@ -2,8 +2,8 @@ import { FileUpload } from "@/components/FileUpload";
 import { FeedbackForm } from "@/components/ActionFeedback";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
+import { InvestorTabs } from "@/components/InvestorTabs";
 import { NotificationCard } from "@/components/NotificationCard";
-import { Tabs } from "@/components/Tabs";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
@@ -70,14 +70,7 @@ export default async function KycPage({ searchParams }: { searchParams?: SearchP
                   : "These details are needed for participant review, legal documentation and transparent cooperation with projects."}
               </p>
             </div>
-            <Tabs
-              items={[
-                { label: isRu ? "Обзор" : "Overview", href: withLocale("/investor", locale) },
-                { label: isRu ? "Проверка" : "Review", href: withLocale("/investor/kyc", locale), active: true },
-                { label: isRu ? "Кошелек" : "Wallet", href: withLocale("/investor/wallet", locale) },
-                { label: isRu ? "Участие" : "Participation", href: withLocale("/investor/investments", locale) }
-              ]}
-            />
+            <InvestorTabs activePath="/investor/kyc" locale={locale} />
           </div>
         </section>
 

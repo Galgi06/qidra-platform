@@ -9,6 +9,7 @@ const adminSections = [
   { path: "/admin/projects", label: { ru: "Проекты", en: "Projects" } },
   { path: "/admin/investments", label: { ru: "Заявки", en: "Applications" } },
   { path: "/admin/payments", label: { ru: "Платежи", en: "Payments" } },
+  { path: "/admin/support", label: { ru: "Коммуникации", en: "Communications" } },
   { path: "/admin/audit", label: { ru: "Журнал", en: "Audit" } }
 ];
 

@@ -306,6 +306,8 @@ function actorName(actor: { email: string; name: string | null } | null, locale:
 function actorRoleLabel(role: string | undefined, locale: Locale) {
   if (role === "SUPER_ADMIN") return locale === "ru" ? "Главный администратор" : "Super administrator";
   if (role === "ADMIN") return locale === "ru" ? "Администратор" : "Administrator";
+  if (role === "TECH_SUPPORT") return locale === "ru" ? "Менеджер техподдержки" : "Technical support manager";
+  if (role === "SALES_MANAGER") return locale === "ru" ? "Менеджер отдела продаж" : "Sales manager";
   if (role === "INVESTOR") return locale === "ru" ? "Участник" : "Participant";
   return locale === "ru" ? "Система" : "System";
 }
@@ -403,8 +405,10 @@ function enumValueLabel(value: string, locale: Locale) {
     REJECTED: { ru: "Отклонено", en: "Rejected" },
     RETURN: { ru: "Возврат", en: "Return" },
     REVIEW: { ru: "Проверка", en: "Review" },
+    SALES_MANAGER: { ru: "Менеджер отдела продаж", en: "Sales manager" },
     SUBMITTED: { ru: "На проверке", en: "Submitted" },
     SUPER_ADMIN: { ru: "Главный администратор", en: "Super administrator" },
+    TECH_SUPPORT: { ru: "Менеджер техподдержки", en: "Technical support manager" },
     WITHDRAWAL: { ru: "Вывод", en: "Withdrawal" }
   };
 

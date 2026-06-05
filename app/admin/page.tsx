@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { InvestmentStatus, KycStatus, PaymentStatus, ProjectStatus, TransactionType } from "@prisma/client";
+import { InvestmentStatus, KycStatus, PaymentStatus, ProjectStatus, SupportThreadStatus, TransactionType } from "@prisma/client";
 import { AdminTabs } from "@/components/AdminTabs";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { Footer } from "@/components/Footer";
@@ -37,6 +37,11 @@ const sections = [
     text: { ru: "Сверка USDT-операций и статусов заявок.", en: "Reconcile USDT operations and application statuses." }
   },
   {
+    href: "/admin/support",
+    label: { ru: "Коммуникации", en: "Communications" },
+    text: { ru: "Личные диалоги с участниками, поддержкой и продажами.", en: "Personal participant threads for support and sales." }
+  },
+  {
     href: "/admin/audit",
     label: { ru: "Журнал действий", en: "Audit log" },
     text: { ru: "История изменений, проверок и финансовых решений.", en: "History of changes, reviews and financial decisions." }
@@ -46,7 +51,7 @@ const sections = [
 export default async function AdminPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const locale = await getLocale(searchParams);
   await requireAdmin(locale, "/admin");
-  const [userCount, pendingKycCount, pendingInvestmentCount, pendingPaymentCount, activeProjectCount, draftProjectCount, reviewProjectCount, pendingDepositCount, pendingWithdrawalCount] = await Promise.all([
+  const [userCount, pendingKycCount, pendingInvestmentCount, pendingPaymentCount, activeProjectCount, draftProjectCount, reviewProjectCount, pendingDepositCount, pendingWithdrawalCount, openSupportCount] = await Promise.all([
     prisma.user.count(),
     prisma.kycApplication.count({ where: { status: KycStatus.SUBMITTED } }),
     prisma.investmentApplication.count({ where: { status: InvestmentStatus.PENDING } }),
@@ -55,7 +60,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     prisma.project.count({ where: { status: ProjectStatus.DRAFT } }),
     prisma.project.count({ where: { status: ProjectStatus.REVIEW } }),
     prisma.walletTransaction.count({ where: { status: PaymentStatus.PENDING, type: TransactionType.DEPOSIT } }),
-    prisma.walletTransaction.count({ where: { status: PaymentStatus.PENDING, type: TransactionType.WITHDRAWAL } })
+    prisma.walletTransaction.count({ where: { status: PaymentStatus.PENDING, type: TransactionType.WITHDRAWAL } }),
+    prisma.supportThread.count({ where: { status: SupportThreadStatus.OPEN } })
   ]);
   const metrics = [
     {
@@ -72,6 +78,11 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       label: { ru: "Платежные операции", en: "Payment operations" },
       value: formatNumber(pendingPaymentCount),
       note: { ru: "Ожидают сверки", en: "Awaiting reconciliation" }
+    },
+    {
+      label: { ru: "Коммуникации", en: "Communications" },
+      value: formatNumber(openSupportCount),
+      note: { ru: "Открытые диалоги", en: "Open threads" }
     },
     {
       label: { ru: "Проекты", en: "Projects" },
@@ -103,6 +114,12 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       label: { ru: "Проекты на проверке", en: "Projects in review" },
       value: reviewProjectCount,
       text: { ru: "Подготовить публикацию после юридической проверки.", en: "Prepare publishing after legal review." }
+    },
+    {
+      href: withLocale("/admin/support?status=open", locale),
+      label: { ru: "Диалоги участников", en: "Participant threads" },
+      value: openSupportCount,
+      text: { ru: "Ответить клиентам и назначить менеджера.", en: "Reply to clients and assign a manager." }
     },
     {
       href: withLocale("/admin/projects?status=draft", locale),
@@ -144,7 +161,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                 }
               />
             </div>
-            <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
               {metrics.map((item) => (
                 <div key={item.label.en} className="surface bg-white p-6">
                   <p className="text-14 font-medium text-qidra-grayBlue">{item.label[locale]}</p>
@@ -165,7 +182,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                   {locale === "ru" ? "Открыть журнал" : "Open audit log"}
                 </ButtonLink>
               </div>
-              <div className="mt-5 grid gap-4 lg:grid-cols-5">
+              <div className="mt-5 grid gap-4 lg:grid-cols-3 xl:grid-cols-6">
                 {queueItems.map((item) => (
                   <Link key={item.href} href={item.href} className="rounded-qidra bg-white p-5 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] transition-colors hover:text-qidra-accent">
                     <p className="text-14 font-medium text-qidra-grayBlue">{item.label[locale]}</p>

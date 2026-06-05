@@ -1,8 +1,8 @@
 import { Footer } from "@/components/Footer";
 import { FeedbackForm } from "@/components/ActionFeedback";
 import { Header } from "@/components/Header";
+import { InvestorTabs } from "@/components/InvestorTabs";
 import { NotificationCard } from "@/components/NotificationCard";
-import { Tabs } from "@/components/Tabs";
 import { WalletDepositAddress } from "@/components/WalletDepositAddress";
 import { WalletOperationItem } from "@/components/WalletOperationItem";
 import { Button } from "@/components/ui/Button";
@@ -53,14 +53,7 @@ export default async function WalletPage({ searchParams }: { searchParams?: Sear
                   : "Send USDT on TRC20 and add the transaction hash. Qidra will automatically verify the transfer before crediting it."}
               </p>
             </div>
-            <Tabs
-              items={[
-                { label: isRu ? "Обзор" : "Overview", href: withLocale("/investor", locale) },
-                { label: isRu ? "Проверка" : "Review", href: withLocale("/investor/kyc", locale) },
-                { label: isRu ? "Кошелек" : "Wallet", href: withLocale("/investor/wallet", locale), active: true },
-                { label: isRu ? "Участие" : "Participation", href: withLocale("/investor/investments", locale) }
-              ]}
-            />
+            <InvestorTabs activePath="/investor/wallet" locale={locale} />
           </div>
         </section>
 

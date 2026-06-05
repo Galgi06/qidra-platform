@@ -4,8 +4,8 @@ import { InvestmentStatus } from "@prisma/client";
 import { FeedbackForm } from "@/components/ActionFeedback";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
+import { InvestorTabs } from "@/components/InvestorTabs";
 import { NotificationCard } from "@/components/NotificationCard";
-import { Tabs } from "@/components/Tabs";
 import { ButtonLink } from "@/components/ui/Button";
 import { ProjectStatusBadge, type BadgeStatus } from "@/components/ui/ProjectStatusBadge";
 import { requireAuth } from "@/lib/access";
@@ -55,14 +55,7 @@ export default async function InvestmentsPage({ searchParams }: { searchParams?:
                   : "This page shows participation applications submitted from project pages."}
               </p>
             </div>
-            <Tabs
-              items={[
-                { label: isRu ? "Обзор" : "Overview", href: withLocale("/investor", locale) },
-                { label: isRu ? "Проверка" : "Review", href: withLocale("/investor/kyc", locale) },
-                { label: isRu ? "Кошелек" : "Wallet", href: withLocale("/investor/wallet", locale) },
-                { label: isRu ? "Участие" : "Participation", href: withLocale("/investor/investments", locale), active: true }
-              ]}
-            />
+            <InvestorTabs activePath="/investor/investments" locale={locale} />
           </div>
         </section>
 

@@ -2,7 +2,7 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import type { Locale } from "@/lib/i18n";
 import { withLocale } from "@/lib/i18n";
-import { canAccessAdmin } from "@/lib/auth";
+import { canAccessAdmin, canAccessSupportDesk } from "@/lib/auth";
 import { authOptions } from "@/lib/next-auth";
 
 type SessionWithRole = Awaited<ReturnType<typeof getServerSession>> & {
@@ -32,6 +32,16 @@ export async function requireAdmin(locale: Locale, nextPath: string) {
   const session = await requireAuth(locale, nextPath);
 
   if (!canAccessAdmin(session.user?.role as "ADMIN" | "SUPER_ADMIN" | "guest" | undefined)) {
+    redirect(withLocale("/investor", locale));
+  }
+
+  return session;
+}
+
+export async function requireSupportDesk(locale: Locale, nextPath: string) {
+  const session = await requireAuth(locale, nextPath);
+
+  if (!canAccessSupportDesk(session.user?.role as "ADMIN" | "SUPER_ADMIN" | "TECH_SUPPORT" | "SALES_MANAGER" | "guest" | undefined)) {
     redirect(withLocale("/investor", locale));
   }
 

@@ -1,0 +1,104 @@
+import { SupportThreadStatus } from "@prisma/client";
+import { getServerSession } from "next-auth";
+import { NextResponse, type NextRequest } from "next/server";
+import { z } from "zod";
+import { authOptions } from "@/lib/next-auth";
+import { prisma } from "@/lib/prisma";
+
+const messageSchema = z.object({
+  body: z.string().trim().min(2).max(3000),
+  subject: z.string().trim().max(160).optional()
+});
+
+type SessionUser = {
+  user?: {
+    id?: string;
+  };
+};
+
+function isRu(request: NextRequest) {
+  return request.nextUrl.searchParams.get("lang") !== "en";
+}
+
+export async function POST(request: NextRequest) {
+  const localeRu = isRu(request);
+  const session = (await getServerSession(authOptions)) as SessionUser | null;
+  const userId = session?.user?.id;
+
+  if (!userId) {
+    return NextResponse.json(
+      {
+        title: localeRu ? "Нужен вход" : "Sign in required",
+        message: localeRu ? "Войдите в аккаунт, чтобы написать в поддержку." : "Sign in to message support."
+      },
+      { status: 401 }
+    );
+  }
+
+  const parsed = messageSchema.safeParse(await request.json().catch(() => null));
+
+  if (!parsed.success) {
+    return NextResponse.json(
+      {
+        title: localeRu ? "Проверьте сообщение" : "Check the message",
+        message: localeRu ? "Напишите сообщение от 2 до 3000 символов." : "Write a message between 2 and 3000 characters."
+      },
+      { status: 400 }
+    );
+  }
+
+  const openThread = await prisma.supportThread.findFirst({
+    where: {
+      userId,
+      status: { not: SupportThreadStatus.CLOSED }
+    },
+    orderBy: { updatedAt: "desc" }
+  });
+
+  const thread = await prisma.$transaction(async (tx) => {
+    const supportThread =
+      openThread ??
+      (await tx.supportThread.create({
+        data: {
+          userId,
+          subject: parsed.data.subject || (localeRu ? "Обращение участника" : "Participant request")
+        }
+      }));
+
+    await tx.supportMessage.create({
+      data: {
+        threadId: supportThread.id,
+        senderId: userId,
+        body: parsed.data.body
+      }
+    });
+
+    await tx.supportThread.update({
+      where: { id: supportThread.id },
+      data: {
+        status: SupportThreadStatus.OPEN,
+        subject: parsed.data.subject || supportThread.subject
+      }
+    });
+
+    await tx.adminAuditLog.create({
+      data: {
+        actorId: userId,
+        action: "support.message.user",
+        entityType: "SupportThread",
+        entityId: supportThread.id,
+        payload: {
+          subject: parsed.data.subject || supportThread.subject
+        }
+      }
+    });
+
+    return supportThread;
+  });
+
+  return NextResponse.json({
+    title: localeRu ? "Сообщение отправлено" : "Message sent",
+    message: localeRu ? "Команда Qidra увидит обращение в панели коммуникаций." : "The Qidra team will see it in the communications panel.",
+    threadId: thread.id
+  });
+}

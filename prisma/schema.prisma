@@ -9,6 +9,8 @@ datasource db {
 
 enum Role {
   INVESTOR
+  TECH_SUPPORT
+  SALES_MANAGER
   ADMIN
   SUPER_ADMIN
 }
@@ -50,6 +52,12 @@ enum TransactionType {
   ADJUSTMENT
 }
 
+enum SupportThreadStatus {
+  OPEN
+  PENDING
+  CLOSED
+}
+
 enum DocumentKind {
   PROJECT
   LEGAL
@@ -59,23 +67,26 @@ enum DocumentKind {
 }
 
 model User {
-  id                   String                  @id @default(cuid())
-  email                String                  @unique
-  name                 String?
-  passwordHash         String?
-  role                 Role                    @default(INVESTOR)
-  emailVerified        DateTime?
-  createdAt            DateTime                @default(now())
-  updatedAt            DateTime                @updatedAt
-  investorProfile      InvestorProfile?
-  kycApplications      KycApplication[]
-  wallet               Wallet?
-  investments          InvestmentApplication[]
-  paymentConfirmations PaymentConfirmation[]   @relation("PaymentReviewer")
-  auditLogs            AdminAuditLog[]
-  twoFactorSetting     TwoFactorSetting?
-  accounts             Account[]
-  sessions             Session[]
+  id                     String                  @id @default(cuid())
+  email                  String                  @unique
+  name                   String?
+  passwordHash           String?
+  role                   Role                    @default(INVESTOR)
+  emailVerified          DateTime?
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  investorProfile        InvestorProfile?
+  kycApplications        KycApplication[]
+  wallet                 Wallet?
+  investments            InvestmentApplication[]
+  paymentConfirmations   PaymentConfirmation[]   @relation("PaymentReviewer")
+  auditLogs              AdminAuditLog[]
+  twoFactorSetting       TwoFactorSetting?
+  supportThreads         SupportThread[]         @relation("SupportThreadUser")
+  assignedSupportThreads SupportThread[]         @relation("SupportThreadAssignee")
+  supportMessages        SupportMessage[]        @relation("SupportMessageSender")
+  accounts               Account[]
+  sessions               Session[]
 }
 
 model InvestorProfile {
@@ -208,6 +219,37 @@ model PaymentConfirmation {
   note          String?
   transaction   WalletTransaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
   reviewer      User?             @relation("PaymentReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+}
+
+model SupportThread {
+  id           String              @id @default(cuid())
+  userId       String
+  assignedToId String?
+  status       SupportThreadStatus @default(OPEN)
+  subject      String?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  user         User                @relation("SupportThreadUser", fields: [userId], references: [id], onDelete: Cascade)
+  assignedTo   User?               @relation("SupportThreadAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  messages     SupportMessage[]
+
+  @@index([assignedToId])
+  @@index([status])
+  @@index([userId])
+}
+
+model SupportMessage {
+  id        String        @id @default(cuid())
+  threadId  String
+  senderId  String?
+  body      String        @db.Text
+  internal  Boolean       @default(false)
+  createdAt DateTime      @default(now())
+  thread    SupportThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  sender    User?         @relation("SupportMessageSender", fields: [senderId], references: [id], onDelete: SetNull)
+
+  @@index([senderId])
+  @@index([threadId])
 }
 
 model AdminAuditLog {

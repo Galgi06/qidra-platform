@@ -19,7 +19,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
   const params = await searchParams;
   const locale = await getLocale(params);
   const session = await requireAdmin(locale, "/admin/users");
-  const canManageRoles = canManageManagers(session.user?.role as "ADMIN" | "SUPER_ADMIN" | "guest" | undefined);
+  const canManageRoles = canManageManagers(session.user?.role as "ADMIN" | "SUPER_ADMIN" | "TECH_SUPPORT" | "SALES_MANAGER" | "guest" | undefined);
   const roleFilter = parseRole(searchParamString(params.role));
   const kycFilter = parseKycFilter(searchParamString(params.kyc));
   const users = await prisma.user.findMany({
@@ -158,16 +158,19 @@ type UserStats = {
   notSubmittedKycCount: number;
   pendingKycCount: number;
   rejectedKycCount: number;
+  salesManagerCount: number;
   superAdminCount: number;
+  techSupportCount: number;
   totalCount: number;
 };
 
 function UsersDashboard({ locale, stats }: { locale: "ru" | "en"; stats: UserStats }) {
   return (
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
       <UserStatCard label={locale === "ru" ? "Всего аккаунтов" : "Total accounts"} value={stats.totalCount} />
       <UserStatCard label={locale === "ru" ? "Участники" : "Participants"} value={stats.investorCount} />
       <UserStatCard label={locale === "ru" ? "Админы" : "Admins"} tone="accent" value={stats.adminCount + stats.superAdminCount} />
+      <UserStatCard label={locale === "ru" ? "Менеджеры" : "Managers"} tone="accent" value={stats.techSupportCount + stats.salesManagerCount} />
       <UserStatCard label={locale === "ru" ? "KYC на проверке" : "KYC pending"} tone="accent" value={stats.pendingKycCount} />
       <UserStatCard label={locale === "ru" ? "KYC одобрен" : "KYC approved"} tone="success" value={stats.approvedKycCount} />
     </div>
@@ -196,6 +199,12 @@ function UsersFilters({ kycFilter, locale, roleFilter, stats }: { kycFilter?: Ky
           </UserFilterPill>
           <UserFilterPill active={roleFilter === Role.INVESTOR} href={usersFilterHref(locale, Role.INVESTOR, kycFilter)}>
             {locale === "ru" ? "Участники" : "Participants"} ({formatCount(stats.investorCount)})
+          </UserFilterPill>
+          <UserFilterPill active={roleFilter === Role.TECH_SUPPORT} href={usersFilterHref(locale, Role.TECH_SUPPORT, kycFilter)}>
+            {locale === "ru" ? "Техподдержка" : "Support"} ({formatCount(stats.techSupportCount)})
+          </UserFilterPill>
+          <UserFilterPill active={roleFilter === Role.SALES_MANAGER} href={usersFilterHref(locale, Role.SALES_MANAGER, kycFilter)}>
+            {locale === "ru" ? "Отдел продаж" : "Sales"} ({formatCount(stats.salesManagerCount)})
           </UserFilterPill>
           <UserFilterPill active={roleFilter === Role.ADMIN} href={usersFilterHref(locale, Role.ADMIN, kycFilter)}>
             {locale === "ru" ? "Админы" : "Admins"} ({formatCount(stats.adminCount)})
@@ -264,6 +273,8 @@ function RoleForm({ currentRole, endpoint, locale }: { currentRole: string; endp
         defaultValue={currentRole}
         options={[
           { value: "INVESTOR", label: locale === "ru" ? "Участник" : "Participant" },
+          { value: "TECH_SUPPORT", label: locale === "ru" ? "Менеджер техподдержки" : "Technical support manager" },
+          { value: "SALES_MANAGER", label: locale === "ru" ? "Менеджер отдела продаж" : "Sales manager" },
           { value: "ADMIN", label: locale === "ru" ? "Админ" : "Admin" },
           { value: "SUPER_ADMIN", label: locale === "ru" ? "Главный админ" : "Super admin" }
         ]}
@@ -278,6 +289,8 @@ function RoleForm({ currentRole, endpoint, locale }: { currentRole: string; endp
 function roleLabel(role: string, locale: "ru" | "en") {
   if (role === "SUPER_ADMIN") return locale === "ru" ? "Главный админ" : "Super admin";
   if (role === "ADMIN") return locale === "ru" ? "Админ" : "Admin";
+  if (role === "TECH_SUPPORT") return locale === "ru" ? "Менеджер техподдержки" : "Technical support manager";
+  if (role === "SALES_MANAGER") return locale === "ru" ? "Менеджер отдела продаж" : "Sales manager";
   return locale === "ru" ? "Участник" : "Participant";
 }
 
@@ -308,6 +321,8 @@ function buildUserStats(users: AdminUserListItem[]): UserStats {
 
       stats.totalCount += 1;
       if (user.role === Role.INVESTOR) stats.investorCount += 1;
+      if (user.role === Role.TECH_SUPPORT) stats.techSupportCount += 1;
+      if (user.role === Role.SALES_MANAGER) stats.salesManagerCount += 1;
       if (user.role === Role.ADMIN) stats.adminCount += 1;
       if (user.role === Role.SUPER_ADMIN) stats.superAdminCount += 1;
       if (!kycStatus) stats.notSubmittedKycCount += 1;
@@ -324,7 +339,9 @@ function buildUserStats(users: AdminUserListItem[]): UserStats {
       notSubmittedKycCount: 0,
       pendingKycCount: 0,
       rejectedKycCount: 0,
+      salesManagerCount: 0,
       superAdminCount: 0,
+      techSupportCount: 0,
       totalCount: 0
     }
   );
@@ -338,6 +355,8 @@ function parseRole(value: string | undefined) {
   const normalized = value?.toUpperCase();
 
   if (normalized === Role.INVESTOR) return Role.INVESTOR;
+  if (normalized === Role.TECH_SUPPORT) return Role.TECH_SUPPORT;
+  if (normalized === Role.SALES_MANAGER) return Role.SALES_MANAGER;
   if (normalized === Role.ADMIN) return Role.ADMIN;
   if (normalized === Role.SUPER_ADMIN) return Role.SUPER_ADMIN;
   return undefined;

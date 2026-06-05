@@ -25,7 +25,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const localeRu = isRu(request);
   const session = (await getServerSession(authOptions)) as SessionUser | null;
 
-  if (!canManageManagers(session?.user?.role as "ADMIN" | "SUPER_ADMIN" | "guest" | undefined)) {
+  if (!canManageManagers(session?.user?.role as "ADMIN" | "SUPER_ADMIN" | "TECH_SUPPORT" | "SALES_MANAGER" | "guest" | undefined)) {
     return NextResponse.json(
       {
         title: localeRu ? "Нет доступа" : "Access denied",
