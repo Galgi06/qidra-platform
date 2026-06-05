@@ -73,11 +73,21 @@ export default async function AdminInvestmentsPage({ searchParams }: { searchPar
             {requests.length ? (
               requests.map((request) => {
                 const latestKycStatus = request.user.kycApplications[0]?.status;
-                const availableUsdt = Number(request.user.wallet?.availableUsdt.toString() ?? 0);
-                const reservedUsdt = Number(request.reservedUsdt.toString());
+                const walletAvailableUsdt = Number(request.user.wallet?.availableUsdt.toString() ?? 0);
+                const walletReservedUsdt = Number(request.user.wallet?.reservedUsdt.toString() ?? 0);
+                const applicationReservedUsdt = Number(request.reservedUsdt.toString());
                 const amountUsdt = Number(request.amountUsdt.toString());
-                const hasEnoughBalance = availableUsdt + reservedUsdt >= amountUsdt;
+                const reserveGapUsdt = Math.max(amountUsdt - applicationReservedUsdt, 0);
+                const hasEnoughAvailable = walletAvailableUsdt >= reserveGapUsdt;
+                const hasEnoughReserve = walletReservedUsdt >= applicationReservedUsdt;
+                const hasEnoughBalance = hasEnoughAvailable && hasEnoughReserve;
                 const canConfirm = latestKycStatus === "APPROVED" && hasEnoughBalance;
+                const blockedMessage = investmentBlockedMessage({
+                  hasEnoughAvailable,
+                  hasEnoughReserve,
+                  latestKycStatus,
+                  locale
+                });
 
                 return (
                   <div key={request.id} className="surface grid gap-5 p-6">
@@ -101,11 +111,17 @@ export default async function AdminInvestmentsPage({ searchParams }: { searchPar
                       </div>
                       <div className="grid gap-1 text-14">
                         <p className="font-medium text-qidra-dark">{locale === "ru" ? "KYC" : "KYC"}: {kycStatusLabel(latestKycStatus, locale)}</p>
-                        <p className={hasEnoughBalance ? "text-qidra-green" : "text-qidra-red"}>
+                        <p className={hasEnoughAvailable ? "text-qidra-green" : "text-qidra-red"}>
                           {locale === "ru" ? "Свободно" : "Available"}: {formatUsdt(request.user.wallet?.availableUsdt ?? 0)}
+                        </p>
+                        <p className={hasEnoughReserve ? "text-qidra-green" : "text-qidra-red"}>
+                          {locale === "ru" ? "Резерв кошелька" : "Wallet reserve"}: {formatUsdt(request.user.wallet?.reservedUsdt ?? 0)}
                         </p>
                         <p className="text-qidra-grayBlue">
                           {locale === "ru" ? "Резерв заявки" : "Application reserve"}: {formatUsdt(request.reservedUsdt)}
+                        </p>
+                        <p className="text-qidra-grayBlue">
+                          {locale === "ru" ? "Нужно из свободного" : "Needed from available"}: {formatUsdt(reserveGapUsdt)}
                         </p>
                       </div>
                       <div className="grid gap-3 lg:justify-items-end">
@@ -120,13 +136,7 @@ export default async function AdminInvestmentsPage({ searchParams }: { searchPar
                     </div>
                     {request.status === "PENDING" && !canConfirm ? (
                       <div className="rounded-qidra border border-qidra-gold bg-qidra-accent8 p-4 text-14 text-qidra-dark">
-                        {latestKycStatus !== "APPROVED"
-                          ? locale === "ru"
-                            ? "Подтверждение заблокировано: сначала одобрите KYC участника."
-                            : "Confirmation is blocked: approve the participant KYC first."
-                          : locale === "ru"
-                            ? "Подтверждение заблокировано: свободного баланса и резерва заявки недостаточно для суммы участия."
-                            : "Confirmation is blocked: available balance and application reserve are not enough for the participation amount."}
+                        {blockedMessage}
                       </div>
                     ) : null}
                   </div>
@@ -226,8 +236,8 @@ function InvestmentActionForm({ action, disabled = false, endpoint, locale }: { 
         title: confirm ? (locale === "ru" ? "Заявка подтверждена" : "Application confirmed") : locale === "ru" ? "Заявка отклонена" : "Application rejected",
         text: confirm
           ? locale === "ru"
-            ? "Зарезервированная сумма переведена в участие по проекту."
-            : "The reserved amount was moved into project participation."
+            ? "Зарезервированная сумма переведена в участие по проекту, прогресс проекта обновлён."
+            : "The reserved amount was moved into project participation and the project progress was updated."
           : locale === "ru"
             ? "Участник увидит обновлённый статус в профиле участника."
             : "The participant will see the updated status in the participant profile.",
@@ -270,6 +280,40 @@ function kycStatusLabel(status: string | undefined, locale: "ru" | "en") {
   if (status === "SUBMITTED") return locale === "ru" ? "на проверке" : "under review";
   if (status === "REJECTED") return locale === "ru" ? "отклонён" : "rejected";
   return locale === "ru" ? "не отправлен" : "not submitted";
+}
+
+function investmentBlockedMessage({
+  hasEnoughAvailable,
+  hasEnoughReserve,
+  latestKycStatus,
+  locale
+}: {
+  hasEnoughAvailable: boolean;
+  hasEnoughReserve: boolean;
+  latestKycStatus: string | undefined;
+  locale: "ru" | "en";
+}) {
+  if (latestKycStatus !== "APPROVED") {
+    return locale === "ru"
+      ? "Подтверждение заблокировано: сначала одобрите KYC участника."
+      : "Confirmation is blocked: approve the participant KYC first.";
+  }
+
+  if (!hasEnoughReserve) {
+    return locale === "ru"
+      ? "Подтверждение заблокировано: резерв кошелька меньше резерва заявки. Обновите страницу или отклоните заявку, чтобы вернуть доступный баланс участнику."
+      : "Confirmation is blocked: the wallet reserve is lower than the application reserve. Refresh the page or reject the application to return available balance to the participant.";
+  }
+
+  if (!hasEnoughAvailable) {
+    return locale === "ru"
+      ? "Подтверждение заблокировано: свободного баланса недостаточно для недостающей части заявки."
+      : "Confirmation is blocked: available balance is not enough for the remaining part of the application.";
+  }
+
+  return locale === "ru"
+    ? "Подтверждение временно недоступно. Обновите страницу и проверьте заявку снова."
+    : "Confirmation is temporarily unavailable. Refresh the page and check the application again.";
 }
 
 function formatUsdt(value: { toString(): string }) {
