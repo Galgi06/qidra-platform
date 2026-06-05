@@ -72,7 +72,18 @@ export async function syncWalletDeposits({ actorId, limitPerWallet = 100, wallet
 
     for (const transfer of scan.transfers) {
       const txHash = transfer.transactionId.toLowerCase();
-      const result = await prisma.$transaction(async (tx) => syncTransfer(tx, wallet.id, transfer, txHash, actorId));
+      let result: Awaited<ReturnType<typeof syncTransfer>>;
+
+      try {
+        result = await prisma.$transaction(async (tx) => syncTransfer(tx, wallet.id, transfer, txHash, actorId));
+      } catch (error) {
+        if (isUniqueTxHashError(error)) {
+          skippedCount += 1;
+          continue;
+        }
+
+        throw error;
+      }
 
       rejectedClaimCount += result.rejectedClaimCount;
 
@@ -99,6 +110,12 @@ export async function syncWalletDeposits({ actorId, limitPerWallet = 100, wallet
     skippedCount,
     status: failedWallets === wallets.length && wallets.length > 0 ? "network_error" : "configured"
   };
+}
+
+function isUniqueTxHashError(error: unknown) {
+  const target = error instanceof Prisma.PrismaClientKnownRequestError ? error.meta?.target : null;
+
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002" && Array.isArray(target) && target.includes("txHash");
 }
 
 async function syncTransfer(tx: Prisma.TransactionClient, walletId: string, transfer: VerifiedTronTransfer, txHash: string, actorId?: string) {

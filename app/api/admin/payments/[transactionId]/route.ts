@@ -135,16 +135,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     });
 
     if (duplicateHash) {
-      return NextResponse.json(
-        {
-          title: localeRu ? "Hash уже используется" : "Hash already used",
-          message:
-            localeRu
-              ? "Этот transaction hash уже сохранён в другой операции. Повторное использование hash невозможно."
-              : "This transaction hash is already saved on another operation. Hash reuse is not allowed."
-        },
-        { status: 409 }
-      );
+      return duplicateHashResponse(localeRu);
     }
 
     const verification = await verifyTrc20Withdrawal(outgoingTxHash, transaction.amountUsdt, transaction.destinationAddress);
@@ -199,48 +190,56 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
   }
 
-  await prisma.$transaction(async (tx) => {
-    await tx.walletTransaction.update({
-      where: { id: transaction.id },
-      data: {
-        status: nextStatus,
-        ...(outgoingTxHash && transaction.type === TransactionType.WITHDRAWAL ? { txHash: outgoingTxHash } : {}),
-        note: parsed.data.note || transaction.note
-      }
-    });
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.walletTransaction.update({
+        where: { id: transaction.id },
+        data: {
+          status: nextStatus,
+          ...(outgoingTxHash && transaction.type === TransactionType.WITHDRAWAL ? { txHash: outgoingTxHash } : {}),
+          note: parsed.data.note || transaction.note
+        }
+      });
 
-    await tx.paymentConfirmation.upsert({
-      where: { transactionId: transaction.id },
-      update: {
-        reviewerId: session?.user?.id,
-        status: nextStatus,
-        reviewedAt: new Date(),
-        note: parsed.data.note
-      },
-      create: {
-        transactionId: transaction.id,
-        reviewerId: session?.user?.id,
-        status: nextStatus,
-        reviewedAt: new Date(),
-        note: parsed.data.note
-      }
-    });
+      await tx.paymentConfirmation.upsert({
+        where: { transactionId: transaction.id },
+        update: {
+          reviewerId: session?.user?.id,
+          status: nextStatus,
+          reviewedAt: new Date(),
+          note: parsed.data.note
+        },
+        create: {
+          transactionId: transaction.id,
+          reviewerId: session?.user?.id,
+          status: nextStatus,
+          reviewedAt: new Date(),
+          note: parsed.data.note
+        }
+      });
 
-    await tx.wallet.update({
-      where: { id: transaction.walletId },
-      data: walletUpdateForAction(transaction.type, nextStatus, transaction.amountUsdt)
-    });
+      await tx.wallet.update({
+        where: { id: transaction.walletId },
+        data: walletUpdateForAction(transaction.type, nextStatus, transaction.amountUsdt)
+      });
 
-    await tx.adminAuditLog.create({
-      data: {
-        actorId: session?.user?.id,
-        action: paymentAuditAction(transaction.type, nextStatus),
-        entityType: "WalletTransaction",
-        entityId: transaction.id,
-        payload: auditPayload
-      }
+      await tx.adminAuditLog.create({
+        data: {
+          actorId: session?.user?.id,
+          action: paymentAuditAction(transaction.type, nextStatus),
+          entityType: "WalletTransaction",
+          entityId: transaction.id,
+          payload: auditPayload
+        }
+      });
     });
-  });
+  } catch (error) {
+    if (isUniqueTxHashError(error)) {
+      return duplicateHashResponse(localeRu);
+    }
+
+    throw error;
+  }
 
   return NextResponse.json({
     title: responseTitle(transaction.type, nextStatus, localeRu),
@@ -253,6 +252,25 @@ function paymentAuditAction(type: TransactionType, status: PaymentStatus) {
   const normalizedStatus = status === PaymentStatus.CONFIRMED ? "confirm" : "reject";
 
   return `payment.${normalizedType}.${normalizedStatus}`;
+}
+
+function duplicateHashResponse(localeRu: boolean) {
+  return NextResponse.json(
+    {
+      title: localeRu ? "Hash уже используется" : "Hash already used",
+      message:
+        localeRu
+          ? "Этот transaction hash уже сохранён в другой операции. Повторное использование hash невозможно."
+          : "This transaction hash is already saved on another operation. Hash reuse is not allowed."
+    },
+    { status: 409 }
+  );
+}
+
+function isUniqueTxHashError(error: unknown) {
+  const target = error instanceof Prisma.PrismaClientKnownRequestError ? error.meta?.target : null;
+
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002" && Array.isArray(target) && target.includes("txHash");
 }
 
 function withdrawalMismatchReason(reason: "amount" | "contract" | "recipient" | "source", localeRu: boolean) {

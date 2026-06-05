@@ -63,16 +63,7 @@ export async function POST(request: NextRequest) {
   });
 
   if (duplicate) {
-    return NextResponse.json(
-      {
-        title: localeRu ? "Hash уже отправлен" : "Hash already submitted",
-        message:
-          localeRu
-            ? "Этот transaction hash уже был отправлен в Qidra. Повторное использование hash невозможно."
-            : "This transaction hash has already been submitted to Qidra. Hash reuse is not allowed."
-      },
-      { status: 409 }
-    );
+    return duplicateHashResponse(localeRu);
   }
 
   const wallet = await ensureUserDepositWallet(userId);
@@ -142,37 +133,64 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  await prisma.$transaction(async (tx) => {
-    const updatedWallet = await tx.wallet.update({
-      where: { id: wallet.id },
-      data: { availableUsdt: { increment: amountUsdt } }
-    });
+  try {
+    await prisma.$transaction(async (tx) => {
+      const updatedWallet = await tx.wallet.update({
+        where: { id: wallet.id },
+        data: { availableUsdt: { increment: amountUsdt } }
+      });
 
-    const transaction = await tx.walletTransaction.create({
-      data: {
-        walletId: updatedWallet.id,
-        type: TransactionType.DEPOSIT,
-        status: PaymentStatus.CONFIRMED,
-        amountUsdt,
-        txHash,
-        note: depositNote(verification.status, localeRu)
-      }
-    });
+      const transaction = await tx.walletTransaction.create({
+        data: {
+          walletId: updatedWallet.id,
+          type: TransactionType.DEPOSIT,
+          status: PaymentStatus.CONFIRMED,
+          amountUsdt,
+          txHash,
+          note: depositNote(verification.status, localeRu)
+        }
+      });
 
-    await tx.paymentConfirmation.create({
-      data: {
-        transactionId: transaction.id,
-        status: PaymentStatus.CONFIRMED,
-        reviewedAt: new Date(),
-        note: "TronGrid auto verification"
-      }
+      await tx.paymentConfirmation.create({
+        data: {
+          transactionId: transaction.id,
+          status: PaymentStatus.CONFIRMED,
+          reviewedAt: new Date(),
+          note: "TronGrid auto verification"
+        }
+      });
     });
-  });
+  } catch (error) {
+    if (isUniqueTxHashError(error)) {
+      return duplicateHashResponse(localeRu);
+    }
+
+    throw error;
+  }
 
   return NextResponse.json({
     title: localeRu ? "Платеж подтвержден" : "Payment confirmed",
     message: depositMessage(verification.status, localeRu)
   });
+}
+
+function duplicateHashResponse(localeRu: boolean) {
+  return NextResponse.json(
+    {
+      title: localeRu ? "Hash уже отправлен" : "Hash already submitted",
+      message:
+        localeRu
+          ? "Этот transaction hash уже был отправлен в Qidra. Повторное использование hash невозможно."
+          : "This transaction hash has already been submitted to Qidra. Hash reuse is not allowed."
+    },
+    { status: 409 }
+  );
+}
+
+function isUniqueTxHashError(error: unknown) {
+  const target = error instanceof Prisma.PrismaClientKnownRequestError ? error.meta?.target : null;
+
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002" && Array.isArray(target) && target.includes("txHash");
 }
 
 function mismatchReason(reason: "amount" | "contract" | "recipient" | "source", localeRu: boolean) {
