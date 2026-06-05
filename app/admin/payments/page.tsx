@@ -1,3 +1,6 @@
+import Link from "next/link";
+import type { ReactNode } from "react";
+import { PaymentStatus, Prisma, TransactionType } from "@prisma/client";
 import { AdminTabs } from "@/components/AdminTabs";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { FeedbackForm } from "@/components/ActionFeedback";
@@ -12,20 +15,37 @@ import { getLocale, t, type SearchParams, withLocale } from "@/lib/i18n";
 import { prisma } from "@/lib/prisma";
 
 export default async function AdminPaymentsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
-  const locale = await getLocale(searchParams);
+  const params = await searchParams;
+  const locale = await getLocale(params);
   await requireAdmin(locale, "/admin/payments");
-  const payments = await prisma.walletTransaction.findMany({
-    include: {
-      paymentReview: true,
-      wallet: {
-        include: {
-          user: true
+  const statusFilter = parsePaymentStatus(searchParamString(params.status));
+  const typeFilter = parseTransactionType(searchParamString(params.type));
+  const paymentWhere: Prisma.WalletTransactionWhereInput = {
+    ...(statusFilter ? { status: statusFilter } : {}),
+    ...(typeFilter ? { type: typeFilter } : {})
+  };
+  const [payments, totalCount, pendingCount, confirmedCount, rejectedCount, depositCount, withdrawalCount] = await Promise.all([
+    prisma.walletTransaction.findMany({
+      where: paymentWhere,
+      include: {
+        paymentReview: true,
+        wallet: {
+          include: {
+            user: true
+          }
         }
-      }
-    },
-    orderBy: { createdAt: "desc" },
-    take: 50
-  });
+      },
+      orderBy: { createdAt: "desc" },
+      take: 80
+    }),
+    prisma.walletTransaction.count(),
+    prisma.walletTransaction.count({ where: { status: PaymentStatus.PENDING } }),
+    prisma.walletTransaction.count({ where: { status: PaymentStatus.CONFIRMED } }),
+    prisma.walletTransaction.count({ where: { status: PaymentStatus.REJECTED } }),
+    prisma.walletTransaction.count({ where: { type: TransactionType.DEPOSIT } }),
+    prisma.walletTransaction.count({ where: { type: TransactionType.WITHDRAWAL } })
+  ]);
+  const stats = { confirmedCount, depositCount, pendingCount, rejectedCount, totalCount, withdrawalCount };
 
   return (
     <>
@@ -51,6 +71,8 @@ export default async function AdminPaymentsPage({ searchParams }: { searchParams
         <section className="section">
           <div className="container-qidra grid gap-8">
             <AdminTabs activePath="/admin/payments" locale={locale} />
+            <PaymentDashboard locale={locale} stats={stats} />
+            <PaymentFilters locale={locale} stats={stats} statusFilter={statusFilter} typeFilter={typeFilter} />
             <div className="grid gap-8 lg:grid-cols-[1fr_0.46fr]">
               <div className="grid gap-4">
                 {payments.length ? (
@@ -160,6 +182,98 @@ export default async function AdminPaymentsPage({ searchParams }: { searchParams
       </main>
       <Footer locale={locale} />
     </>
+  );
+}
+
+type PaymentStats = {
+  confirmedCount: number;
+  depositCount: number;
+  pendingCount: number;
+  rejectedCount: number;
+  totalCount: number;
+  withdrawalCount: number;
+};
+
+function PaymentDashboard({ locale, stats }: { locale: "ru" | "en"; stats: PaymentStats }) {
+  return (
+    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <PaymentStatCard label={locale === "ru" ? "Всего операций" : "Total operations"} value={stats.totalCount} />
+      <PaymentStatCard label={locale === "ru" ? "На проверке" : "Pending review"} tone="accent" value={stats.pendingCount} />
+      <PaymentStatCard label={locale === "ru" ? "Подтверждено" : "Confirmed"} tone="success" value={stats.confirmedCount} />
+      <PaymentStatCard label={locale === "ru" ? "Отклонено" : "Rejected"} tone="danger" value={stats.rejectedCount} />
+    </div>
+  );
+}
+
+function PaymentStatCard({ label, tone = "neutral", value }: { label: string; tone?: "accent" | "danger" | "neutral" | "success"; value: number }) {
+  const valueClass = tone === "success" ? "text-qidra-green" : tone === "danger" ? "text-qidra-red" : tone === "accent" ? "text-qidra-accent" : "text-qidra-dark";
+
+  return (
+    <article className="rounded-qidra bg-white p-5 shadow-[0_0_0_1px_rgba(18,20,23,0.08)]">
+      <p className="text-14 font-medium text-qidra-grayBlue">{label}</p>
+      <p className={`mt-3 text-[32px] font-medium leading-tight tracking-[0] ${valueClass}`}>{formatCount(value)}</p>
+    </article>
+  );
+}
+
+function PaymentFilters({
+  locale,
+  stats,
+  statusFilter,
+  typeFilter
+}: {
+  locale: "ru" | "en";
+  stats: PaymentStats;
+  statusFilter?: PaymentStatus;
+  typeFilter?: TransactionType;
+}) {
+  return (
+    <div className="grid gap-4 rounded-qidra border border-qidra-grayLight bg-white p-4">
+      <div className="grid gap-2">
+        <p className="text-14 font-medium text-qidra-grayBlue">{locale === "ru" ? "Статус" : "Status"}</p>
+        <div className="flex flex-wrap gap-2">
+          <PaymentFilterPill active={!statusFilter} href={paymentFilterHref(locale, undefined, typeFilter)}>
+            {locale === "ru" ? "Все" : "All"} ({formatCount(stats.totalCount)})
+          </PaymentFilterPill>
+          <PaymentFilterPill active={statusFilter === PaymentStatus.PENDING} href={paymentFilterHref(locale, PaymentStatus.PENDING, typeFilter)}>
+            {locale === "ru" ? "На проверке" : "Pending"} ({formatCount(stats.pendingCount)})
+          </PaymentFilterPill>
+          <PaymentFilterPill active={statusFilter === PaymentStatus.CONFIRMED} href={paymentFilterHref(locale, PaymentStatus.CONFIRMED, typeFilter)}>
+            {locale === "ru" ? "Подтверждено" : "Confirmed"} ({formatCount(stats.confirmedCount)})
+          </PaymentFilterPill>
+          <PaymentFilterPill active={statusFilter === PaymentStatus.REJECTED} href={paymentFilterHref(locale, PaymentStatus.REJECTED, typeFilter)}>
+            {locale === "ru" ? "Отклонено" : "Rejected"} ({formatCount(stats.rejectedCount)})
+          </PaymentFilterPill>
+        </div>
+      </div>
+      <div className="grid gap-2">
+        <p className="text-14 font-medium text-qidra-grayBlue">{locale === "ru" ? "Тип операции" : "Operation type"}</p>
+        <div className="flex flex-wrap gap-2">
+          <PaymentFilterPill active={!typeFilter} href={paymentFilterHref(locale, statusFilter)}>
+            {locale === "ru" ? "Все операции" : "All operations"} ({formatCount(stats.totalCount)})
+          </PaymentFilterPill>
+          <PaymentFilterPill active={typeFilter === TransactionType.DEPOSIT} href={paymentFilterHref(locale, statusFilter, TransactionType.DEPOSIT)}>
+            {locale === "ru" ? "Пополнения" : "Deposits"} ({formatCount(stats.depositCount)})
+          </PaymentFilterPill>
+          <PaymentFilterPill active={typeFilter === TransactionType.WITHDRAWAL} href={paymentFilterHref(locale, statusFilter, TransactionType.WITHDRAWAL)}>
+            {locale === "ru" ? "Выводы" : "Withdrawals"} ({formatCount(stats.withdrawalCount)})
+          </PaymentFilterPill>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PaymentFilterPill({ active, children, href }: { active: boolean; children: ReactNode; href: string }) {
+  return (
+    <Link
+      className={`inline-flex h-10 items-center justify-center rounded-qidra border px-4 text-14 font-medium transition-colors ${
+        active ? "border-qidra-dark bg-qidra-dark text-white" : "border-qidra-grayLight bg-white text-qidra-grayBlue hover:border-qidra-accent hover:text-qidra-accent"
+      }`}
+      href={href}
+    >
+      {children}
+    </Link>
   );
 }
 
@@ -296,4 +410,41 @@ function formatDate(date: Date, locale: "ru" | "en") {
     month: "short",
     year: "numeric"
   }).format(date);
+}
+
+function searchParamString(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function parsePaymentStatus(value: string | undefined) {
+  const normalized = value?.toUpperCase();
+
+  if (normalized === PaymentStatus.PENDING) return PaymentStatus.PENDING;
+  if (normalized === PaymentStatus.CONFIRMED) return PaymentStatus.CONFIRMED;
+  if (normalized === PaymentStatus.REJECTED) return PaymentStatus.REJECTED;
+  return undefined;
+}
+
+function parseTransactionType(value: string | undefined) {
+  const normalized = value?.toUpperCase();
+
+  if (normalized === TransactionType.DEPOSIT) return TransactionType.DEPOSIT;
+  if (normalized === TransactionType.WITHDRAWAL) return TransactionType.WITHDRAWAL;
+  if (normalized === TransactionType.INVESTMENT) return TransactionType.INVESTMENT;
+  if (normalized === TransactionType.RETURN) return TransactionType.RETURN;
+  if (normalized === TransactionType.ADJUSTMENT) return TransactionType.ADJUSTMENT;
+  return undefined;
+}
+
+function paymentFilterHref(locale: "ru" | "en", status?: PaymentStatus, type?: TransactionType) {
+  const params = new URLSearchParams({ lang: locale });
+
+  if (status) params.set("status", status.toLowerCase());
+  if (type) params.set("type", type.toLowerCase());
+
+  return `/admin/payments?${params.toString()}`;
+}
+
+function formatCount(value: number) {
+  return new Intl.NumberFormat("en-US").format(value);
 }
