@@ -3,11 +3,14 @@ import { notFound } from "next/navigation";
 import { InvestmentStatus, KycStatus, PaymentStatus, Role, SupportThreadStatus, TransactionType } from "@prisma/client";
 import { AdminTabs } from "@/components/AdminTabs";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { FeedbackForm } from "@/components/ActionFeedback";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { NotificationCard } from "@/components/NotificationCard";
 import { UserAvatar } from "@/components/UserAvatar";
-import { ButtonLink } from "@/components/ui/Button";
+import { Button, ButtonLink } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
 import { requireAdmin } from "@/lib/access";
 import { getLocale, t, type Locale, type SearchParams, withLocale } from "@/lib/i18n";
 import { prisma } from "@/lib/prisma";
@@ -22,8 +25,9 @@ export default async function AdminUserDetailPage({
   searchParams?: SearchParams;
 }) {
   const [{ userId }, locale] = await Promise.all([params, getLocale(searchParams)]);
-  await requireAdmin(locale, `/admin/users/${userId}`);
+  const session = await requireAdmin(locale, `/admin/users/${userId}`);
   const isRu = locale === "ru";
+  const canAdjustBalance = session.user?.role === Role.SUPER_ADMIN;
   const user = await prisma.user.findUnique({
     where: { id: userId },
     include: {
@@ -134,6 +138,9 @@ export default async function AdminUserDetailPage({
   const latestKyc = user.kycApplications[0];
   const displayName = user.name || user.email;
   const wallet = user.wallet;
+  const adjustmentEndpoint = `/api/admin/users/${user.id}/adjustments?lang=${locale}`;
+  const pendingPaymentTransactions =
+    wallet?.transactions.filter((transaction) => transaction.status === PaymentStatus.PENDING && (transaction.type === TransactionType.DEPOSIT || transaction.type === TransactionType.WITHDRAWAL)) ?? [];
 
   return (
     <>
@@ -262,6 +269,25 @@ export default async function AdminUserDetailPage({
               </section>
             </div>
 
+            <SafeAdjustmentsPanel
+              canAdjustBalance={canAdjustBalance}
+              endpoint={adjustmentEndpoint}
+              kycApplications={user.kycApplications.map((application) => ({
+                createdAt: application.createdAt,
+                id: application.id,
+                status: application.status
+              }))}
+              locale={locale}
+              pendingPaymentTransactions={pendingPaymentTransactions.map((transaction) => ({
+                amountUsdt: transaction.amountUsdt,
+                createdAt: transaction.createdAt,
+                id: transaction.id,
+                reference: transaction.txHash ?? transaction.destinationAddress,
+                type: transaction.type
+              }))}
+              walletAvailable={wallet?.availableUsdt}
+            />
+
             <Panel title={isRu ? "Заявки на участие" : "Participation applications"} description={isRu ? "Все последние заявки участника по проектам." : "Recent participant applications across projects."}>
               {user.investments.length ? (
                 <div className="overflow-x-auto rounded-qidra border border-qidra-grayLight bg-white">
@@ -354,6 +380,200 @@ export default async function AdminUserDetailPage({
       </main>
       <Footer locale={locale} />
     </>
+  );
+}
+
+function SafeAdjustmentsPanel({
+  canAdjustBalance,
+  endpoint,
+  kycApplications,
+  locale,
+  pendingPaymentTransactions,
+  walletAvailable
+}: {
+  canAdjustBalance: boolean;
+  endpoint: string;
+  kycApplications: { createdAt: Date; id: string; status: KycStatus }[];
+  locale: Locale;
+  pendingPaymentTransactions: { amountUsdt: { toString(): string }; createdAt: Date; id: string; reference: string | null; type: TransactionType }[];
+  walletAvailable?: { toString(): string };
+}) {
+  const isRu = locale === "ru";
+
+  return (
+    <Panel
+      title={isRu ? "Безопасные корректировки" : "Safe adjustments"}
+      description={
+        isRu
+          ? "Баланс, KYC и спорные платежи меняются только с причиной, ручным подтверждением и записью в журнал действий."
+          : "Balance, KYC and disputed payment changes require a reason, manual confirmation and an audit entry."
+      }
+    >
+      <div className="grid gap-6 xl:grid-cols-3">
+        <div className="grid gap-4 rounded-qidra border border-qidra-grayLight bg-qidra-grayLight p-4">
+          <div>
+            <p className="text-18 font-semibold text-qidra-dark">{isRu ? "Корректировка баланса" : "Balance adjustment"}</p>
+            <p className="mt-2 text-14 text-qidra-grayBlue">
+              {isRu ? `Доступно сейчас: ${formatUsdt(walletAvailable ?? 0)}` : `Current available: ${formatUsdt(walletAvailable ?? 0)}`}
+            </p>
+          </div>
+          {canAdjustBalance ? (
+            <FeedbackForm
+              className="grid gap-3"
+              endpoint={endpoint}
+              feedback={{
+                title: isRu ? "Баланс обновлён" : "Balance updated",
+                text: isRu ? "Корректировка сохранена в карточке и журнале действий." : "The adjustment was saved in the client card and audit log.",
+                buttonLabel: isRu ? "Понятно" : "Got it",
+                dismissLabel: isRu ? "Закрыть уведомление" : "Close notification",
+                tone: "success"
+              }}
+              popupPlacement="center"
+              reloadOnSuccess
+            >
+              <input name="kind" type="hidden" value="balance" />
+              <Select
+                label={isRu ? "Действие" : "Action"}
+                name="direction"
+                options={[
+                  { label: isRu ? "Увеличить доступный баланс" : "Increase available balance", value: "credit" },
+                  { label: isRu ? "Уменьшить доступный баланс" : "Decrease available balance", value: "debit" }
+                ]}
+                required
+              />
+              <Input label={isRu ? "Сумма USDT" : "USDT amount"} min="0.000001" name="amountUsdt" placeholder="100" required step="0.000001" type="number" />
+              <ReasonField
+                label={isRu ? "Причина корректировки" : "Adjustment reason"}
+                locale={locale}
+                name="reason"
+                placeholder={isRu ? "Например: исправление ошибочного ручного начисления после проверки документов" : "For example: correcting an erroneous manual credit after document review"}
+              />
+              <Input label={isRu ? "Подтверждение" : "Confirmation"} name="confirmation" pattern="CONFIRM" placeholder="CONFIRM" required />
+              <Button type="submit">{isRu ? "Сохранить корректировку" : "Save adjustment"}</Button>
+            </FeedbackForm>
+          ) : (
+            <NotificationCard
+              title={isRu ? "Только главный администратор" : "Super administrator only"}
+              text={
+                isRu
+                  ? "Прямое изменение доступного баланса отключено для обычного администратора."
+                  : "Direct available balance changes are disabled for regular administrators."
+              }
+            />
+          )}
+        </div>
+
+        <div className="grid gap-4 rounded-qidra border border-qidra-grayLight bg-qidra-grayLight p-4">
+          <div>
+            <p className="text-18 font-semibold text-qidra-dark">{isRu ? "Статус KYC" : "KYC status"}</p>
+            <p className="mt-2 text-14 text-qidra-grayBlue">
+              {isRu ? "Исправление статуса анкеты с обязательной причиной." : "Profile status correction with a required reason."}
+            </p>
+          </div>
+          {kycApplications.length ? (
+            <FeedbackForm
+              className="grid gap-3"
+              endpoint={endpoint}
+              feedback={{
+                title: isRu ? "Статус KYC обновлён" : "KYC status updated",
+                text: isRu ? "Изменение сохранено и записано в журнал действий." : "The change was saved and written to the audit log.",
+                buttonLabel: isRu ? "Понятно" : "Got it",
+                dismissLabel: isRu ? "Закрыть уведомление" : "Close notification",
+                tone: "success"
+              }}
+              popupPlacement="center"
+              reloadOnSuccess
+            >
+              <input name="kind" type="hidden" value="kyc_status" />
+              <Select
+                label={isRu ? "Анкета" : "Profile"}
+                name="applicationId"
+                options={kycApplications.map((application) => ({
+                  label: `${formatDateTime(application.createdAt, locale)} · ${kycStatusLabel(application.status, locale)}`,
+                  value: application.id
+                }))}
+                required
+              />
+              <Select
+                label={isRu ? "Новый статус" : "New status"}
+                name="status"
+                options={[
+                  { label: kycStatusLabel(KycStatus.APPROVED, locale), value: KycStatus.APPROVED },
+                  { label: kycStatusLabel(KycStatus.SUBMITTED, locale), value: KycStatus.SUBMITTED },
+                  { label: kycStatusLabel(KycStatus.REJECTED, locale), value: KycStatus.REJECTED },
+                  { label: kycStatusLabel(KycStatus.DRAFT, locale), value: KycStatus.DRAFT }
+                ]}
+                required
+              />
+              <ReasonField label={isRu ? "Причина изменения" : "Reason for change"} locale={locale} name="reason" placeholder={isRu ? "Например: статус исправлен после повторной проверки документов" : "For example: status corrected after a repeated document review"} />
+              <Input label={isRu ? "Подтверждение" : "Confirmation"} name="confirmation" pattern="CONFIRM" placeholder="CONFIRM" required />
+              <Button type="submit">{isRu ? "Обновить KYC" : "Update KYC"}</Button>
+            </FeedbackForm>
+          ) : (
+            <NotificationCard title={isRu ? "Анкет нет" : "No profiles"} text={isRu ? "У клиента пока нет KYC-анкет для корректировки." : "The client has no KYC profiles to adjust yet."} />
+          )}
+        </div>
+
+        <div className="grid gap-4 rounded-qidra border border-qidra-grayLight bg-qidra-grayLight p-4">
+          <div>
+            <p className="text-18 font-semibold text-qidra-dark">{isRu ? "Отклонение спорной операции" : "Reject disputed operation"}</p>
+            <p className="mt-2 text-14 text-qidra-grayBlue">
+              {isRu ? "Подтверждение пополнений остаётся только через автоматическую сверку." : "Deposit confirmation remains available only through automatic reconciliation."}
+            </p>
+          </div>
+          {pendingPaymentTransactions.length ? (
+            <FeedbackForm
+              className="grid gap-3"
+              endpoint={endpoint}
+              feedback={{
+                title: isRu ? "Операция отклонена" : "Operation rejected",
+                text: isRu ? "Статус изменён с причиной и записью в журнале." : "The status was changed with a reason and an audit entry.",
+                buttonLabel: isRu ? "Понятно" : "Got it",
+                dismissLabel: isRu ? "Закрыть уведомление" : "Close notification",
+                tone: "warning"
+              }}
+              popupPlacement="center"
+              reloadOnSuccess
+            >
+              <input name="kind" type="hidden" value="payment_reject" />
+              <Select
+                label={isRu ? "Операция на проверке" : "Pending operation"}
+                name="transactionId"
+                options={pendingPaymentTransactions.map((transaction) => ({
+                  label: `${transactionTitle(transaction.type, locale)} · ${formatUsdt(transaction.amountUsdt)} · ${formatDateTime(transaction.createdAt, locale)}`,
+                  value: transaction.id
+                }))}
+                required
+              />
+              <ReasonField label={isRu ? "Причина отклонения" : "Rejection reason"} locale={locale} name="reason" placeholder={isRu ? "Например: transaction hash не относится к личному адресу клиента" : "For example: transaction hash does not belong to the client's personal address"} />
+              <Input label={isRu ? "Подтверждение" : "Confirmation"} name="confirmation" pattern="CONFIRM" placeholder="CONFIRM" required />
+              <Button type="submit" variant="outline">
+                {isRu ? "Отклонить операцию" : "Reject operation"}
+              </Button>
+            </FeedbackForm>
+          ) : (
+            <NotificationCard title={isRu ? "Спорных операций нет" : "No disputed operations"} text={isRu ? "У клиента нет ожидающих пополнений или выводов." : "The client has no pending deposits or withdrawals."} />
+          )}
+        </div>
+      </div>
+    </Panel>
+  );
+}
+
+function ReasonField({ label, locale, name, placeholder }: { label: string; locale: Locale; name: string; placeholder: string }) {
+  return (
+    <label className="grid gap-2 text-14 font-medium text-qidra-dark">
+      {label}
+      <textarea
+        className="min-h-28 rounded-qidra border border-transparent bg-white px-4 py-3 text-16 outline-none transition-colors placeholder:text-qidra-grayMedium focus:border-qidra-accent"
+        maxLength={600}
+        minLength={12}
+        name={name}
+        placeholder={placeholder}
+        required
+      />
+      <span className="text-12 text-qidra-grayBlue">{locale === "ru" ? "Минимум 12 символов. Эта причина попадёт в журнал действий." : "Minimum 12 characters. This reason will be written to the audit log."}</span>
+    </label>
   );
 }
 
@@ -474,6 +694,11 @@ function transactionTitle(type: TransactionType, locale: Locale) {
 }
 
 function transactionAmount(type: TransactionType, amount: { toString(): string }) {
+  if (type === TransactionType.ADJUSTMENT) {
+    const numericAmount = Number(amount.toString());
+    return `${numericAmount > 0 ? "+" : ""}${formatUsdt(amount)}`;
+  }
+
   const sign = type === TransactionType.INVESTMENT || type === TransactionType.WITHDRAWAL ? "-" : "+";
   return `${sign}${formatUsdt(amount)}`;
 }
@@ -530,15 +755,19 @@ function auditActionLabel(action: string, locale: Locale) {
     "investment.request.update": { ru: "Участник обновил заявку", en: "Participant updated request" },
     "kyc.approve": { ru: "Анкета одобрена", en: "KYC approved" },
     "kyc.reject": { ru: "Анкета отклонена", en: "KYC rejected" },
+    "kyc.status.adjust": { ru: "Статус KYC изменён корректировкой", en: "KYC status adjusted" },
     "payment.deposit.confirm": { ru: "Пополнение подтверждено", en: "Deposit confirmed" },
     "payment.deposit.reject": { ru: "Пополнение отклонено", en: "Deposit rejected" },
+    "payment.status.reject.adjust": { ru: "Операция отклонена корректировкой", en: "Operation rejected by adjustment" },
     "payment.trc20.auto_confirm": { ru: "Пополнение зачислено автоматически", en: "Deposit credited automatically" },
     "payment.withdrawal.confirm": { ru: "Вывод подтвержден", en: "Withdrawal confirmed" },
     "payment.withdrawal.reject": { ru: "Вывод отклонен", en: "Withdrawal rejected" },
     "payment.withdrawal.request": { ru: "Участник запросил вывод", en: "Participant requested withdrawal" },
     "support.message.manager": { ru: "Менеджер ответил в чате", en: "Manager replied in chat" },
     "support.message.user": { ru: "Участник написал в чат", en: "Participant messaged support" },
-    "user.role.update": { ru: "Роль пользователя изменена", en: "User role updated" }
+    "user.role.update": { ru: "Роль пользователя изменена", en: "User role updated" },
+    "wallet.adjustment.credit": { ru: "Баланс увеличен корректировкой", en: "Balance increased by adjustment" },
+    "wallet.adjustment.debit": { ru: "Баланс уменьшен корректировкой", en: "Balance decreased by adjustment" }
   };
 
   return labels[action]?.[locale] ?? action;

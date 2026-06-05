@@ -7,12 +7,21 @@ import { ButtonLink } from "@/components/ui/Button";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { authOptions } from "@/lib/next-auth";
 import { SignOutButton } from "@/components/auth/SignOutButton";
+import { canAccessAdmin } from "@/lib/auth";
+
+type SessionWithRole = Awaited<ReturnType<typeof getServerSession>> & {
+  user?: {
+    role?: string;
+  };
+};
 
 export async function Header({ locale, path = "/" }: { locale: Locale; path?: string }) {
-  const session = await getServerSession(authOptions);
+  const session = (await getServerSession(authOptions)) as SessionWithRole;
   const signedIn = Boolean(session?.user);
+  const adminSession = canAccessAdmin(session?.user?.role as "ADMIN" | "SUPER_ADMIN" | "guest" | undefined);
   const t = dictionary[locale].nav;
   const links = [
+    ...(adminSession ? [{ href: "/admin", label: locale === "ru" ? "Операционный центр" : "Operations center" }] : []),
     { href: "/projects", label: t.projects },
     { href: "/faq", label: t.faq },
     { href: "/legal/terms", label: t.legal }

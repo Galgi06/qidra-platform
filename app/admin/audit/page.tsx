@@ -13,6 +13,7 @@ import { prisma } from "@/lib/prisma";
 const actionLabels: Record<string, Record<Locale, string>> = {
   "kyc.approve": { ru: "Анкета одобрена", en: "KYC approved" },
   "kyc.reject": { ru: "Анкета отклонена", en: "KYC rejected" },
+  "kyc.status.adjust": { ru: "Статус KYC изменён корректировкой", en: "KYC status adjusted" },
   "investment.confirm": { ru: "Заявка участия подтверждена", en: "Participation request confirmed" },
   "investment.reject": { ru: "Заявка участия отклонена", en: "Participation request rejected" },
   "investment.request.cancel": { ru: "Участник отменил заявку", en: "Participant cancelled request" },
@@ -21,6 +22,7 @@ const actionLabels: Record<string, Record<Locale, string>> = {
   "payment.deposit.confirm": { ru: "Пополнение подтверждено", en: "Deposit confirmed" },
   "payment.deposit.reject": { ru: "Пополнение отклонено", en: "Deposit rejected" },
   "payment.deposit.user_confirmed": { ru: "Пополнение подтверждено автоматически", en: "Deposit confirmed automatically" },
+  "payment.status.reject.adjust": { ru: "Операция отклонена корректировкой", en: "Operation rejected by adjustment" },
   "payment.withdrawal.confirm": { ru: "Вывод подтвержден", en: "Withdrawal confirmed" },
   "payment.withdrawal.reject": { ru: "Вывод отклонен", en: "Withdrawal rejected" },
   "payment.withdrawal.request": { ru: "Участник запросил вывод", en: "Participant requested withdrawal" },
@@ -33,7 +35,9 @@ const actionLabels: Record<string, Record<Locale, string>> = {
   "project.status.update": { ru: "Статус проекта изменен", en: "Project status updated" },
   "support.message.manager": { ru: "Менеджер ответил в чате", en: "Manager replied in chat" },
   "support.message.user": { ru: "Участник написал в чат", en: "Participant messaged support" },
-  "user.role.update": { ru: "Роль пользователя изменена", en: "User role updated" }
+  "user.role.update": { ru: "Роль пользователя изменена", en: "User role updated" },
+  "wallet.adjustment.credit": { ru: "Баланс увеличен корректировкой", en: "Balance increased by adjustment" },
+  "wallet.adjustment.debit": { ru: "Баланс уменьшен корректировкой", en: "Balance decreased by adjustment" }
 };
 
 export default async function AdminAuditPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
@@ -260,18 +264,21 @@ function payloadKeyLabel(key: string, locale: Locale) {
   const labels: Record<string, Record<Locale, string>> = {
     amountUsdt: { ru: "Сумма", en: "Amount" },
     destinationAddress: { ru: "Адрес получателя", en: "Recipient address" },
+    direction: { ru: "Направление", en: "Direction" },
     from: { ru: "Было", en: "From" },
     fromAddress: { ru: "Адрес отправителя", en: "Sender address" },
     note: { ru: "Комментарий", en: "Note" },
     projectFundedUsdt: { ru: "Собрано по проекту", en: "Project funded" },
     projectId: { ru: "ID проекта", en: "Project ID" },
     reservedDeltaUsdt: { ru: "Изменение резерва", en: "Reserve change" },
+    reason: { ru: "Причина", en: "Reason" },
     slug: { ru: "Slug", en: "Slug" },
     status: { ru: "Статус", en: "Status" },
     to: { ru: "Стало", en: "To" },
     toAddress: { ru: "Адрес зачисления", en: "Recipient address" },
     txHash: { ru: "Transaction hash", en: "Transaction hash" },
-    type: { ru: "Тип операции", en: "Operation type" }
+    type: { ru: "Тип операции", en: "Operation type" },
+    userId: { ru: "ID клиента", en: "Client ID" }
   };
 
   return labels[key]?.[locale] || key;
@@ -360,6 +367,11 @@ function parseAuditCategory(value: string | undefined): AuditCategory | undefine
 function auditCategoryWhere(category?: AuditCategory): Prisma.AdminAuditLogWhereInput {
   if (!category) return {};
   if (category === "system") return { actorId: null };
+  if (category === "payment") {
+    return {
+      OR: [{ action: { startsWith: "payment." } }, { action: { startsWith: "wallet." } }]
+    };
+  }
 
   return {
     action: {

@@ -66,8 +66,10 @@ export function SignInForm({
       tone: "success"
     });
 
+    const targetPath = await resolveTargetPath(nextPath, locale);
+
     window.setTimeout(() => {
-      window.location.href = nextPath;
+      window.location.href = targetPath;
     }, 350);
   }
 
@@ -94,4 +96,23 @@ export function SignInForm({
       {feedback ? <FeedbackPopup feedback={feedback} onClose={() => setFeedback(null)} /> : null}
     </>
   );
+}
+
+async function resolveTargetPath(nextPath: string, locale: Locale) {
+  if (nextPath !== "/investor") {
+    return nextPath;
+  }
+
+  try {
+    const response = await fetch("/api/auth/session");
+    const session = (await response.json()) as { user?: { role?: string } };
+
+    if (session.user?.role === "ADMIN" || session.user?.role === "SUPER_ADMIN") {
+      return withLocale("/admin", locale);
+    }
+  } catch {
+    return nextPath;
+  }
+
+  return nextPath;
 }
