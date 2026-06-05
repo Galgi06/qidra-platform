@@ -22,14 +22,14 @@ export const projects: Project[] = [
       en: "Qidra Real Estate Income"
     },
     summary: {
-      ru: "Проект долевого участия в объекте недвижимости с понятной структурой сотрудничества и открытой отчетностью.",
-      en: "A real estate participation project with a clear cooperation structure and open reporting."
+      ru: "Партнёрское участие в объекте недвижимости в ОАЭ с раскрытием документов, структуры Mudaraba и регулярной отчётностью.",
+      en: "Partnership participation in a UAE real estate asset with document disclosure, Mudaraba structure and regular reporting."
     },
     description: {
       ru:
-        "Участник подает заявку, изучает условия Mudaraba/Musharaka и получает доступ к документам проекта до принятия решения. Показатели проекта не являются гарантией доходности.",
+        "Проект предполагает участие в объекте недвижимости через структуру Mudaraba. До подачи заявки участник изучает регистрационные документы, правовую основу, целевой объём, статус сбора и порядок отчётности. Ожидаемый результат зависит от фактической реализации проекта, расходов, сроков и рыночных условий; фиксированная доходность не обещается.",
       en:
-        "A participant submits an application, reviews Mudaraba/Musharaka terms, and gets access to project documents before making a decision. Project metrics are not guaranteed returns."
+        "The project provides participation in a real estate asset through a Mudaraba structure. Before applying, a participant reviews registration documents, legal basis, target amount, funding status and reporting process. The expected result depends on actual execution, costs, timing and market conditions; fixed returns are not promised."
     },
     status: "active",
     targetUsdt: 250000,
@@ -57,14 +57,14 @@ export const projects: Project[] = [
       en: "Qidra Trade Participation"
     },
     summary: {
-      ru: "Торговый проект в формате партнёрского участия с понятными этапами и документами.",
-      en: "A trade project in a partnership participation format with clear stages and documents."
+      ru: "Торговый проект в формате Musharaka: участники заранее видят структуру, документы, этапы и правила распределения результата.",
+      en: "A Musharaka trade project: participants review the structure, documents, stages and result allocation rules before applying."
     },
     description: {
       ru:
-        "Карточка описывает формат участия, основные условия сотрудничества и документы, которые раскрываются перед подачей заявки.",
+        "Проект описывает торговый цикл, роль сторон, ориентировочный объём участия, документы компании и правила отчётности. Перед заявкой участник должен изучить раскрытые материалы и учитывать, что итоговый результат зависит от фактической торговли, сроков поставки, расходов и исполнения договоров.",
       en:
-        "This page describes the participation format, core cooperation terms, and documents disclosed before an application is submitted."
+        "The project describes the trade cycle, parties' roles, indicative participation amount, company documents and reporting rules. Before applying, a participant must review disclosed materials and understand that results depend on actual trade, delivery timing, costs and contract execution."
     },
     status: "review",
     targetUsdt: 120000,
@@ -72,7 +72,18 @@ export const projects: Project[] = [
     location: "UAE",
     structure: "Musharaka",
     riskLevel: "High",
-    documents: []
+    documents: [
+      {
+        title: { ru: "ESR Declaration", en: "ESR Declaration" },
+        href: "/assets/documents/compliance/esr-declaration.pdf",
+        kind: "compliance"
+      },
+      {
+        title: { ru: "DNFBP Confirmation", en: "DNFBP Confirmation" },
+        href: "/assets/documents/compliance/dnfbp-confirmation.pdf",
+        kind: "compliance"
+      }
+    ]
   }
 ];
 

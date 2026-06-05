@@ -12,8 +12,10 @@ import { Button, ButtonLink } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { requireAdmin } from "@/lib/access";
+import { countryName } from "@/lib/countries";
 import { getLocale, t, type Locale, type SearchParams, withLocale } from "@/lib/i18n";
 import { prisma } from "@/lib/prisma";
+import { projectSubmissionStatusLabel } from "@/lib/project-submission-status";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +48,10 @@ export default async function AdminUserDetailPage({
         take: 12
       },
       kycApplications: {
+        orderBy: { createdAt: "desc" },
+        take: 8
+      },
+      projectSubmissions: {
         orderBy: { createdAt: "desc" },
         take: 8
       },
@@ -101,6 +107,7 @@ export default async function AdminUserDetailPage({
           accounts: true,
           investments: true,
           kycApplications: true,
+          projectSubmissions: true,
           sessions: true,
           supportThreads: true
         }
@@ -116,6 +123,7 @@ export default async function AdminUserDetailPage({
     user.id,
     ...user.kycApplications.map((item) => item.id),
     ...user.investments.map((item) => item.id),
+    ...user.projectSubmissions.map((item) => item.id),
     ...(user.wallet?.transactions.map((item) => item.id) ?? []),
     ...user.supportThreads.map((item) => item.id)
   ];
@@ -174,12 +182,13 @@ export default async function AdminUserDetailPage({
                 </ButtonLink>
               </div>
             </div>
-            <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+            <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-6">
               <MetricCard label={isRu ? "Роль" : "Role"} value={roleLabel(user.role, locale)} />
               <MetricCard label={isRu ? "Email" : "Email"} value={user.emailVerified ? (isRu ? "Подтверждён" : "Verified") : isRu ? "Не подтверждён" : "Not verified"} tone={user.emailVerified ? "success" : "warning"} />
               <MetricCard label="KYC" value={kycStatusLabel(latestKyc?.status, locale)} tone={latestKyc?.status === KycStatus.APPROVED ? "success" : latestKyc?.status === KycStatus.REJECTED ? "danger" : "warning"} />
               <MetricCard label={isRu ? "Доступный баланс" : "Available balance"} value={formatUsdt(wallet?.availableUsdt ?? 0)} tone="accent" />
               <MetricCard label={isRu ? "Заявки участия" : "Applications"} value={formatCount(user._count.investments)} />
+              <MetricCard label={isRu ? "Свои проекты" : "Own projects"} value={formatCount(user._count.projectSubmissions)} />
             </div>
           </div>
         </section>
@@ -194,9 +203,9 @@ export default async function AdminUserDetailPage({
                   <div className="grid gap-4 sm:grid-cols-2">
                     <InfoBlock label={isRu ? "Телефон" : "Phone"} value={user.investorProfile?.phone} locale={locale} />
                     <InfoBlock label={isRu ? "Дата рождения" : "Date of birth"} value={user.investorProfile?.dateOfBirth ? formatDate(user.investorProfile.dateOfBirth, locale) : null} locale={locale} />
-                    <InfoBlock label={isRu ? "Страна" : "Country"} value={user.investorProfile?.country} locale={locale} />
+                    <InfoBlock label={isRu ? "Страна" : "Country"} value={countryName(user.investorProfile?.country, locale)} locale={locale} />
                     <InfoBlock label={isRu ? "Город" : "City"} value={user.investorProfile?.city} locale={locale} />
-                    <InfoBlock label={isRu ? "Гражданство" : "Citizenship"} value={user.investorProfile?.citizenship} locale={locale} />
+                    <InfoBlock label={isRu ? "Гражданство" : "Citizenship"} value={countryName(user.investorProfile?.citizenship, locale)} locale={locale} />
                     <InfoBlock label={isRu ? "Адрес" : "Address"} value={user.investorProfile?.address} locale={locale} />
                   </div>
                 </Panel>
@@ -322,6 +331,31 @@ export default async function AdminUserDetailPage({
                 </div>
               ) : (
                 <NotificationCard title={isRu ? "Заявок нет" : "No applications"} text={isRu ? "Участник ещё не подавал заявки на проекты." : "The participant has not applied to projects yet."} />
+              )}
+            </Panel>
+
+            <Panel title={isRu ? "Проекты клиента" : "Client projects"} description={isRu ? "Заявки участника на размещение собственных проектов." : "Participant submissions for listing their own projects."}>
+              {user.projectSubmissions.length ? (
+                <div className="grid gap-3">
+                  {user.projectSubmissions.map((submission) => (
+                    <TimelineItem
+                      key={submission.id}
+                      title={submission.title}
+                      meta={`${formatDateTime(submission.createdAt, locale)} · ${projectSubmissionStatusLabel(submission.status, locale)}`}
+                      tone={submission.status === "APPROVED" ? "success" : submission.status === "REJECTED" ? "danger" : "warning"}
+                    >
+                      <div className="grid gap-2 text-14 text-qidra-grayBlue md:grid-cols-2">
+                        <p>{isRu ? "Отрасль" : "Sector"}: {submission.sector || (isRu ? "не указана" : "not set")}</p>
+                        <p>{isRu ? "Локация" : "Location"}: {submission.location || (isRu ? "не указана" : "not set")}</p>
+                        <p>{isRu ? "Структура" : "Structure"}: {submission.structure || (isRu ? "на проверке" : "to review")}</p>
+                        <p>{isRu ? "Цель" : "Target"}: {submission.targetUsdt ? formatUsdt(submission.targetUsdt) : isRu ? "не указана" : "not set"}</p>
+                      </div>
+                      <p className="mt-3 text-14 text-qidra-grayBlue">{submission.summary}</p>
+                    </TimelineItem>
+                  ))}
+                </div>
+              ) : (
+                <NotificationCard title={isRu ? "Проектов нет" : "No projects"} text={isRu ? "Участник ещё не отправлял свой проект на размещение." : "The participant has not submitted a project listing yet."} />
               )}
             </Panel>
 
@@ -763,6 +797,7 @@ function auditActionLabel(action: string, locale: Locale) {
     "payment.withdrawal.confirm": { ru: "Вывод подтвержден", en: "Withdrawal confirmed" },
     "payment.withdrawal.reject": { ru: "Вывод отклонен", en: "Withdrawal rejected" },
     "payment.withdrawal.request": { ru: "Участник запросил вывод", en: "Participant requested withdrawal" },
+    "project.submission.create": { ru: "Проект отправлен на размещение", en: "Project submitted for listing" },
     "support.message.manager": { ru: "Менеджер ответил в чате", en: "Manager replied in chat" },
     "support.message.user": { ru: "Участник написал в чат", en: "Participant messaged support" },
     "user.role.update": { ru: "Роль пользователя изменена", en: "User role updated" },
@@ -776,6 +811,7 @@ function auditActionLabel(action: string, locale: Locale) {
 function entityLabel(entityType: string, locale: Locale) {
   if (entityType === "InvestmentApplication") return locale === "ru" ? "Заявка участия" : "Participation application";
   if (entityType === "KycApplication") return "KYC";
+  if (entityType === "ProjectSubmission") return locale === "ru" ? "Проект клиента" : "Client project";
   if (entityType === "WalletTransaction") return locale === "ru" ? "Операция кошелька" : "Wallet operation";
   if (entityType === "SupportThread") return locale === "ru" ? "Диалог" : "Thread";
   if (entityType === "User") return locale === "ru" ? "Пользователь" : "User";

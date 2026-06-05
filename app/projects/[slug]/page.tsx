@@ -95,14 +95,16 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
           </div>
         </section>
 
-        <section className="px-5 pb-16 sm:px-8 lg:px-11 lg:pb-24">
+        <section className="px-5 pb-16 sm:px-8 lg:px-11 lg:pb-24" id="documents">
           <div className="mx-auto grid max-w-[1840px] gap-5">
             <h2 className="text-[36px] font-medium leading-tight tracking-[0] text-qidra-dark sm:text-[44px]">
               {isRu ? "Документы проекта" : "Project documents"}
             </h2>
             <div className="grid gap-3 lg:grid-cols-2">
               {project.documents.length ? (
-                project.documents.map((document) => <DocumentItem key={document.href} title={document.title[locale]} href={document.href} meta={document.kind} />)
+                project.documents.map((document) => (
+                  <DocumentItem key={document.href} title={document.title[locale]} href={document.href} meta={document.kind} actionLabel={isRu ? "Открыть" : "Open"} />
+                ))
               ) : (
                 <p className="text-16 text-qidra-grayBlue">{isRu ? "Документы появятся после подготовки проекта." : "Documents will appear after the project is prepared."}</p>
               )}

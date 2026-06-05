@@ -8,7 +8,9 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { requireAuth } from "@/lib/access";
-import { getLocale, type SearchParams, withLocale } from "@/lib/i18n";
+import { countryOptions, dialCodeOptions, normalizeCountryCode } from "@/lib/countries";
+import { getLocale, type SearchParams } from "@/lib/i18n";
+import { readKycDocuments } from "@/lib/kyc-documents";
 import { prisma } from "@/lib/prisma";
 
 export default async function KycPage({ searchParams }: { searchParams?: SearchParams }) {
@@ -24,6 +26,11 @@ export default async function KycPage({ searchParams }: { searchParams?: SearchP
   const approved = application?.status === "APPROVED";
   const rejected = application?.status === "REJECTED";
   const dateOfBirth = profile?.dateOfBirth ? profile.dateOfBirth.toISOString().slice(0, 10) : "";
+  const countries = countryOptions(locale);
+  const phoneCodes = dialCodeOptions(locale);
+  const documents = readKycDocuments(application?.documents);
+  const countryCode = normalizeCountryCode(profile?.country);
+  const citizenshipCode = normalizeCountryCode(profile?.citizenship);
   const statusTitle = approved
     ? isRu
       ? "Профиль одобрен"
@@ -102,11 +109,30 @@ export default async function KycPage({ searchParams }: { searchParams?: SearchP
                 </p>
               </div>
               <div className="grid gap-4 md:grid-cols-2">
-                <Input label={isRu ? "Телефон" : "Phone"} name="phone" defaultValue={profile?.phone ?? ""} placeholder="+971..." />
+                <Input
+                  label={isRu ? "Телефон" : "Phone"}
+                  name="phone"
+                  type="tel"
+                  defaultValue={profile?.phone ?? ""}
+                  list="qidra-phone-codes"
+                  placeholder={isRu ? "+971 50 000 0000" : "+971 50 000 0000"}
+                />
                 <Input label={isRu ? "Дата рождения" : "Date of birth"} name="dateOfBirth" type="date" defaultValue={dateOfBirth} />
-                <Input label={isRu ? "Страна проживания" : "Country of residence"} name="country" defaultValue={profile?.country ?? ""} required />
+                <Select
+                  label={isRu ? "Страна проживания" : "Country of residence"}
+                  name="country"
+                  defaultValue={countryCode}
+                  options={[{ value: "", label: isRu ? "Выберите страну" : "Select country" }, ...countries]}
+                  required
+                />
                 <Input label={isRu ? "Город" : "City"} name="city" defaultValue={profile?.city ?? ""} required />
-                <Input label={isRu ? "Гражданство" : "Citizenship"} name="citizenship" defaultValue={profile?.citizenship ?? ""} required />
+                <Select
+                  label={isRu ? "Гражданство" : "Citizenship"}
+                  name="citizenship"
+                  defaultValue={citizenshipCode}
+                  options={[{ value: "", label: isRu ? "Выберите гражданство" : "Select citizenship" }, ...countries]}
+                  required
+                />
                 <Input label={isRu ? "Профессия" : "Occupation"} name="occupation" defaultValue={application?.occupation ?? ""} required />
                 <Select
                   label={isRu ? "Источник средств" : "Source of funds"}
@@ -124,18 +150,31 @@ export default async function KycPage({ searchParams }: { searchParams?: SearchP
                 />
                 <Input label={isRu ? "Адрес проживания" : "Residential address"} name="address" defaultValue={profile?.address ?? ""} required />
               </div>
+              <datalist id="qidra-phone-codes">
+                {phoneCodes.map((option) => (
+                  <option key={`${option.label}-${option.value}`} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </datalist>
               <div className="grid gap-4 md:grid-cols-2">
                 <FileUpload
+                  existingFileName={documents.identityDocument?.name}
+                  existingLabel={isRu ? "Уже загружено" : "Uploaded"}
                   label={isRu ? "Документ личности" : "Identity document"}
                   hint={isRu ? "Паспорт или ID, PDF/JPG/PNG" : "Passport or ID, PDF/JPG/PNG"}
                   name="identityDocument"
-                  required={!submitted && !approved}
+                  required={!documents.identityDocument && !submitted && !approved}
+                  selectedLabel={isRu ? "Выбрано" : "Selected"}
                 />
                 <FileUpload
+                  existingFileName={documents.addressProof?.name}
+                  existingLabel={isRu ? "Уже загружено" : "Uploaded"}
                   label={isRu ? "Подтверждение адреса" : "Proof of address"}
                   hint={isRu ? "Счёт или справка, PDF/JPG/PNG" : "Bill or statement, PDF/JPG/PNG"}
                   name="addressProof"
-                  required={!submitted && !approved}
+                  required={!documents.addressProof && !submitted && !approved}
+                  selectedLabel={isRu ? "Выбрано" : "Selected"}
                 />
               </div>
               <Button type="submit" className="w-full sm:w-auto">

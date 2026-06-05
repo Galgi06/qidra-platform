@@ -4,6 +4,7 @@ import path from "node:path";
 import { getServerSession } from "next-auth";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
+import { countryCodes } from "@/lib/countries";
 import { readKycDocuments, type KycDocumentKind, type KycDocuments, type KycFileMeta } from "@/lib/kyc-documents";
 import { authOptions } from "@/lib/next-auth";
 import { prisma } from "@/lib/prisma";
@@ -18,9 +19,9 @@ const optionalText = z.preprocess((value) => {
 
 const kycSchema = z.object({
   phone: optionalText,
-  country: z.string().trim().min(2).max(120),
+  country: z.string().trim().refine((value) => countryCodes.has(value)),
   city: z.string().trim().min(2).max(120),
-  citizenship: z.string().trim().min(2).max(120),
+  citizenship: z.string().trim().refine((value) => countryCodes.has(value)),
   dateOfBirth: optionalText,
   address: z.string().trim().min(5).max(240),
   sourceOfFunds: z.enum(["salary", "business", "savings", "family", "other"]),

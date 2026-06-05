@@ -7,6 +7,7 @@ const adminSections = [
   { path: "/admin/users", label: { ru: "Пользователи", en: "Users" } },
   { path: "/admin/kyc", label: { ru: "KYC", en: "KYC" } },
   { path: "/admin/projects", label: { ru: "Проекты", en: "Projects" } },
+  { path: "/admin/project-submissions", label: { ru: "Размещение", en: "Listings" } },
   { path: "/admin/investments", label: { ru: "Заявки", en: "Applications" } },
   { path: "/admin/payments", label: { ru: "Платежи", en: "Payments" } },
   { path: "/admin/support", label: { ru: "Коммуникации", en: "Communications" } },

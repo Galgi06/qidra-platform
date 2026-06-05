@@ -2,6 +2,7 @@ import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { ProjectCard } from "@/components/ProjectCard";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { ButtonLink } from "@/components/ui/Button";
 import { getLocale, type SearchParams, withLocale } from "@/lib/i18n";
 import { getPublicProjects } from "@/lib/project-catalog";
 
@@ -30,6 +31,14 @@ export default async function ProjectsPage({ searchParams }: { searchParams?: Se
                     ? "Выберите направление, изучите документы и условия сотрудничества, затем отправьте заявку на участие."
                     : "Choose a sector, review documents and cooperation terms, then submit a participation application."}
                 </p>
+                <div className="mt-7 flex flex-wrap gap-3">
+                  <ButtonLink href={withLocale("/investor/projects/new", locale)} className="h-12">
+                    {isRu ? "Залистить свой проект" : "List your project"}
+                  </ButtonLink>
+                  <ButtonLink href={withLocale("/investor", locale)} variant="outline" className="h-12">
+                    {isRu ? "Профиль участника" : "Participant profile"}
+                  </ButtonLink>
+                </div>
               </div>
               <div className="grid gap-3 sm:grid-cols-3 lg:min-w-[520px]">
                 <CatalogStat value={projects.length.toString()} label={isRu ? "проекта" : "projects"} />

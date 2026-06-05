@@ -1,13 +1,31 @@
 import Image from "next/image";
 import Link from "next/link";
+import { getServerSession } from "next-auth";
 import { Footer } from "@/components/Footer";
+import { ProjectCard } from "@/components/ProjectCard";
+import { SignOutButton } from "@/components/auth/SignOutButton";
 import { ButtonLink } from "@/components/ui/Button";
+import { canAccessAdmin } from "@/lib/auth";
 import { dictionary, getLocale, type SearchParams, withLocale } from "@/lib/i18n";
+import { authOptions } from "@/lib/next-auth";
+import { getPublicProjects } from "@/lib/project-catalog";
+
+export const dynamic = "force-dynamic";
+
+type SessionWithRole = Awaited<ReturnType<typeof getServerSession>> & {
+  user?: {
+    role?: string;
+  };
+};
 
 export default async function Home({ searchParams }: { searchParams?: SearchParams }) {
   const locale = await getLocale(searchParams);
   const t = dictionary[locale];
   const isRu = locale === "ru";
+  const [session, projects] = await Promise.all([(getServerSession(authOptions) as Promise<SessionWithRole>), getPublicProjects()]);
+  const signedIn = Boolean(session?.user);
+  const adminSession = canAccessAdmin(session?.user?.role as "ADMIN" | "SUPER_ADMIN" | "guest" | undefined);
+  const accountHref = adminSession ? "/admin" : "/investor";
 
   return (
     <>
@@ -28,12 +46,23 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
                 Qidra
               </Link>
               <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-                <ButtonLink href={withLocale("/auth/sign-up", locale)} variant="white" size="sm" className="h-11 px-4 sm:min-w-44 sm:px-6">
-                  {t.nav.signUp}
-                </ButtonLink>
-                <ButtonLink href={withLocale("/auth/sign-in", locale)} size="sm" className="h-11 border-white/16 bg-white/14 px-4 text-white hover:bg-white/22 sm:min-w-32 sm:px-6">
-                  {t.nav.signIn}
-                </ButtonLink>
+                {signedIn ? (
+                  <>
+                    <ButtonLink href={withLocale(accountHref, locale)} variant="white" size="sm" className="h-11 px-4 sm:min-w-44 sm:px-6">
+                      {adminSession ? (isRu ? "Операционный центр" : "Operations") : isRu ? "Профиль" : "Profile"}
+                    </ButtonLink>
+                    <SignOutButton callbackUrl={withLocale("/", locale)} label={isRu ? "Выход" : "Sign out"} />
+                  </>
+                ) : (
+                  <>
+                    <ButtonLink href={withLocale("/auth/sign-up", locale)} variant="white" size="sm" className="h-11 px-4 sm:min-w-44 sm:px-6">
+                      {t.nav.signUp}
+                    </ButtonLink>
+                    <ButtonLink href={withLocale("/auth/sign-in", locale)} size="sm" className="h-11 border-white/16 bg-white/14 px-4 text-white hover:bg-white/22 sm:min-w-32 sm:px-6">
+                      {t.nav.signIn}
+                    </ButtonLink>
+                  </>
+                )}
               </div>
             </div>
 
@@ -141,6 +170,36 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
         </section>
 
         <section className="px-5 pb-20 sm:px-8 lg:px-11 lg:pb-28">
+          <div className="mx-auto grid max-w-[1840px] gap-8">
+            <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
+              <div>
+                <h2 className="text-[44px] font-medium leading-[1.12] tracking-[0] text-qidra-dark sm:text-[58px] lg:text-[72px]">
+                  {isRu ? "Открытые проекты" : "Open projects"}
+                </h2>
+                <p className="mt-5 max-w-4xl text-[22px] leading-[1.35] text-qidra-grayBlue sm:text-[26px]">
+                  {isRu
+                    ? "На главной доступны те же опубликованные проекты, документы и описания, которые участник видит в каталоге."
+                    : "The home page shows the same published projects, documents and descriptions available in the participant catalog."}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <ButtonLink href={withLocale("/projects", locale)} variant="outline" className="h-12">
+                  {isRu ? "Весь каталог" : "Full catalog"}
+                </ButtonLink>
+                <ButtonLink href={withLocale("/investor/projects/new", locale)} className="h-12">
+                  {isRu ? "Залистить проект" : "List project"}
+                </ButtonLink>
+              </div>
+            </div>
+            <div className="grid gap-5 lg:grid-cols-2">
+              {projects.slice(0, 2).map((project) => (
+                <ProjectCard key={project.slug} project={project} locale={locale} />
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="px-5 pb-20 sm:px-8 lg:px-11 lg:pb-28">
           <div className="mx-auto max-w-[1840px]">
             <h2 className="text-[44px] font-medium leading-[1.12] tracking-[0] text-qidra-dark sm:text-[58px] lg:text-[72px]">
               {isRu ? "Быстрый старт для бизнеса" : "Fast start for business"}
@@ -154,7 +213,7 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
                     : ["Expert project assessment", "Qidra team support while preparing the project for publication"]
                 }
                 action={isRu ? "Создать проект" : "Create project"}
-                href={withLocale("/auth/sign-up", locale)}
+                href={withLocale(signedIn ? "/investor/projects/new" : "/auth/sign-up", locale)}
               />
               <StepCard
                 title={isRu ? "Получите поддержку международного сообщества" : "Get support from an international community"}

@@ -70,6 +70,16 @@ export async function ensureBaseProjects() {
       continue;
     }
 
+    await prisma.project.update({
+      where: { id: existing.id },
+      data: {
+        summaryRu: project.summary.ru,
+        summaryEn: project.summary.en,
+        descriptionRu: project.description.ru,
+        descriptionEn: project.description.en
+      }
+    });
+
     if (!existing.documents.length) {
       await createBaseDocuments(existing.id, project);
     }

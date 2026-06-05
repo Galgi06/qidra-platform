@@ -34,6 +34,49 @@ export function ProjectCard({ project, locale }: { project: CatalogProject; loca
           <dd className="mt-1 font-medium text-qidra-dark">{project.documents.length || (isRu ? "Скоро" : "Soon")}</dd>
         </div>
       </dl>
+      <details className="group rounded-[14px] bg-white p-4 text-15 text-qidra-grayBlue shadow-[0_0_0_1px_rgba(18,20,23,0.06)]">
+        <summary className="cursor-pointer list-none font-medium text-qidra-dark">
+          <span className="inline-flex items-center gap-2">
+            {isRu ? "Описание и условия" : "Description and terms"}
+            <span className="text-qidra-accent transition-transform group-open:rotate-45">+</span>
+          </span>
+        </summary>
+        <div className="mt-4 grid gap-4">
+          <p>{project.description[locale]}</p>
+          <dl className="grid gap-3 sm:grid-cols-2">
+            <ProjectInfo label={isRu ? "Целевой объём" : "Target"} value={`${project.targetUsdt.toLocaleString()} USDT`} />
+            <ProjectInfo label={isRu ? "Модель" : "Model"} value={project.structure} />
+            <ProjectInfo
+              label={isRu ? "Ожидаемый результат" : "Expected result"}
+              value={isRu ? "Зависит от фактических итогов проекта" : "Depends on actual project results"}
+            />
+            <ProjectInfo label={isRu ? "Доходность" : "Returns"} value={isRu ? "Не фиксируется и не гарантируется" : "Not fixed or guaranteed"} />
+          </dl>
+          {project.documents.length ? (
+            <div className="grid gap-2">
+              <p className="text-13 font-medium uppercase text-qidra-grayBlue">{isRu ? "Документы для ознакомления" : "Documents to review"}</p>
+              <div className="grid gap-2">
+                {project.documents.slice(0, 3).map((document) => (
+                  <a
+                    key={document.href}
+                    className="flex items-center justify-between gap-3 rounded-[10px] bg-qidra-grayLight px-3 py-2 text-14 font-medium text-qidra-dark transition-colors hover:text-qidra-accent"
+                    href={document.href}
+                    rel="noreferrer"
+                    target="_blank"
+                  >
+                    <span>{document.title[locale]}</span>
+                    <span className="text-qidra-accent">{isRu ? "Открыть" : "Open"}</span>
+                  </a>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <p className="rounded-[10px] bg-qidra-grayLight px-3 py-2 text-14">
+              {isRu ? "Документы появятся после завершения подготовки проекта." : "Documents will appear after project preparation is complete."}
+            </p>
+          )}
+        </div>
+      </details>
       <div className="grid gap-2">
         <ProgressBar value={progress} />
         <div className="flex justify-between text-14 text-qidra-grayBlue">
@@ -41,9 +84,23 @@ export function ProjectCard({ project, locale }: { project: CatalogProject; loca
           <span>{isRu ? "Цель" : "Target"}: {project.targetUsdt.toLocaleString()} USDT</span>
         </div>
       </div>
-      <ButtonLink href={withLocale(`/projects/${project.slug}`, locale)} variant="dark" className="mt-auto w-full sm:w-fit sm:min-w-56">
-        {isRu ? "Открыть проект" : "Open project"}
-      </ButtonLink>
+      <div className="mt-auto flex flex-wrap gap-3">
+        <ButtonLink href={withLocale(`/projects/${project.slug}`, locale)} variant="dark" className="w-full sm:w-fit sm:min-w-56">
+          {isRu ? "Открыть проект" : "Open project"}
+        </ButtonLink>
+        <ButtonLink href={`${withLocale(`/projects/${project.slug}`, locale)}#documents`} variant="outline" className="w-full sm:w-fit sm:min-w-44">
+          {isRu ? "Документы" : "Documents"}
+        </ButtonLink>
+      </div>
     </article>
+  );
+}
+
+function ProjectInfo({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-13 text-qidra-grayBlue">{label}</dt>
+      <dd className="mt-1 font-medium text-qidra-dark">{value}</dd>
+    </div>
   );
 }

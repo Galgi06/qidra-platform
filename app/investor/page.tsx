@@ -74,6 +74,9 @@ export default async function InvestorPage({ searchParams }: { searchParams?: Se
                 <ButtonLink href={withLocale("/projects", locale)} variant="outline" className="h-12 min-w-44">
                   {isRu ? "Открыть проекты" : "Open projects"}
                 </ButtonLink>
+                <ButtonLink href={withLocale("/investor/projects/new", locale)} variant="outline" className="h-12 min-w-44">
+                  {isRu ? "Залистить проект" : "List project"}
+                </ButtonLink>
               </div>
             </div>
             <InvestorTabs activePath="/investor" locale={locale} />
@@ -119,6 +122,16 @@ export default async function InvestorPage({ searchParams }: { searchParams?: Se
                     text={isRu ? "Выберите проект, изучите документы и подайте заявку только в пределах свободного баланса." : "Choose a project, review documents and apply within available balance."}
                     href={withLocale("/projects", locale)}
                     label={isRu ? "Открыть" : "Open"}
+                  />
+                  <ActionRow
+                    title={isRu ? "Залистить свой проект" : "List your project"}
+                    text={
+                      isRu
+                        ? "Подайте инициативу на первичную проверку: описание, документы, модель сотрудничества и команда."
+                        : "Submit an initiative for initial review: description, documents, cooperation model and team."
+                    }
+                    href={withLocale("/investor/projects/new", locale)}
+                    label={isRu ? "Подать" : "Submit"}
                   />
                   <ActionRow
                     title={isRu ? "Мои заявки" : "My applications"}

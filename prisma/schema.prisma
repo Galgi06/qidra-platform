@@ -44,6 +44,13 @@ enum PaymentStatus {
   REJECTED
 }
 
+enum ProjectSubmissionStatus {
+  SUBMITTED
+  REVIEW
+  APPROVED
+  REJECTED
+}
+
 enum TransactionType {
   DEPOSIT
   INVESTMENT
@@ -79,6 +86,7 @@ model User {
   kycApplications        KycApplication[]
   wallet                 Wallet?
   investments            InvestmentApplication[]
+  projectSubmissions     ProjectSubmission[]
   paymentConfirmations   PaymentConfirmation[]   @relation("PaymentReviewer")
   auditLogs              AdminAuditLog[]
   twoFactorSetting       TwoFactorSetting?
@@ -194,6 +202,27 @@ model ProjectReport {
   project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
 }
 
+model ProjectSubmission {
+  id             String                  @id @default(cuid())
+  userId         String
+  title          String
+  sector         String?
+  location       String?
+  targetUsdt     Decimal?                @db.Decimal(18, 6)
+  structure      String?
+  expectedReturn String?
+  summary        String                  @db.Text
+  documents      Json?
+  status         ProjectSubmissionStatus @default(SUBMITTED)
+  adminNote      String?
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+  user           User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([userId])
+}
+
 model InvestmentApplication {
   id                 String           @id @default(cuid())
   userId             String
@@ -222,18 +251,25 @@ model PaymentConfirmation {
 }
 
 model SupportThread {
-  id           String              @id @default(cuid())
-  userId       String
-  assignedToId String?
-  status       SupportThreadStatus @default(OPEN)
-  subject      String?
-  createdAt    DateTime            @default(now())
-  updatedAt    DateTime            @updatedAt
-  user         User                @relation("SupportThreadUser", fields: [userId], references: [id], onDelete: Cascade)
-  assignedTo   User?               @relation("SupportThreadAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
-  messages     SupportMessage[]
+  id                    String              @id @default(cuid())
+  userId                String
+  assignedToId          String?
+  status                SupportThreadStatus @default(OPEN)
+  subject               String?
+  lastCustomerMessageAt DateTime?
+  lastManagerMessageAt  DateTime?
+  closedAt              DateTime?
+  rating                Int?
+  ratingComment         String?
+  ratedAt               DateTime?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  user                  User                @relation("SupportThreadUser", fields: [userId], references: [id], onDelete: Cascade)
+  assignedTo            User?               @relation("SupportThreadAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  messages              SupportMessage[]
 
   @@index([assignedToId])
+  @@index([rating])
   @@index([status])
   @@index([userId])
 }

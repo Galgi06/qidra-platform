@@ -27,6 +27,11 @@ const sections = [
     text: { ru: "Создание, публикация и архив проектов.", en: "Create, edit, publish and archive projects." }
   },
   {
+    href: "/admin/project-submissions",
+    label: { ru: "Размещение проектов", en: "Project listings" },
+    text: { ru: "Входящие проекты участников перед первичной проверкой.", en: "Incoming participant projects before initial review." }
+  },
+  {
     href: "/admin/investments",
     label: { ru: "Заявки", en: "Applications" },
     text: { ru: "Подтверждение или отклонение заявок на участие.", en: "Approve or reject participation requests." }
@@ -51,7 +56,19 @@ const sections = [
 export default async function AdminPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const locale = await getLocale(searchParams);
   await requireAdmin(locale, "/admin");
-  const [userCount, pendingKycCount, pendingInvestmentCount, pendingPaymentCount, activeProjectCount, draftProjectCount, reviewProjectCount, pendingDepositCount, pendingWithdrawalCount, openSupportCount] = await Promise.all([
+  const [
+    userCount,
+    pendingKycCount,
+    pendingInvestmentCount,
+    pendingPaymentCount,
+    activeProjectCount,
+    draftProjectCount,
+    reviewProjectCount,
+    pendingProjectSubmissionCount,
+    pendingDepositCount,
+    pendingWithdrawalCount,
+    openSupportCount
+  ] = await Promise.all([
     prisma.user.count(),
     prisma.kycApplication.count({ where: { status: KycStatus.SUBMITTED } }),
     prisma.investmentApplication.count({ where: { status: InvestmentStatus.PENDING } }),
@@ -59,6 +76,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     prisma.project.count({ where: { status: { in: [ProjectStatus.ACTIVE, ProjectStatus.FUNDED] } } }),
     prisma.project.count({ where: { status: ProjectStatus.DRAFT } }),
     prisma.project.count({ where: { status: ProjectStatus.REVIEW } }),
+    prisma.projectSubmission.count({ where: { status: { in: ["SUBMITTED", "REVIEW"] } } }),
     prisma.walletTransaction.count({ where: { status: PaymentStatus.PENDING, type: TransactionType.DEPOSIT } }),
     prisma.walletTransaction.count({ where: { status: PaymentStatus.PENDING, type: TransactionType.WITHDRAWAL } }),
     prisma.supportThread.count({ where: { status: SupportThreadStatus.OPEN } })
@@ -87,7 +105,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     {
       label: { ru: "Проекты", en: "Projects" },
       value: formatNumber(activeProjectCount),
-      note: { ru: `${formatNumber(draftProjectCount)} в черновике`, en: `${formatNumber(draftProjectCount)} in draft` }
+      note: { ru: `${formatNumber(pendingProjectSubmissionCount)} входящих`, en: `${formatNumber(pendingProjectSubmissionCount)} incoming` }
     }
   ];
   const queueItems = [
@@ -114,6 +132,12 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       label: { ru: "Проекты на проверке", en: "Projects in review" },
       value: reviewProjectCount,
       text: { ru: "Подготовить публикацию после юридической проверки.", en: "Prepare publishing after legal review." }
+    },
+    {
+      href: withLocale("/admin/project-submissions", locale),
+      label: { ru: "Проекты от участников", en: "Participant projects" },
+      value: pendingProjectSubmissionCount,
+      text: { ru: "Первично проверить описание и документы.", en: "Review descriptions and documents first." }
     },
     {
       href: withLocale("/admin/support?status=open", locale),
