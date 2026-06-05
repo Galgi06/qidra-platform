@@ -32,10 +32,11 @@ export default async function InvestPage({ params, searchParams }: { params: Pro
         status: "PENDING"
       },
       orderBy: { createdAt: "desc" },
-      select: { id: true, reservedUsdt: true }
+      select: { amountUsdt: true, id: true, reservedUsdt: true }
     })
   ]);
   const availableUsdt = Number(wallet?.availableUsdt?.toString() ?? 0);
+  const activeApplicationAmountUsdt = Number(activeApplication?.amountUsdt?.toString() ?? 0);
   const activeReservedUsdt = Number(activeApplication?.reservedUsdt?.toString() ?? 0);
   const freeUsdt = Math.max(availableUsdt + activeReservedUsdt, 0);
   const kycApproved = latestKyc?.status === "APPROVED";
@@ -46,6 +47,8 @@ export default async function InvestPage({ params, searchParams }: { params: Pro
       <main className="section">
         <InvestmentApplicationForm
           endpoint={`/api/investments?lang=${locale}`}
+          activeApplicationAmountUsdt={activeApplicationAmountUsdt}
+          activeReservedUsdt={activeReservedUsdt}
           freeUsdt={freeUsdt}
           kycApproved={kycApproved}
           locale={locale}

@@ -18,6 +18,8 @@ type PopupState = {
 };
 
 type InvestmentApplicationFormProps = {
+  activeApplicationAmountUsdt: number;
+  activeReservedUsdt: number;
   endpoint: string;
   freeUsdt: number;
   kycApproved: boolean;
@@ -30,6 +32,8 @@ type InvestmentApplicationFormProps = {
 const minParticipationUsdt = 100;
 
 export function InvestmentApplicationForm({
+  activeApplicationAmountUsdt,
+  activeReservedUsdt,
   endpoint,
   freeUsdt,
   kycApproved,
@@ -42,6 +46,7 @@ export function InvestmentApplicationForm({
   const router = useRouter();
   const [popup, setPopup] = useState<PopupState | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const hasActiveApplication = activeApplicationAmountUsdt > 0;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -124,7 +129,7 @@ export function InvestmentApplicationForm({
 
       form.reset();
       setPopup({
-        title: data.title ?? (isRu ? "Заявка создана" : "Application created"),
+        title: data.title ?? (hasActiveApplication ? (isRu ? "Заявка обновлена" : "Application updated") : isRu ? "Заявка создана" : "Application created"),
         text:
           data.message ??
           (isRu
@@ -151,6 +156,16 @@ export function InvestmentApplicationForm({
         <p className="text-18 text-qidra-grayBlue">{projectTitle}</p>
         <input name="projectSlug" type="hidden" value={projectSlug} />
         <InvestmentAmountInput locale={locale} />
+        {hasActiveApplication ? (
+          <NotificationCard
+            title={isRu ? "Заявка уже на проверке" : "Application already in review"}
+            text={
+              isRu
+                ? `Текущая сумма заявки: ${formatUsdt(activeApplicationAmountUsdt)}. Зарезервировано: ${formatUsdt(activeReservedUsdt)}. Повторная отправка обновит эту заявку, а не создаст новую.`
+                : `Current application amount: ${formatUsdt(activeApplicationAmountUsdt)}. Reserved: ${formatUsdt(activeReservedUsdt)}. Submitting again updates this application instead of creating a new one.`
+            }
+          />
+        ) : null}
         <NotificationCard title={isRu ? "Без гарантии доходности" : "No guaranteed returns"} text={noFixedYieldText} />
         <NotificationCard
           title={applicationReadinessTitle(kycApproved, freeUsdt, locale)}
@@ -164,7 +179,7 @@ export function InvestmentApplicationForm({
           {isRu ? "Я принимаю договорную структуру Mudaraba/Musharaka." : "I accept the Mudaraba/Musharaka contractual structure."}
         </Checkbox>
         <Button loading={submitting} loadingLabel={isRu ? "Отправка" : "Submitting"} type="submit">
-          {isRu ? "Создать заявку" : "Create application"}
+          {hasActiveApplication ? (isRu ? "Обновить заявку" : "Update application") : isRu ? "Создать заявку" : "Create application"}
         </Button>
         <Link className="text-center text-14 font-medium text-qidra-accent hover:text-qidra-dark" href={`/investor/wallet?lang=${locale}`}>
           {isRu ? "Пополнить кошелёк" : "Top up wallet"}

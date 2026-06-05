@@ -119,6 +119,7 @@ export async function POST(request: NextRequest) {
   const requestedUsdt = new Prisma.Decimal(parsed.data.amount);
   const rawFreeUsdt = availableUsdt.plus(activeReservedUsdt);
   const freeUsdt = rawFreeUsdt.gt(0) ? rawFreeUsdt : zeroUsdt;
+  const isUpdate = Boolean(activeApplication);
 
   if (!wallet || freeUsdt.lt(requestedUsdt)) {
     const shortfallUsdt = requestedUsdt.minus(freeUsdt);
@@ -236,10 +237,14 @@ export async function POST(request: NextRequest) {
   }
 
   return NextResponse.json({
-    title: localeRu ? "Заявка создана" : "Application created",
+    title: isUpdate ? (localeRu ? "Заявка обновлена" : "Application updated") : localeRu ? "Заявка создана" : "Application created",
     message:
-      localeRu
-        ? "Мы приняли заявку на участие. Статус появится в профиле участника после проверки профиля и условий."
-        : "We received your participation application. The status will appear in your participant profile after profile and terms review."
+      isUpdate
+        ? localeRu
+          ? "Мы обновили заявку на участие. Сумма и резерв отразятся в разделе «Моё участие»."
+          : "We updated your participation application. The amount and reserve will appear in My participation."
+        : localeRu
+          ? "Мы приняли заявку на участие. Статус появится в профиле участника после проверки профиля и условий."
+          : "We received your participation application. The status will appear in your participant profile after profile and terms review."
   });
 }
