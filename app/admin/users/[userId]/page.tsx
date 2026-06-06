@@ -856,6 +856,7 @@ function auditActionLabel(action: string, locale: Locale) {
     "support.message.manager": { ru: "Менеджер ответил в чате", en: "Manager replied in chat" },
     "support.message.user": { ru: "Участник написал в чат", en: "Participant messaged support" },
     "support.thread.update": { ru: "Диалог поддержки обновлён", en: "Support thread updated" },
+    "user.staff.create": { ru: "Создан аккаунт сотрудника", en: "Staff account created" },
     "support.rating.user": { ru: "Участник оценил поддержку", en: "Participant rated support" },
     "user.block.permanent": { ru: "Пользователь заблокирован постоянно", en: "User permanently blocked" },
     "user.block.temporary": { ru: "Пользователь заблокирован временно", en: "User temporarily blocked" },

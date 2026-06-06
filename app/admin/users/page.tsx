@@ -7,6 +7,7 @@ import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { NotificationCard } from "@/components/NotificationCard";
 import { UserAvatar } from "@/components/UserAvatar";
+import { CreateStaffAccountForm } from "@/components/admin/CreateStaffAccountForm";
 import { RoleManagementForm } from "@/components/admin/RoleManagementForm";
 import { requireAdmin } from "@/lib/access";
 import { canManageManagers } from "@/lib/auth";
@@ -73,6 +74,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
           <div className="container-qidra grid gap-8">
             <AdminTabs activePath="/admin/users" locale={locale} />
             <UsersDashboard locale={locale} stats={stats} />
+            {canManageRoles ? <CreateStaffAccountForm locale={locale} /> : null}
             <UsersFilters kycFilter={kycFilter} locale={locale} roleFilter={roleFilter} stats={stats} />
             {filteredUsers.length ? (
               <div className="overflow-x-auto rounded-qidra bg-white p-2 shadow-[0_0_0_1px_rgba(18,20,23,0.08)]">
