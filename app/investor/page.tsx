@@ -75,7 +75,7 @@ export default async function InvestorPage({ searchParams }: { searchParams?: Se
                   {isRu ? "Открыть проекты" : "Open projects"}
                 </ButtonLink>
                 <ButtonLink href={withLocale("/investor/projects/new", locale)} variant="outline" className="h-12 min-w-44">
-                  {isRu ? "Залистить проект" : "List project"}
+                  {isRu ? "Разместить проект" : "List project"}
                 </ButtonLink>
               </div>
             </div>
@@ -124,10 +124,10 @@ export default async function InvestorPage({ searchParams }: { searchParams?: Se
                     label={isRu ? "Открыть" : "Open"}
                   />
                   <ActionRow
-                    title={isRu ? "Залистить свой проект" : "List your project"}
+                    title={isRu ? "Разместить свой проект" : "List your project"}
                     text={
                       isRu
-                        ? "Подайте инициативу на первичную проверку: описание, документы, модель сотрудничества и команда."
+                        ? "Отправьте инициативу на первичную проверку: описание проекта, документы, модель сотрудничества и сведения о команде."
                         : "Submit an initiative for initial review: description, documents, cooperation model and team."
                     }
                     href={withLocale("/investor/projects/new", locale)}

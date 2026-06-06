@@ -7,7 +7,7 @@ const investorSections = [
   { path: "/investor/kyc", label: { ru: "Проверка", en: "Review" } },
   { path: "/investor/wallet", label: { ru: "Кошелек", en: "Wallet" } },
   { path: "/investor/investments", label: { ru: "Участие", en: "Participation" } },
-  { path: "/investor/projects/new", label: { ru: "Мой проект", en: "My project" } },
+  { path: "/investor/projects/new", label: { ru: "Разместить проект", en: "List project" } },
   { path: "/investor/support", label: { ru: "Поддержка", en: "Support" } }
 ];
 

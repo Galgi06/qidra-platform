@@ -31,11 +31,11 @@ export default async function NewProjectSubmissionPage({ searchParams }: { searc
             <div>
               <p className="text-14 font-medium uppercase text-qidra-accent">{isRu ? "Профиль участника" : "Participant profile"}</p>
               <h1 className="mt-3 max-w-4xl text-[42px] font-medium leading-tight tracking-[0] text-qidra-dark sm:text-[56px]">
-                {isRu ? "Залистить свой проект" : "List your project"}
+                {isRu ? "Разместить свой проект" : "List your project"}
               </h1>
               <p className="mt-4 max-w-3xl text-20 text-qidra-grayBlue">
                 {isRu
-                  ? "Опишите инициативу, приложите документы и отправьте проект на первичную проверку Qidra."
+                  ? "Опишите инициативу, приложите документы и отправьте проект на первичную проверку Qidra перед публикацией в каталоге."
                   : "Describe the initiative, attach documents and send the project for Qidra's initial review."}
               </p>
             </div>

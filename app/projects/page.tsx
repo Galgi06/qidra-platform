@@ -33,7 +33,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams?: Se
                 </p>
                 <div className="mt-7 flex flex-wrap gap-3">
                   <ButtonLink href={withLocale("/investor/projects/new", locale)} className="h-12">
-                    {isRu ? "Залистить свой проект" : "List your project"}
+                    {isRu ? "Разместить свой проект" : "List your project"}
                   </ButtonLink>
                   <ButtonLink href={withLocale("/investor", locale)} variant="outline" className="h-12">
                     {isRu ? "Профиль участника" : "Participant profile"}

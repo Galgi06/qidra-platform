@@ -187,7 +187,7 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
                   {isRu ? "Весь каталог" : "Full catalog"}
                 </ButtonLink>
                 <ButtonLink href={withLocale("/investor/projects/new", locale)} className="h-12">
-                  {isRu ? "Залистить проект" : "List project"}
+                  {isRu ? "Разместить проект" : "List project"}
                 </ButtonLink>
               </div>
             </div>

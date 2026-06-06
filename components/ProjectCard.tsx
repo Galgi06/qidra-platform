@@ -30,14 +30,22 @@ export function ProjectCard({ project, locale }: { project: CatalogProject; loca
           <dd className="mt-1 font-medium text-qidra-dark">{riskLabel}</dd>
         </div>
         <div className="rounded-[12px] bg-white p-4">
-          <dt>{isRu ? "Документы" : "Documents"}</dt>
-          <dd className="mt-1 font-medium text-qidra-dark">{project.documents.length || (isRu ? "Скоро" : "Soon")}</dd>
+          <dt>
+            <a className="transition-colors hover:text-qidra-accent" href={`${withLocale(`/projects/${project.slug}`, locale)}#documents`}>
+              {isRu ? "Документы" : "Documents"}
+            </a>
+          </dt>
+          <dd className="mt-1 font-medium text-qidra-dark">
+            <a className="transition-colors hover:text-qidra-accent" href={`${withLocale(`/projects/${project.slug}`, locale)}#documents`}>
+              {project.documents.length || (isRu ? "Скоро" : "Soon")}
+            </a>
+          </dd>
         </div>
       </dl>
       <details className="group rounded-[14px] bg-white p-4 text-15 text-qidra-grayBlue shadow-[0_0_0_1px_rgba(18,20,23,0.06)]">
         <summary className="cursor-pointer list-none font-medium text-qidra-dark">
           <span className="inline-flex items-center gap-2">
-            {isRu ? "Описание и условия" : "Description and terms"}
+            {isRu ? "Описание проекта и условия" : "Project description and terms"}
             <span className="text-qidra-accent transition-transform group-open:rotate-45">+</span>
           </span>
         </summary>
