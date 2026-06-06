@@ -96,6 +96,7 @@ export const countries: CountryOption[] = [
 ];
 
 export const countryCodes = new Set(countries.map((country) => country.code));
+export const dialCodes = new Set(countries.map((country) => country.dialCode));
 
 export function countryOptions(locale: Locale) {
   return countries

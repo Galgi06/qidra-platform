@@ -108,6 +108,7 @@ model InvestorProfile {
   id             String    @id @default(cuid())
   userId         String    @unique
   phone          String?
+  phoneDialCode  String?
   country        String?
   city           String?
   dateOfBirth    DateTime?

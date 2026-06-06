@@ -31,6 +31,7 @@ export default async function KycPage({ searchParams }: { searchParams?: SearchP
   const documents = readKycDocuments(application?.documents);
   const countryCode = normalizeCountryCode(profile?.country);
   const citizenshipCode = normalizeCountryCode(profile?.citizenship);
+  const phoneDialCode = profile?.phoneDialCode ?? "+971";
   const statusTitle = approved
     ? isRu
       ? "Профиль одобрен"
@@ -109,14 +110,22 @@ export default async function KycPage({ searchParams }: { searchParams?: SearchP
                 </p>
               </div>
               <div className="grid gap-4 md:grid-cols-2">
-                <Input
-                  label={isRu ? "Телефон" : "Phone"}
-                  name="phone"
-                  type="tel"
-                  defaultValue={profile?.phone ?? ""}
-                  list="qidra-phone-codes"
-                  placeholder={isRu ? "+971 50 000 0000" : "+971 50 000 0000"}
-                />
+                <div className="grid gap-3 sm:grid-cols-[180px_1fr]">
+                  <Select
+                    label={isRu ? "Код" : "Code"}
+                    name="phoneDialCode"
+                    defaultValue={phoneDialCode}
+                    options={phoneCodes}
+                    required
+                  />
+                  <Input
+                    label={isRu ? "Телефон" : "Phone"}
+                    name="phone"
+                    type="tel"
+                    defaultValue={profile?.phone ?? ""}
+                    placeholder={isRu ? "50 000 0000" : "50 000 0000"}
+                  />
+                </div>
                 <Input label={isRu ? "Дата рождения" : "Date of birth"} name="dateOfBirth" type="date" defaultValue={dateOfBirth} />
                 <Select
                   label={isRu ? "Страна проживания" : "Country of residence"}
@@ -150,13 +159,6 @@ export default async function KycPage({ searchParams }: { searchParams?: SearchP
                 />
                 <Input label={isRu ? "Адрес проживания" : "Residential address"} name="address" defaultValue={profile?.address ?? ""} required />
               </div>
-              <datalist id="qidra-phone-codes">
-                {phoneCodes.map((option) => (
-                  <option key={`${option.label}-${option.value}`} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </datalist>
               <div className="grid gap-4 md:grid-cols-2">
                 <FileUpload
                   existingFileName={documents.identityDocument?.name}

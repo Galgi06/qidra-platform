@@ -4,7 +4,7 @@ import path from "node:path";
 import { getServerSession } from "next-auth";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import { countryCodes } from "@/lib/countries";
+import { countryCodes, dialCodes } from "@/lib/countries";
 import { readKycDocuments, type KycDocumentKind, type KycDocuments, type KycFileMeta } from "@/lib/kyc-documents";
 import { authOptions } from "@/lib/next-auth";
 import { prisma } from "@/lib/prisma";
@@ -19,6 +19,7 @@ const optionalText = z.preprocess((value) => {
 
 const kycSchema = z.object({
   phone: optionalText,
+  phoneDialCode: z.string().trim().refine((value) => dialCodes.has(value)).optional(),
   country: z.string().trim().refine((value) => countryCodes.has(value)),
   city: z.string().trim().min(2).max(120),
   citizenship: z.string().trim().refine((value) => countryCodes.has(value)),
@@ -129,6 +130,7 @@ export async function POST(request: NextRequest) {
   const formData = await request.formData();
   const parsed = kycSchema.safeParse({
     phone: readText(formData, "phone"),
+    phoneDialCode: readText(formData, "phoneDialCode") || undefined,
     country: readText(formData, "country"),
     city: readText(formData, "city"),
     citizenship: readText(formData, "citizenship"),
@@ -211,6 +213,7 @@ export async function POST(request: NextRequest) {
       where: { userId },
       update: {
         phone: data.phone,
+        phoneDialCode: data.phoneDialCode,
         country: data.country,
         city: data.city,
         citizenship: data.citizenship,
@@ -221,6 +224,7 @@ export async function POST(request: NextRequest) {
       create: {
         userId,
         phone: data.phone,
+        phoneDialCode: data.phoneDialCode,
         country: data.country,
         city: data.city,
         citizenship: data.citizenship,

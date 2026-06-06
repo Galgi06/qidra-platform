@@ -94,7 +94,7 @@ export default async function AdminKycPage({ searchParams }: { searchParams: Pro
                     </div>
 
                     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                      <InfoBlock label={locale === "ru" ? "Телефон" : "Phone"} value={profile?.phone} locale={locale} />
+                      <InfoBlock label={locale === "ru" ? "Телефон" : "Phone"} value={formatPhone(profile?.phoneDialCode, profile?.phone)} locale={locale} />
                       <InfoBlock label={locale === "ru" ? "Дата рождения" : "Date of birth"} value={profile?.dateOfBirth ? formatDate(profile.dateOfBirth, locale) : null} locale={locale} />
                       <InfoBlock label={locale === "ru" ? "Страна и город" : "Country and city"} value={formatLocation(profile?.country, profile?.city, locale)} locale={locale} />
                       <InfoBlock label={locale === "ru" ? "Гражданство" : "Citizenship"} value={profile?.citizenship} locale={locale} />
@@ -351,6 +351,10 @@ function formatDateTime(date: Date, locale: "ru" | "en") {
     month: "short",
     year: "numeric"
   }).format(date);
+}
+
+function formatPhone(dialCode?: string | null, phone?: string | null) {
+  return [dialCode, phone].filter(Boolean).join(" ");
 }
 
 function formatIsoDateTime(value: string, locale: "ru" | "en") {

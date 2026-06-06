@@ -214,7 +214,7 @@ export default async function AdminUserDetailPage({
               <section className="grid content-start gap-6">
                 <Panel title={isRu ? "Профиль участника" : "Participant profile"} description={isRu ? "Основные данные, которые участник отправляет для проверки." : "Core data submitted by the participant for review."}>
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <InfoBlock label={isRu ? "Телефон" : "Phone"} value={user.investorProfile?.phone} locale={locale} />
+                    <InfoBlock label={isRu ? "Телефон" : "Phone"} value={formatPhone(user.investorProfile?.phoneDialCode, user.investorProfile?.phone)} locale={locale} />
                     <InfoBlock label={isRu ? "Дата рождения" : "Date of birth"} value={user.investorProfile?.dateOfBirth ? formatDate(user.investorProfile.dateOfBirth, locale) : null} locale={locale} />
                     <InfoBlock label={isRu ? "Страна" : "Country"} value={countryName(user.investorProfile?.country, locale)} locale={locale} />
                     <InfoBlock label={isRu ? "Город" : "City"} value={user.investorProfile?.city} locale={locale} />
@@ -903,4 +903,8 @@ function formatDateTime(date: Date, locale: Locale) {
     month: "short",
     year: "numeric"
   }).format(date);
+}
+
+function formatPhone(dialCode?: string | null, phone?: string | null) {
+  return [dialCode, phone].filter(Boolean).join(" ");
 }
