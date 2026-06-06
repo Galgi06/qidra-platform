@@ -81,6 +81,15 @@ export function AccessRecoveryForm({
             ]}
             required
           />
+          <NotificationCard
+            title={isRu ? "Если документы не совпадают" : "If documents do not match"}
+            text={
+              isRu
+                ? "Выберите вариант несоответствия: ссылка восстановления не будет отправлена, а решение попадёт в журнал действий клиента."
+                : "Choose the mismatch option: no recovery link will be sent, and the decision will be recorded in the client's audit log."
+            }
+            tone="warning"
+          />
           <ReasonField
             label={isRu ? "Причина восстановления" : "Recovery reason"}
             locale={locale}

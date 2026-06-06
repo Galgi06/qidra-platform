@@ -124,8 +124,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             ? "Ссылка восстановления не отправлена. Событие зафиксировано в журнале действий клиента."
             : "The recovery link was not sent. The event was recorded in the client's audit log.",
         tone: "warning"
-      },
-      { status: 409 }
+      }
     );
   }
 

@@ -11,6 +11,7 @@ import { Button, ButtonLink } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
 import { requireSupportDesk } from "@/lib/access";
 import { getLocale, t, type SearchParams, withLocale } from "@/lib/i18n";
+import { readKycDocuments } from "@/lib/kyc-documents";
 import { prisma } from "@/lib/prisma";
 
 export default async function AdminSupportPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
@@ -64,7 +65,7 @@ export default async function AdminSupportPage({ searchParams }: { searchParams:
             role: true,
             kycApplications: {
               orderBy: { createdAt: "desc" },
-              select: { status: true },
+              select: { documents: true, id: true, status: true },
               take: 5
             }
           }
@@ -219,6 +220,10 @@ export default async function AdminSupportPage({ searchParams }: { searchParams:
               <div className="grid gap-5">
                 {threads.map((thread) => {
                   const messages = [...thread.messages].reverse();
+                  const approvedKycApplication = thread.user.kycApplications.find((application) => application.status === KycStatus.APPROVED);
+                  const accessRecoveryDocumentLinks = approvedKycApplication
+                    ? kycDocumentLinkItems(approvedKycApplication.id, readKycDocuments(approvedKycApplication.documents), locale)
+                    : [];
 
                   return (
                     <article key={thread.id} className="grid gap-5 rounded-[20px] bg-white p-6 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] sm:p-8">
@@ -273,6 +278,7 @@ export default async function AdminSupportPage({ searchParams }: { searchParams:
                         <AccessRecoveryForm
                           endpoint={`/api/admin/users/${thread.user.id}/password-reset?lang=${locale}`}
                           hasApprovedKyc={thread.user.kycApplications.some((application) => application.status === KycStatus.APPROVED)}
+                          kycDocumentLinks={accessRecoveryDocumentLinks}
                           locale={locale}
                         />
                       </details>
@@ -627,6 +633,21 @@ function supportFilterHref(locale: "ru" | "en", status?: SupportThreadStatus, qu
   if (owner) params.set("owner", owner);
   if (query) params.set("q", query);
   return `/admin/support?${params.toString()}`;
+}
+
+function kycDocumentLinkItems(applicationId: string, documents: ReturnType<typeof readKycDocuments>, locale: "ru" | "en") {
+  return [
+    {
+      href: `/api/admin/kyc/${applicationId}/documents/identityDocument?lang=${locale}`,
+      label: locale === "ru" ? "Документ личности" : "Identity document",
+      name: documents.identityDocument?.name
+    },
+    {
+      href: `/api/admin/kyc/${applicationId}/documents/addressProof?lang=${locale}`,
+      label: locale === "ru" ? "Подтверждение адреса" : "Address proof",
+      name: documents.addressProof?.name
+    }
+  ].filter((item): item is { href: string; label: string; name: string } => Boolean(item.name));
 }
 
 function roleLabel(role: string, locale: "ru" | "en") {
