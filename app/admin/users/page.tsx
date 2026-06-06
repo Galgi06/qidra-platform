@@ -9,7 +9,7 @@ import { NotificationCard } from "@/components/NotificationCard";
 import { UserAvatar } from "@/components/UserAvatar";
 import { CreateStaffAccountForm } from "@/components/admin/CreateStaffAccountForm";
 import { RoleManagementForm } from "@/components/admin/RoleManagementForm";
-import { requireAdmin } from "@/lib/access";
+import { requireSupportDesk } from "@/lib/access";
 import { canManageManagers } from "@/lib/auth";
 import { getLocale, t, type SearchParams, withLocale } from "@/lib/i18n";
 import { prisma } from "@/lib/prisma";
@@ -18,7 +18,7 @@ import { userBlockMode } from "@/lib/user-access";
 export default async function AdminUsersPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const params = await searchParams;
   const locale = await getLocale(params);
-  const session = await requireAdmin(locale, "/admin/users");
+  const session = await requireSupportDesk(locale, "/admin/users");
   const canManageRoles = canManageManagers(session.user?.role as "ADMIN" | "SUPER_ADMIN" | "TECH_SUPPORT" | "SALES_MANAGER" | "guest" | undefined);
   const roleFilter = parseRole(searchParamString(params.role));
   const kycFilter = parseKycFilter(searchParamString(params.kyc));
@@ -89,7 +89,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
         </section>
         <section className="section">
           <div className="container-qidra grid gap-8">
-            <AdminTabs activePath="/admin/users" locale={locale} />
+            <AdminTabs activePath="/admin/users" locale={locale} role={session.user?.role} />
             <UsersDashboard locale={locale} stats={stats} />
             {canManageRoles ? <CreateStaffAccountForm locale={locale} /> : null}
             <UserSearchForm kycFilter={kycFilter} locale={locale} query={query} resultCount={filteredUsers.length} roleFilter={roleFilter} />

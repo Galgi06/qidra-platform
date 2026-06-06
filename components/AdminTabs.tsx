@@ -16,7 +16,9 @@ const adminSections = [
 
 export function AdminTabs({ activePath, locale, role }: { activePath: string; locale: Locale; role?: string }) {
   const visibleSections =
-    role === "TECH_SUPPORT" || role === "SALES_MANAGER" ? adminSections.filter((section) => section.path === "/admin/support") : adminSections;
+    role === "TECH_SUPPORT" || role === "SALES_MANAGER"
+      ? adminSections.filter((section) => section.path === "/admin/users" || section.path === "/admin/support")
+      : adminSections;
 
   return (
     <Tabs

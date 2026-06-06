@@ -14,7 +14,7 @@ import { UserBlockForm } from "@/components/admin/UserBlockForm";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
-import { requireAdmin } from "@/lib/access";
+import { requireSupportDesk } from "@/lib/access";
 import { canAccessSupportDesk, canManageManagers } from "@/lib/auth";
 import { countryName } from "@/lib/countries";
 import { getLocale, t, type Locale, type SearchParams, withLocale } from "@/lib/i18n";
@@ -33,7 +33,7 @@ export default async function AdminUserDetailPage({
   searchParams?: SearchParams;
 }) {
   const [{ userId }, locale] = await Promise.all([params, getLocale(searchParams)]);
-  const session = await requireAdmin(locale, `/admin/users/${userId}`);
+  const session = await requireSupportDesk(locale, `/admin/users/${userId}`);
   const isRu = locale === "ru";
   const view = parseDossierView(searchParamString(searchParams?.view));
   const walletTypeFilter = parseWalletType(searchParamString(searchParams?.walletType));
@@ -230,7 +230,7 @@ export default async function AdminUserDetailPage({
 
         <section className="section">
           <div className="container-qidra grid gap-8">
-            <AdminTabs activePath="/admin/users" locale={locale} />
+            <AdminTabs activePath="/admin/users" locale={locale} role={session.user?.role} />
             <DossierTabs activeView={view} locale={locale} userId={user.id} />
 
             {view === "overview" ? (
