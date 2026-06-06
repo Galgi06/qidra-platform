@@ -66,38 +66,38 @@ export function AccessRecoveryForm({
           popupPlacement="center"
           resetOnSubmit
         >
+          <NotificationCard
+            title={isRu ? "Решение принимается по первичным KYC-документам" : "Decision is based on original KYC documents"}
+            text={
+              isRu
+                ? "Если документы клиента не совпадают с одобренной анкетой, выберите вариант несоответствия. Ссылка не будет отправлена, а отказ сохранится в журнале действий."
+                : "If the client's documents do not match the approved profile, choose the mismatch option. No link will be sent and the rejection will be saved in the audit log."
+            }
+            tone="warning"
+          />
           <Select
-            label={isRu ? "Сверка личности" : "Identity check"}
+            label={isRu ? "Решение по сверке личности" : "Identity verification decision"}
             name="identityCheck"
             options={[
               {
-                label: isRu ? "Документы клиента совпадают с одобренной KYC-анкетой" : "Client documents match the approved KYC profile",
+                label: isRu ? "Документы совпадают — отправить ссылку восстановления" : "Documents match — send recovery link",
                 value: "KYC_DOCUMENTS_MATCH"
               },
               {
-                label: isRu ? "Документы клиента НЕ совпадают с одобренной KYC-анкетой" : "Client documents do NOT match the approved KYC profile",
+                label: isRu ? "Документы не совпадают — отказать и записать в журнал" : "Documents do not match — reject and record in audit log",
                 value: "KYC_DOCUMENTS_MISMATCH"
               }
             ]}
             required
           />
-          <NotificationCard
-            title={isRu ? "Если документы не совпадают" : "If documents do not match"}
-            text={
-              isRu
-                ? "Выберите вариант несоответствия: ссылка восстановления не будет отправлена, а решение попадёт в журнал действий клиента."
-                : "Choose the mismatch option: no recovery link will be sent, and the decision will be recorded in the client's audit log."
-            }
-            tone="warning"
-          />
           <ReasonField
-            label={isRu ? "Причина восстановления" : "Recovery reason"}
+            label={isRu ? "Причина решения" : "Decision reason"}
             locale={locale}
             name="reason"
-            placeholder={isRu ? "Например: клиент обратился в чат поддержки и подтвердил личность по KYC-документам" : "For example: client contacted support chat and confirmed identity with KYC documents"}
+            placeholder={isRu ? "Например: клиент обратился в чат поддержки, документы сверены с одобренной KYC-анкетой" : "For example: client contacted support chat, documents were checked against the approved KYC profile"}
           />
           <Input label={isRu ? "Подтверждение" : "Confirmation"} name="confirmation" pattern="CONFIRM" placeholder="CONFIRM" required />
-          <Button type="submit">{isRu ? "Отправить ссылку восстановления" : "Send recovery link"}</Button>
+          <Button type="submit">{isRu ? "Зафиксировать решение" : "Record decision"}</Button>
         </FeedbackForm>
       ) : (
         <NotificationCard
