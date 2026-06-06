@@ -74,7 +74,7 @@ export default async function AdminSupportPage({ searchParams }: { searchParams:
         role: true
       }
     }),
-    buildSupportStats()
+    buildSupportStats(locale)
   ]);
 
   return (
@@ -104,11 +104,44 @@ export default async function AdminSupportPage({ searchParams }: { searchParams:
         <section className="section">
           <div className="container-qidra grid gap-8">
             <AdminTabs activePath="/admin/support" locale={locale} role={session.user?.role} />
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-4">
               <StatCard label={isRu ? "Открытые" : "Open"} value={stats.openCount} tone="accent" />
               <StatCard label={isRu ? "Ожидают участника" : "Waiting participant"} value={stats.pendingCount} />
               <StatCard label={isRu ? "Закрытые" : "Closed"} value={stats.closedCount} tone="success" />
+              <StatCard label={isRu ? "Средняя оценка" : "Average rating"} value={stats.averageRatingLabel} />
             </div>
+            <section className="rounded-[20px] bg-white p-6 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] sm:p-8">
+              <div className="flex flex-wrap items-end justify-between gap-4">
+                <div>
+                  <h2 className="text-[28px] font-medium leading-tight tracking-[0] text-qidra-dark">{isRu ? "Качество работы менеджеров" : "Manager performance"}</h2>
+                  <p className="mt-2 text-16 text-qidra-grayBlue">
+                    {isRu
+                      ? `Оценённых диалогов: ${stats.ratedCount}. Рейтинг появляется после закрытия обращения и оценки участником.`
+                      : `Rated threads: ${stats.ratedCount}. Ratings appear after a participant rates a closed request.`}
+                  </p>
+                </div>
+              </div>
+              {stats.managerStats.length ? (
+                <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  {stats.managerStats.map((manager) => (
+                    <article key={manager.id} className="rounded-[16px] bg-qidra-grayLight p-5">
+                      <p className="text-16 font-medium text-qidra-dark">{manager.name}</p>
+                      <p className="mt-1 text-13 text-qidra-grayBlue">{manager.role}</p>
+                      <div className="mt-5 grid grid-cols-3 gap-3 text-14">
+                        <ManagerMetric label={isRu ? "Диалоги" : "Threads"} value={manager.threadCount.toString()} />
+                        <ManagerMetric label={isRu ? "Закрыто" : "Closed"} value={manager.closedCount.toString()} />
+                        <ManagerMetric label={isRu ? "Оценка" : "Rating"} value={manager.averageRatingLabel} />
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <NotificationCard
+                  title={isRu ? "Статистики пока нет" : "No statistics yet"}
+                  text={isRu ? "Назначьте менеджера на диалог и закройте обращение, после оценки участника данные появятся здесь." : "Assign a manager to a thread and close the request; after participant rating, data will appear here."}
+                />
+              )}
+            </section>
             <div className="flex flex-wrap gap-2 rounded-qidra border border-qidra-grayLight bg-white p-4">
               <FilterPill active={!statusFilter} href={supportFilterHref(locale)}>
                 {isRu ? "Все" : "All"} ({stats.totalCount})
@@ -142,6 +175,12 @@ export default async function AdminSupportPage({ searchParams }: { searchParams:
                             {isRu ? "Статус" : "Status"}: {supportStatusLabel(thread.status, locale)} · {isRu ? "Ответственный" : "Owner"}:{" "}
                             {thread.assignedTo ? thread.assignedTo.name || thread.assignedTo.email : isRu ? "не назначен" : "unassigned"}
                           </p>
+                          {thread.rating ? (
+                            <p className="mt-2 text-14 font-medium text-qidra-green">
+                              {isRu ? "Оценка участника" : "Participant rating"}: {thread.rating}/5
+                              {thread.ratingComment ? ` · ${thread.ratingComment}` : ""}
+                            </p>
+                          ) : null}
                         </div>
                         <span className={`rounded-full px-3 py-1 text-12 font-medium text-white ${thread.status === SupportThreadStatus.CLOSED ? "bg-qidra-green" : thread.status === SupportThreadStatus.PENDING ? "bg-qidra-dark" : "bg-qidra-accent"}`}>
                           {supportStatusLabel(thread.status, locale)}
@@ -237,7 +276,7 @@ export default async function AdminSupportPage({ searchParams }: { searchParams:
   );
 }
 
-function StatCard({ label, tone = "neutral", value }: { label: string; tone?: "accent" | "neutral" | "success"; value: number }) {
+function StatCard({ label, tone = "neutral", value }: { label: string; tone?: "accent" | "neutral" | "success"; value: number | string }) {
   const valueClass = tone === "success" ? "text-qidra-green" : tone === "accent" ? "text-qidra-accent" : "text-qidra-dark";
 
   return (
@@ -245,6 +284,15 @@ function StatCard({ label, tone = "neutral", value }: { label: string; tone?: "a
       <p className="text-14 font-medium text-qidra-grayBlue">{label}</p>
       <p className={`mt-3 text-[32px] font-medium leading-tight tracking-[0] ${valueClass}`}>{value}</p>
     </article>
+  );
+}
+
+function ManagerMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-12 text-qidra-grayBlue">{label}</p>
+      <p className="mt-1 font-medium text-qidra-dark">{value}</p>
+    </div>
   );
 }
 
@@ -261,15 +309,68 @@ function FilterPill({ active, children, href }: { active: boolean; children: Rea
   );
 }
 
-async function buildSupportStats() {
-  const [totalCount, openCount, pendingCount, closedCount] = await Promise.all([
+async function buildSupportStats(locale: "ru" | "en") {
+  const [totalCount, openCount, pendingCount, closedCount, ratingAggregate, managerRows] = await Promise.all([
     prisma.supportThread.count(),
     prisma.supportThread.count({ where: { status: SupportThreadStatus.OPEN } }),
     prisma.supportThread.count({ where: { status: SupportThreadStatus.PENDING } }),
-    prisma.supportThread.count({ where: { status: SupportThreadStatus.CLOSED } })
+    prisma.supportThread.count({ where: { status: SupportThreadStatus.CLOSED } }),
+    prisma.supportThread.aggregate({
+      _avg: { rating: true },
+      _count: { rating: true },
+      where: { rating: { not: null } }
+    }),
+    prisma.supportThread.groupBy({
+      by: ["assignedToId"],
+      _avg: { rating: true },
+      _count: { _all: true, rating: true },
+      where: { assignedToId: { not: null } }
+    })
   ]);
+  const managerIds = managerRows.map((row) => row.assignedToId).filter((id): id is string => Boolean(id));
+  const [managers, closedRows] = await Promise.all([
+    managerIds.length
+      ? prisma.user.findMany({
+          where: { id: { in: managerIds } },
+          select: { id: true, name: true, email: true, role: true }
+        })
+      : [],
+    managerIds.length
+      ? prisma.supportThread.groupBy({
+          by: ["assignedToId"],
+          _count: { _all: true },
+          where: { assignedToId: { in: managerIds }, status: SupportThreadStatus.CLOSED }
+        })
+      : []
+  ]);
+  const managerMap = new Map(managers.map((manager) => [manager.id, manager]));
+  const closedMap = new Map(closedRows.map((row) => [row.assignedToId, row._count._all]));
+  const managerStats = managerRows
+    .map((row) => {
+      const managerId = row.assignedToId;
+      const manager = managerId ? managerMap.get(managerId) : null;
+      const averageRating = row._avg.rating;
 
-  return { closedCount, openCount, pendingCount, totalCount };
+      return {
+        averageRatingLabel: averageRating ? averageRating.toFixed(1) : "—",
+        closedCount: managerId ? closedMap.get(managerId) ?? 0 : 0,
+        id: managerId ?? "unassigned",
+        name: manager?.name || manager?.email || "Qidra",
+        role: manager ? roleLabel(manager.role, locale) : "Qidra",
+        threadCount: row._count._all
+      };
+    })
+    .sort((a, b) => b.threadCount - a.threadCount);
+
+  return {
+    averageRatingLabel: ratingAggregate._avg.rating ? ratingAggregate._avg.rating.toFixed(1) : "—",
+    closedCount,
+    managerStats,
+    openCount,
+    pendingCount,
+    ratedCount: ratingAggregate._count.rating,
+    totalCount
+  };
 }
 
 function parseSupportStatus(value: string | undefined) {

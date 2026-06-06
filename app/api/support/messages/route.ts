@@ -76,6 +76,7 @@ export async function POST(request: NextRequest) {
     await tx.supportThread.update({
       where: { id: supportThread.id },
       data: {
+        lastCustomerMessageAt: new Date(),
         status: SupportThreadStatus.OPEN,
         subject: parsed.data.subject || supportThread.subject
       }

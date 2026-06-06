@@ -1,3 +1,4 @@
+import { SupportThreadStatus } from "@prisma/client";
 import { FeedbackForm } from "@/components/ActionFeedback";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
@@ -96,6 +97,57 @@ export default async function InvestorSupportPage({ searchParams }: { searchPara
                   text={isRu ? "Напишите первый вопрос команде Qidra." : "Write the first question to the Qidra team."}
                 />
               )}
+
+              {thread?.status === SupportThreadStatus.CLOSED ? (
+                thread.rating ? (
+                  <NotificationCard
+                    title={isRu ? "Оценка поддержки сохранена" : "Support rating saved"}
+                    text={
+                      isRu
+                        ? `Вы оценили работу поддержки на ${thread.rating} из 5. Спасибо за обратную связь.`
+                        : `You rated support ${thread.rating} out of 5. Thank you for the feedback.`
+                    }
+                    tone="success"
+                  />
+                ) : (
+                  <FeedbackForm
+                    className="grid gap-4 rounded-[18px] bg-qidra-grayLight p-5"
+                    endpoint={`/api/support/threads/${thread.id}/rating?lang=${locale}`}
+                    feedback={{
+                      title: isRu ? "Спасибо за оценку" : "Thanks for the rating",
+                      text: isRu ? "Оценка сохранена и попадёт в статистику качества поддержки." : "The rating was saved and will appear in support quality statistics.",
+                      buttonLabel: isRu ? "Понятно" : "Got it",
+                      dismissLabel: isRu ? "Закрыть уведомление" : "Close notification",
+                      tone: "success"
+                    }}
+                    refreshOnSuccess
+                    popupPlacement="center"
+                  >
+                    <fieldset className="grid gap-3">
+                      <legend className="text-18 font-medium text-qidra-dark">{isRu ? "Оцените работу поддержки" : "Rate support"}</legend>
+                      <div className="flex flex-wrap gap-2">
+                        {[1, 2, 3, 4, 5].map((rating) => (
+                          <label key={rating} className="flex cursor-pointer items-center gap-2 rounded-qidra bg-white px-4 py-3 text-18 font-medium text-qidra-dark shadow-[0_0_0_1px_rgba(18,20,23,0.08)]">
+                            <input className="accent-qidra-accent" name="rating" required type="radio" value={rating} />
+                            <span aria-hidden="true">{"★".repeat(rating)}</span>
+                            <span className="sr-only">{rating}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </fieldset>
+                    <label className="grid gap-2 text-14 font-medium text-qidra-dark">
+                      {isRu ? "Комментарий" : "Comment"}
+                      <textarea
+                        className="min-h-24 rounded-qidra border border-transparent bg-white px-4 py-3 text-16 outline-none transition-colors placeholder:text-qidra-grayMedium focus:border-qidra-accent"
+                        maxLength={1000}
+                        name="ratingComment"
+                        placeholder={isRu ? "Что можно улучшить или что понравилось" : "What could be improved or what worked well"}
+                      />
+                    </label>
+                    <Button type="submit">{isRu ? "Сохранить оценку" : "Save rating"}</Button>
+                  </FeedbackForm>
+                )
+              ) : null}
 
               <FeedbackForm
                 className="grid gap-4 border-t border-qidra-grayLight pt-5"

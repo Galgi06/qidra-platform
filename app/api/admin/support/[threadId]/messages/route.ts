@@ -87,6 +87,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
 
   await prisma.$transaction(async (tx) => {
+    const now = new Date();
+
     await tx.supportMessage.create({
       data: {
         threadId,
@@ -99,6 +101,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       where: { id: threadId },
       data: {
         assignedToId,
+        closedAt: parsed.data.status === SupportThreadStatus.CLOSED ? now : null,
+        lastManagerMessageAt: now,
         status: parsed.data.status
       }
     });
