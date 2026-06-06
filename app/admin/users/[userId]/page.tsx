@@ -10,6 +10,7 @@ import { NotificationCard } from "@/components/NotificationCard";
 import { UserAvatar } from "@/components/UserAvatar";
 import { AccessRecoveryForm } from "@/components/admin/AccessRecoveryForm";
 import { RoleManagementForm } from "@/components/admin/RoleManagementForm";
+import { UserBlockForm } from "@/components/admin/UserBlockForm";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
@@ -19,6 +20,7 @@ import { countryName } from "@/lib/countries";
 import { getLocale, t, type Locale, type SearchParams, withLocale } from "@/lib/i18n";
 import { prisma } from "@/lib/prisma";
 import { projectSubmissionStatusLabel } from "@/lib/project-submission-status";
+import { userBlockMode } from "@/lib/user-access";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +35,7 @@ export default async function AdminUserDetailPage({
   const session = await requireAdmin(locale, `/admin/users/${userId}`);
   const isRu = locale === "ru";
   const canAdjustBalance = session.user?.role === Role.SUPER_ADMIN;
+  const canManageBlock = session.user?.role === Role.SUPER_ADMIN;
   const canManageRoles = canManageManagers(session.user?.role as "ADMIN" | "SUPER_ADMIN" | "TECH_SUPPORT" | "SALES_MANAGER" | "guest" | undefined);
   const canSendAccessRecovery = canAccessSupportDesk(session.user?.role as "ADMIN" | "SUPER_ADMIN" | "TECH_SUPPORT" | "SALES_MANAGER" | "guest" | undefined);
   const user = await prisma.user.findUnique({
@@ -152,6 +155,7 @@ export default async function AdminUserDetailPage({
   const displayName = user.name || user.email;
   const wallet = user.wallet;
   const adjustmentEndpoint = `/api/admin/users/${user.id}/adjustments?lang=${locale}`;
+  const blockEndpoint = `/api/admin/users/${user.id}/block?lang=${locale}`;
   const roleEndpoint = `/api/admin/users/${user.id}/role?lang=${locale}`;
   const accessRecoveryEndpoint = `/api/admin/users/${user.id}/password-reset?lang=${locale}`;
   const pendingPaymentTransactions =
@@ -190,8 +194,9 @@ export default async function AdminUserDetailPage({
                 </ButtonLink>
               </div>
             </div>
-            <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+            <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-7">
               <MetricCard label={isRu ? "Роль" : "Role"} value={roleLabel(user.role, locale)} />
+              <MetricCard label={isRu ? "Доступ" : "Access"} value={accessStatusLabel(user, locale)} tone={userBlockMode(user) === "active" ? "success" : "danger"} />
               <MetricCard label={isRu ? "Email" : "Email"} value={user.emailVerified ? (isRu ? "Подтверждён" : "Verified") : isRu ? "Не подтверждён" : "Not verified"} tone={user.emailVerified ? "success" : "warning"} />
               <MetricCard label="KYC" value={kycStatusLabel(latestKyc?.status, locale)} tone={latestKyc?.status === KycStatus.APPROVED ? "success" : latestKyc?.status === KycStatus.REJECTED ? "danger" : "warning"} />
               <MetricCard label={isRu ? "Доступный баланс" : "Available balance"} value={formatUsdt(wallet?.availableUsdt ?? 0)} tone="accent" />
@@ -221,6 +226,7 @@ export default async function AdminUserDetailPage({
                 <Panel title={isRu ? "Доступ и авторизация" : "Access and authentication"} description={isRu ? "Роль, провайдеры входа и активные сессии." : "Role, sign-in providers and active sessions."}>
                   <div className="grid gap-4">
                     <InfoBlock label={isRu ? "Роль доступа" : "Access role"} value={roleLabel(user.role, locale)} locale={locale} />
+                    <InfoBlock label={isRu ? "Статус доступа" : "Access status"} value={accessStatusLabel(user, locale)} locale={locale} />
                     <InfoBlock label={isRu ? "Дата регистрации" : "Registration date"} value={formatDateTime(user.createdAt, locale)} locale={locale} />
                     <InfoBlock label={isRu ? "Провайдеры входа" : "Sign-in providers"} value={authProviders(user.accounts, locale)} locale={locale} />
                     <InfoBlock label={isRu ? "Активные сессии" : "Active sessions"} value={formatCount(user._count.sessions)} locale={locale} />
@@ -246,6 +252,7 @@ export default async function AdminUserDetailPage({
                   {canSendAccessRecovery ? (
                     <AccessRecoveryForm endpoint={accessRecoveryEndpoint} hasApprovedKyc={hasApprovedKyc} locale={locale} />
                   ) : null}
+                  <UserBlockForm canManageBlock={canManageBlock} endpoint={blockEndpoint} isOwnAccount={user.id === session.user?.id} locale={locale} user={user} />
                 </Panel>
               </section>
 
@@ -719,6 +726,21 @@ function roleLabel(role: Role, locale: Locale) {
   return locale === "ru" ? "Участник" : "Participant";
 }
 
+function accessStatusLabel(user: { blockedAt: Date | null; blockedUntil: Date | null }, locale: Locale) {
+  const mode = userBlockMode(user);
+
+  if (mode === "temporary") {
+    const blockedUntil = user.blockedUntil ? formatDateTime(user.blockedUntil, locale) : locale === "ru" ? "срок не указан" : "end date not set";
+    return locale === "ru" ? `Блок до ${blockedUntil}` : `Blocked until ${blockedUntil}`;
+  }
+
+  if (mode === "permanent") {
+    return locale === "ru" ? "Заблокирован" : "Blocked";
+  }
+
+  return locale === "ru" ? "Активен" : "Active";
+}
+
 function kycStatusLabel(status: KycStatus | undefined, locale: Locale) {
   if (status === KycStatus.APPROVED) return locale === "ru" ? "Одобрен" : "Approved";
   if (status === KycStatus.SUBMITTED) return locale === "ru" ? "На проверке" : "In review";
@@ -833,6 +855,9 @@ function auditActionLabel(action: string, locale: Locale) {
     "project.submission.review": { ru: "Заявка на размещение взята в проверку", en: "Listing submission moved to review" },
     "support.message.manager": { ru: "Менеджер ответил в чате", en: "Manager replied in chat" },
     "support.message.user": { ru: "Участник написал в чат", en: "Participant messaged support" },
+    "user.block.permanent": { ru: "Пользователь заблокирован постоянно", en: "User permanently blocked" },
+    "user.block.temporary": { ru: "Пользователь заблокирован временно", en: "User temporarily blocked" },
+    "user.block.unblock": { ru: "Пользователь разблокирован", en: "User unblocked" },
     "user.password_reset.link_sent": { ru: "Ссылка восстановления доступа отправлена", en: "Access recovery link sent" },
     "user.role.update": { ru: "Роль пользователя изменена", en: "User role updated" },
     "wallet.adjustment.credit": { ru: "Баланс увеличен корректировкой", en: "Balance increased by adjustment" },

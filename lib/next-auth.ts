@@ -8,6 +8,7 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
 import { prisma } from "@/lib/prisma";
 import { isSocialProviderConfigured } from "@/lib/social-auth";
+import { isUserBlocked } from "@/lib/user-access";
 
 const googleEnabled = isSocialProviderConfigured(process.env.GOOGLE_CLIENT_ID) && isSocialProviderConfigured(process.env.GOOGLE_CLIENT_SECRET);
 const telegramToken = isSocialProviderConfigured(process.env.TELEGRAM_BOT_TOKEN) ? process.env.TELEGRAM_BOT_TOKEN : undefined;
@@ -154,6 +155,10 @@ async function authorizeTelegram(credentials?: Record<string, unknown>) {
   });
 
   if (existingAccount?.user) {
+    if (isUserBlocked(existingAccount.user)) {
+      return null;
+    }
+
     await ensureUserRelations(existingAccount.user.id);
     return {
       id: existingAccount.user.id,
@@ -178,6 +183,10 @@ async function authorizeTelegram(credentials?: Record<string, unknown>) {
       wallet: { create: {} }
     }
   });
+
+  if (isUserBlocked(user)) {
+    return null;
+  }
 
   await prisma.account.upsert({
     where: {
@@ -231,7 +240,7 @@ export const authOptions: NextAuthOptions = {
 
         const user = await prisma.user.findUnique({ where: { email } });
 
-        if (!user?.passwordHash || !user.emailVerified) {
+        if (!user?.passwordHash || !user.emailVerified || isUserBlocked(user)) {
           return null;
         }
 
@@ -278,20 +287,70 @@ export const authOptions: NextAuthOptions = {
         return false;
       }
 
+      if (account?.provider === "google" && profile && "email" in profile && typeof profile.email === "string") {
+        const existingUser = await prisma.user.findUnique({
+          where: { email: profile.email.toLowerCase() },
+          select: {
+            blockedAt: true,
+            blockedUntil: true
+          }
+        });
+
+        if (isUserBlocked(existingUser)) {
+          return false;
+        }
+      }
+
       return true;
     },
     async jwt({ token, user }) {
+      const tokenUserId = (user?.id ?? token.id) as string | undefined;
+
       if (user) {
         token.id = user.id;
-        const dbUser = await prisma.user.findUnique({ where: { id: user.id }, select: { role: true } });
-        token.role = (user as { role?: string }).role ?? dbUser?.role ?? "INVESTOR";
       }
+
+      if (tokenUserId) {
+        const dbUser = await prisma.user.findUnique({
+          where: { id: tokenUserId },
+          select: {
+            blockReason: true,
+            blockedAt: true,
+            blockedUntil: true,
+            role: true
+          }
+        });
+
+        token.id = tokenUserId;
+        token.role = (user as { role?: string } | undefined)?.role ?? dbUser?.role ?? "INVESTOR";
+        token.blocked = !dbUser || isUserBlocked(dbUser);
+        token.blockReason = dbUser?.blockReason ?? null;
+        token.blockedUntil = dbUser?.blockedUntil?.toISOString() ?? null;
+      }
+
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
-        (session.user as { id?: string; role?: string }).id = token.id as string;
-        (session.user as { id?: string; role?: string }).role = token.role as string;
+        const sessionUser = session.user as {
+          blockReason?: string | null;
+          blocked?: boolean;
+          blockedUntil?: string | null;
+          id?: string;
+          role?: string;
+        };
+
+        sessionUser.role = token.role as string;
+        sessionUser.blocked = Boolean(token.blocked);
+        sessionUser.blockReason = (token.blockReason as string | null | undefined) ?? null;
+        sessionUser.blockedUntil = (token.blockedUntil as string | null | undefined) ?? null;
+
+        if (token.blocked) {
+          delete sessionUser.id;
+          return session;
+        }
+
+        sessionUser.id = token.id as string;
       }
       return session;
     }

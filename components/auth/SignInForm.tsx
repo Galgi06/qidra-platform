@@ -49,8 +49,8 @@ export function SignInForm({
         title: locale === "ru" ? "Не удалось войти" : "Could not sign in",
         text:
           locale === "ru"
-            ? "Проверьте email, пароль и подтверждение электронной почты."
-            : "Check your email, password, and email confirmation.",
+            ? "Проверьте email, пароль, подтверждение электронной почты и статус доступа к аккаунту."
+            : "Check your email, password, email confirmation and account access status.",
         buttonLabel: locale === "ru" ? "Понятно" : "Got it",
         dismissLabel: locale === "ru" ? "Закрыть уведомление" : "Close notification",
         tone: "error"

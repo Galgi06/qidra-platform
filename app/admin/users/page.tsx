@@ -12,6 +12,7 @@ import { requireAdmin } from "@/lib/access";
 import { canManageManagers } from "@/lib/auth";
 import { getLocale, t, type SearchParams, withLocale } from "@/lib/i18n";
 import { prisma } from "@/lib/prisma";
+import { userBlockMode } from "@/lib/user-access";
 
 export default async function AdminUsersPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const params = await searchParams;
@@ -96,6 +97,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
                             <div>
                               <p className="text-16 font-medium text-qidra-dark">{user.name || (locale === "ru" ? "Без имени" : "No name")}</p>
                               <p className="text-14 text-qidra-grayBlue">{user.email}</p>
+                              {userBlockMode(user) !== "active" ? <p className="mt-1 text-12 font-medium text-qidra-red">{accessStatusLabel(user, locale)}</p> : null}
                               <p className="mt-1 text-12 text-qidra-grayBlue">{formatDate(user.createdAt, locale)}</p>
                             </div>
                           </div>
@@ -271,6 +273,21 @@ function profileStatus(status: string | undefined, locale: "ru" | "en") {
   if (status === "SUBMITTED") return locale === "ru" ? "На проверке" : "In review";
   if (status === "REJECTED") return locale === "ru" ? "Нужны правки" : "Needs updates";
   return locale === "ru" ? "Не отправлен" : "Not submitted";
+}
+
+function accessStatusLabel(user: { blockedAt: Date | null; blockedUntil: Date | null }, locale: "ru" | "en") {
+  const mode = userBlockMode(user);
+
+  if (mode === "temporary") {
+    const blockedUntil = user.blockedUntil ? formatDate(user.blockedUntil, locale) : locale === "ru" ? "срок не указан" : "end date not set";
+    return locale === "ru" ? `Временная блокировка до ${blockedUntil}` : `Temporarily blocked until ${blockedUntil}`;
+  }
+
+  if (mode === "permanent") {
+    return locale === "ru" ? "Постоянная блокировка" : "Permanently blocked";
+  }
+
+  return locale === "ru" ? "Активен" : "Active";
 }
 
 function formatUsdt(value: { toString(): string } | number) {

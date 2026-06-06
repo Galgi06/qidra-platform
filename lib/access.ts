@@ -21,6 +21,10 @@ function signInUrl(locale: Locale, nextPath: string) {
 export async function requireAuth(locale: Locale, nextPath: string) {
   const session = (await getServerSession(authOptions)) as SessionWithRole;
 
+  if ((session?.user as { blocked?: boolean } | undefined)?.blocked) {
+    redirect(`${signInUrl(locale, nextPath)}&blocked=1`);
+  }
+
   if (!session?.user?.id) {
     redirect(signInUrl(locale, nextPath));
   }
