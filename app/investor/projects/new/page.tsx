@@ -87,9 +87,16 @@ export default async function NewProjectSubmissionPage({ searchParams }: { searc
                     ]}
                   />
                   <Input
-                    label={isRu ? "Ожидаемая модель результата" : "Expected result model"}
+                    label={isRu ? "Ожидаемый результат проекта" : "Expected project result"}
                     name="expectedReturn"
-                    placeholder={isRu ? "Например: доля прибыли по итогам периода" : "Example: profit share by period"}
+                    placeholder={isRu ? "Например: расширение производства и доля прибыли по итогам периода" : "Example: production expansion and profit share by period"}
+                    required
+                  />
+                  <Input
+                    label={isRu ? "Ориентир доходности" : "Return guidance"}
+                    name="expectedYield"
+                    placeholder={isRu ? "Например: ориентировочно 30-40% по итогам проекта, не гарантия" : "Example: approximately 30-40% by project outcome, not guaranteed"}
+                    required
                   />
                 </div>
                 <label className="grid gap-2 text-14 font-medium text-qidra-dark">
@@ -97,11 +104,11 @@ export default async function NewProjectSubmissionPage({ searchParams }: { searc
                   <textarea
                     className="min-h-[220px] rounded-qidra border border-transparent bg-qidra-grayLight px-4 py-3 text-16 outline-none transition-colors placeholder:text-qidra-grayMedium focus:border-qidra-accent"
                     maxLength={5000}
-                    minLength={40}
+                    minLength={120}
                     name="summary"
                     placeholder={
                       isRu
-                        ? "Опишите бизнес-модель, стадию проекта, участников, активы, предполагаемую структуру сотрудничества, риски и документы, которые подтверждают проект."
+                        ? "Опишите бизнес-модель, стадию проекта, участников, активы, ожидаемый результат, ориентир доходности, сроки, риски и документы, которые подтверждают проект."
                         : "Describe the business model, project stage, parties, assets, expected cooperation structure, risks and documents supporting the project."
                     }
                     required

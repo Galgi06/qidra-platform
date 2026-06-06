@@ -6,6 +6,8 @@ import { prisma } from "@/lib/prisma";
 
 export type CatalogProject = {
   documents: { title: Record<Locale, string>; href: string; kind: string }[];
+  expectedReturn: Record<Locale, string>;
+  expectedYield: Record<Locale, string>;
   fundedUsdt: number;
   id: string;
   location: string;
@@ -42,6 +44,10 @@ export function contentProjectPayload(project: ContentProject) {
     summaryEn: project.summary.en,
     descriptionRu: project.description.ru,
     descriptionEn: project.description.en,
+    expectedReturnRu: defaultExpectedReturn("ru"),
+    expectedReturnEn: defaultExpectedReturn("en"),
+    expectedYieldRu: defaultExpectedYield("ru"),
+    expectedYieldEn: defaultExpectedYield("en"),
     status: projectStatusToDb(project.status),
     targetUsdt: project.targetUsdt,
     fundedUsdt: project.fundedUsdt,
@@ -107,6 +113,14 @@ export function mapProject(project: DbProject & { documents?: ProjectDocument[] 
     title: { ru: project.titleRu, en: project.titleEn },
     summary: { ru: project.summaryRu, en: project.summaryEn },
     description: { ru: project.descriptionRu, en: project.descriptionEn },
+    expectedReturn: {
+      ru: project.expectedReturnRu || defaultExpectedReturn("ru"),
+      en: project.expectedReturnEn || defaultExpectedReturn("en")
+    },
+    expectedYield: {
+      ru: project.expectedYieldRu || defaultExpectedYield("ru"),
+      en: project.expectedYieldEn || defaultExpectedYield("en")
+    },
     status: dbStatusToBadge(project.status),
     targetUsdt: Number(project.targetUsdt.toString()),
     fundedUsdt: Number(project.fundedUsdt.toString()),
@@ -129,6 +143,14 @@ function mapContentProject(project: ContentProject): CatalogProject {
     title: project.title,
     summary: project.summary,
     description: project.description,
+    expectedReturn: {
+      ru: defaultExpectedReturn("ru"),
+      en: defaultExpectedReturn("en")
+    },
+    expectedYield: {
+      ru: defaultExpectedYield("ru"),
+      en: defaultExpectedYield("en")
+    },
     status: project.status,
     targetUsdt: project.targetUsdt,
     fundedUsdt: project.fundedUsdt,
@@ -137,6 +159,14 @@ function mapContentProject(project: ContentProject): CatalogProject {
     riskLevel: project.riskLevel,
     documents: project.documents
   };
+}
+
+function defaultExpectedReturn(locale: Locale) {
+  return locale === "ru" ? "Зависит от фактических итогов проекта" : "Depends on actual project results";
+}
+
+function defaultExpectedYield(locale: Locale) {
+  return locale === "ru" ? "Ориентир не указан; фиксированная доходность не обещается" : "Not specified; fixed returns are not promised";
 }
 
 function fallbackProjectBySlug(slug: string) {
@@ -167,7 +197,10 @@ export async function getPublicProjects() {
     await ensureBaseProjects();
 
     const projects = await prisma.project.findMany({
-      where: { status: { in: [ProjectStatus.ACTIVE, ProjectStatus.REVIEW, ProjectStatus.FUNDED] } },
+      where: {
+        status: { in: [ProjectStatus.ACTIVE, ProjectStatus.FUNDED] },
+        documents: { some: {} }
+      },
       include: { documents: true },
       orderBy: { createdAt: "desc" }
     });

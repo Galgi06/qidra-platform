@@ -26,8 +26,9 @@ const projectSubmissionSchema = z.object({
     return Number.isFinite(normalized) ? normalized : value;
   }, z.number().positive().max(100000000).optional()),
   structure: optionalText,
-  expectedReturn: optionalText,
-  summary: z.string().trim().min(40).max(5000)
+  expectedReturn: z.string().trim().min(5).max(180),
+  expectedYield: z.string().trim().min(2).max(180),
+  summary: z.string().trim().min(120).max(5000)
 });
 
 type SessionUser = {
@@ -149,6 +150,7 @@ export async function POST(request: NextRequest) {
     targetUsdt: readText(formData, "targetUsdt"),
     structure: readText(formData, "structure"),
     expectedReturn: readText(formData, "expectedReturn"),
+    expectedYield: readText(formData, "expectedYield"),
     summary: readText(formData, "summary")
   });
   const documents = readFiles(formData, "documents");
@@ -225,6 +227,7 @@ export async function POST(request: NextRequest) {
         targetUsdt: data.targetUsdt,
         structure: data.structure,
         expectedReturn: data.expectedReturn,
+        expectedYield: data.expectedYield,
         summary: data.summary,
         documents: {
           files: savedDocuments,
@@ -242,6 +245,8 @@ export async function POST(request: NextRequest) {
         payload: {
           sector,
           title: data.title,
+          expectedReturn: data.expectedReturn,
+          expectedYield: data.expectedYield,
           documents: savedDocuments.map((document) => document.name)
         }
       }

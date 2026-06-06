@@ -125,6 +125,8 @@ export default async function AdminProjectSubmissionsPage({ searchParams }: { se
                         <Fact label={isRu ? "Локация" : "Location"} value={submission.location || (isRu ? "Не указано" : "Not set")} />
                         <Fact label={isRu ? "Структура" : "Structure"} value={submission.structure || (isRu ? "На проверке" : "To review")} />
                         <Fact label={isRu ? "Цель" : "Target"} value={submission.targetUsdt ? `${Number(submission.targetUsdt.toString()).toLocaleString()} USDT` : isRu ? "Не указано" : "Not set"} />
+                        <Fact label={isRu ? "Ожидаемый результат" : "Expected result"} value={submission.expectedReturn || (isRu ? "Не указано" : "Not set")} />
+                        <Fact label={isRu ? "Ориентир доходности" : "Return guidance"} value={submission.expectedYield || (isRu ? "Не указано" : "Not set")} />
                       </dl>
                       <div>
                         <h3 className="text-18 font-medium text-qidra-dark">{isRu ? "Описание участника" : "Participant description"}</h3>
@@ -164,6 +166,7 @@ export default async function AdminProjectSubmissionsPage({ searchParams }: { se
                         submission={{
                           adminNote: submission.adminNote,
                           expectedReturn: submission.expectedReturn,
+                          expectedYield: submission.expectedYield,
                           id: submission.id,
                           location: submission.location,
                           projectId: submission.projectId,
@@ -252,6 +255,7 @@ function SubmissionActions({
   submission: {
     adminNote: string | null;
     expectedReturn: string | null;
+    expectedYield: string | null;
     id: string;
     location: string | null;
     projectId: string | null;
@@ -371,10 +375,10 @@ function SubmissionActions({
               <Select
                 label={isRu ? "Статус после листинга" : "Status after listing"}
                 name="status"
-                defaultValue="ACTIVE"
+                defaultValue="REVIEW"
                 options={[
-                  { value: "ACTIVE", label: isRu ? "Сбор открыт / опубликован" : "Published / raise open" },
                   { value: "REVIEW", label: isRu ? "Проверен, готовится к публикации" : "Reviewed, preparing to publish" },
+                  { value: "ACTIVE", label: isRu ? "Сбор открыт / опубликован" : "Published / raise open" },
                   { value: "PAUSED", label: isRu ? "Пауза" : "Paused" },
                   { value: "DRAFT", label: isRu ? "Черновик / не опубликован" : "Draft / not published" }
                 ]}
@@ -383,6 +387,32 @@ function SubmissionActions({
               <Input label={isRu ? "Риск" : "Risk"} name="riskLevel" defaultValue="Moderate" required />
               <Input label={isRu ? "Кратко RU" : "Summary RU"} name="summaryRu" defaultValue={summary} required />
               <Input label={isRu ? "Кратко EN" : "Summary EN"} name="summaryEn" defaultValue={summary} required />
+              <Input
+                label={isRu ? "Ожидаемый результат RU" : "Expected result RU"}
+                name="expectedReturnRu"
+                defaultValue={submission.expectedReturn ?? (isRu ? "Зависит от фактических итогов проекта" : "Depends on actual project results")}
+                required
+              />
+              <Input
+                label={isRu ? "Ожидаемый результат EN" : "Expected result EN"}
+                name="expectedReturnEn"
+                defaultValue={submission.expectedReturn ?? "Depends on actual project results"}
+                required
+              />
+              <Input
+                label={isRu ? "Ориентир доходности RU" : "Return guidance RU"}
+                name="expectedYieldRu"
+                defaultValue={submission.expectedYield ?? ""}
+                placeholder={isRu ? "Например: ориентировочно 30-40% по итогам проекта, не гарантия" : "Example: approximately 30-40% by project outcome, not guaranteed"}
+                required
+              />
+              <Input
+                label={isRu ? "Ориентир доходности EN" : "Return guidance EN"}
+                name="expectedYieldEn"
+                defaultValue={submission.expectedYield ?? ""}
+                placeholder="Example: approximately 30-40% by project outcome, not guaranteed"
+                required
+              />
             </div>
             <DescriptionField label={isRu ? "Описание RU" : "Description RU"} name="descriptionRu" defaultValue={submission.summary} />
             <DescriptionField label={isRu ? "Описание EN" : "Description EN"} name="descriptionEn" defaultValue={submission.summary} />
@@ -398,8 +428,8 @@ function SubmissionActions({
             <Input label={isRu ? "Подтверждение" : "Confirmation"} name="confirmation" placeholder="CONFIRM" required />
             <p className="text-13 text-qidra-grayBlue">
               {isRu
-                ? "Если проект готов к каталогу, выберите «Сбор открыт». После создания в управлении проектами доступны статусы: сбор открыт, пауза, сбор завершён и закрыт. Загруженные участником документы остаются в заявке; публичные документы добавьте отдельно."
-                : "If the project is ready for the catalog, choose Published. After creation, project management can set open raise, paused, funded and closed statuses. Participant documents remain in the submission; add public documents separately."}
+                ? "Сначала создайте проект в статусе подготовки, добавьте публичные документы в управлении проектами и только после этого открывайте сбор. Загруженные участником документы остаются в заявке для внутренней проверки."
+                : "First create the project in preparation status, add public documents in project management and only then open the raise. Participant documents remain in the submission for internal review."}
             </p>
             <Button className="w-full sm:w-fit" type="submit">
               {isRu ? "Разрешить листинг и создать проект" : "Approve listing and create project"}

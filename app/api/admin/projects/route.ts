@@ -29,7 +29,11 @@ const projectSchema = z.object({
   location: z.string().trim().max(120).optional(),
   riskLevel: z.string().trim().max(80).optional(),
   summaryRu: z.string().trim().min(5).max(260),
-  summaryEn: z.string().trim().min(5).max(260)
+  summaryEn: z.string().trim().min(5).max(260),
+  expectedReturnRu: z.string().trim().min(5).max(180),
+  expectedReturnEn: z.string().trim().min(5).max(180),
+  expectedYieldRu: z.string().trim().min(2).max(180),
+  expectedYieldEn: z.string().trim().min(2).max(180)
 });
 
 type SessionUser = {
@@ -84,6 +88,19 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  if (parsed.data.status === ProjectStatus.ACTIVE || parsed.data.status === ProjectStatus.FUNDED) {
+    return NextResponse.json(
+      {
+        title: localeRu ? "Сначала добавьте документы" : "Add documents first",
+        message:
+          localeRu
+            ? "Новый проект создаётся как черновик или подготовка. Открыть сбор можно после добавления публичных документов."
+            : "A new project is created as a draft or preparation. The raise can be opened after public documents are added."
+      },
+      { status: 409 }
+    );
+  }
+
   const project = await prisma.project.create({
     data: {
       slug: parsed.data.slug,
@@ -93,6 +110,10 @@ export async function POST(request: NextRequest) {
       summaryEn: parsed.data.summaryEn,
       descriptionRu: parsed.data.summaryRu,
       descriptionEn: parsed.data.summaryEn,
+      expectedReturnRu: parsed.data.expectedReturnRu,
+      expectedReturnEn: parsed.data.expectedReturnEn,
+      expectedYieldRu: parsed.data.expectedYieldRu,
+      expectedYieldEn: parsed.data.expectedYieldEn,
       status: parsed.data.status,
       targetUsdt: parsed.data.targetUsdt,
       fundedUsdt: 0,

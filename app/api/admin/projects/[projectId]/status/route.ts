@@ -48,7 +48,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     );
   }
 
-  const project = await prisma.project.findUnique({ where: { id: projectId } });
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    include: {
+      _count: {
+        select: { documents: true }
+      }
+    }
+  });
 
   if (!project) {
     return NextResponse.json(
@@ -57,6 +64,19 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         message: localeRu ? "Обновите страницу и выберите проект из списка." : "Refresh the page and choose a project from the list."
       },
       { status: 404 }
+    );
+  }
+
+  if ((parsed.data.status === ProjectStatus.ACTIVE || parsed.data.status === ProjectStatus.FUNDED) && project._count.documents < 1) {
+    return NextResponse.json(
+      {
+        title: localeRu ? "Добавьте документы" : "Add documents",
+        message:
+          localeRu
+            ? "Проект нельзя публиковать без документов для инвестора. Добавьте хотя бы один публичный документ и повторите действие."
+            : "A project cannot be published without investor documents. Add at least one public document and try again."
+      },
+      { status: 409 }
     );
   }
 

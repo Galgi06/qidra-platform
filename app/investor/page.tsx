@@ -5,7 +5,7 @@ import { InvestorTabs } from "@/components/InvestorTabs";
 import { NotificationCard } from "@/components/NotificationCard";
 import { UserAvatar } from "@/components/UserAvatar";
 import { ButtonLink } from "@/components/ui/Button";
-import { ProjectStatusBadge, type BadgeStatus } from "@/components/ui/ProjectStatusBadge";
+import { ProjectStatusBadge } from "@/components/ui/ProjectStatusBadge";
 import { requireAuth } from "@/lib/access";
 import { getLocale, type SearchParams, withLocale } from "@/lib/i18n";
 import { prisma } from "@/lib/prisma";
@@ -26,7 +26,7 @@ export default async function InvestorPage({ searchParams }: { searchParams?: Se
     confirmedApplications,
     rejectedApplications,
     cancelledApplications,
-    latestApplications
+    activeContracts
   ] = await Promise.all([
     prisma.kycApplication.findFirst({ where: { userId }, orderBy: { createdAt: "desc" } }),
     prisma.wallet.findUnique({ where: { userId } }),
@@ -35,10 +35,10 @@ export default async function InvestorPage({ searchParams }: { searchParams?: Se
     prisma.investmentApplication.count({ where: { userId, status: InvestmentStatus.REJECTED } }),
     prisma.investmentApplication.count({ where: { userId, status: InvestmentStatus.CANCELLED } }),
     prisma.investmentApplication.findMany({
-      where: { userId },
+      where: { userId, status: InvestmentStatus.CONFIRMED },
       include: { project: true },
       orderBy: { createdAt: "desc" },
-      take: 3
+      take: 4
     })
   ]);
   const profileStatus = latestKyc?.status ?? "DRAFT";
@@ -160,20 +160,19 @@ export default async function InvestorPage({ searchParams }: { searchParams?: Se
                 </section>
                 <section className="rounded-[20px] bg-white p-6 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] sm:p-8">
                   <div className="flex flex-wrap items-center justify-between gap-4">
-                    <h2 className="text-[26px] font-medium leading-tight tracking-[0] text-qidra-dark">{isRu ? "Последние заявки" : "Latest applications"}</h2>
+                    <h2 className="text-[26px] font-medium leading-tight tracking-[0] text-qidra-dark">{isRu ? "Активные партнёрские контракты" : "Active partnership contracts"}</h2>
                     <ButtonLink href={withLocale("/investor/investments", locale)} variant="outline" size="sm">
-                      {isRu ? "Все заявки" : "All applications"}
+                      {isRu ? "Все контракты" : "All contracts"}
                     </ButtonLink>
                   </div>
-                  {latestApplications.length ? (
+                  {activeContracts.length ? (
                     <div className="mt-6 grid gap-4">
-                      {latestApplications.map((application) => (
-                        <LatestApplicationItem
+                      {activeContracts.map((application) => (
+                        <ActiveContractItem
                           key={application.id}
                           amount={formatUsdt(application.amountUsdt)}
                           date={formatDate(application.createdAt, locale)}
                           href={withLocale(`/projects/${application.project.slug}`, locale)}
-                          status={investmentStatus(application.status)}
                           title={locale === "ru" ? application.project.titleRu : application.project.titleEn}
                           locale={locale}
                         />
@@ -183,7 +182,7 @@ export default async function InvestorPage({ searchParams }: { searchParams?: Se
                     <div className="mt-6">
                       <NotificationCard
                         title={isRu ? "Заявок пока нет" : "No applications yet"}
-                        text={isRu ? "После подачи заявки она появится здесь с суммой и текущим статусом." : "After submission, an application will appear here with its amount and current status."}
+                        text={isRu ? "После входа в проект активный контракт появится здесь с суммой и историей начислений." : "After joining a project, the active contract will appear here with amount and accrual history."}
                       />
                     </div>
                   )}
@@ -338,8 +337,8 @@ function walletNoticeContent(status: string, availableUsdt: number, reservedUsdt
     title: locale === "ru" ? "Баланс под контролем" : "Balance is ready",
     text:
       locale === "ru"
-        ? "Свободная сумма используется только для новых заявок, а резерв отдельно показывает уже отправленные заявки."
-        : "Available funds are used only for new applications, while reserved funds show applications already submitted.",
+        ? "Свободная сумма используется для входа в проекты. Если баланса хватает, партнёрский контракт активируется автоматически."
+        : "Available funds are used to join projects. If the balance is sufficient, the partnership contract activates automatically.",
     tone: "success" as const
   };
 }
@@ -388,19 +387,17 @@ function ActivityItem({ label, value }: { label: string; value: string }) {
   );
 }
 
-function LatestApplicationItem({
+function ActiveContractItem({
   amount,
   date,
   href,
   locale,
-  status,
   title
 }: {
   amount: string;
   date: string;
   href: string;
   locale: "ru" | "en";
-  status: BadgeStatus;
   title: string;
 }) {
   return (
@@ -412,17 +409,27 @@ function LatestApplicationItem({
             {title}
           </Link>
         </div>
-        <ProjectStatusBadge status={status} locale={locale} />
+        <ProjectStatusBadge status="confirmed" locale={locale} />
       </div>
-      <p className="mt-3 text-16 font-medium text-qidra-dark">{amount}</p>
+      <div className="mt-4 grid gap-2 rounded-qidra bg-qidra-grayLight p-3 text-14 text-qidra-grayBlue">
+        <ContractLine label={locale === "ru" ? "Сумма участия" : "Participation amount"} value={amount} />
+        <ContractLine label={locale === "ru" ? "Начислено по контракту" : "Accrued by contract"} value="0 USDT" />
+        <ContractLine label={locale === "ru" ? "Выведено по контракту" : "Withdrawn by contract"} value="0 USDT" />
+      </div>
+      <Link className="mt-3 inline-flex text-14 font-medium text-qidra-accent hover:text-qidra-dark" href={href}>
+        {locale === "ru" ? "Открыть контракт" : "Open contract"}
+      </Link>
     </article>
   );
 }
 
-function investmentStatus(status: string): BadgeStatus {
-  if (status === "CONFIRMED") return "confirmed";
-  if (status === "REJECTED" || status === "CANCELLED") return "rejected";
-  return "pending";
+function ContractLine({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <span>{label}</span>
+      <strong className="font-medium text-qidra-dark">{value}</strong>
+    </div>
+  );
 }
 
 function formatDate(date: Date, locale: "ru" | "en") {

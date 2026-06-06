@@ -55,7 +55,7 @@ export function RoleManagementForm({
   return (
     <details className="max-w-[360px]">
       <summary className="inline-flex h-10 cursor-pointer list-none items-center justify-center rounded-qidra border border-qidra-dark px-4 text-14 font-medium text-qidra-dark transition-colors hover:bg-qidra-dark hover:text-white">
-        {isRu ? "Изменить" : "Change"}
+        {isRu ? "Роль/доступ" : "Role/access"}
       </summary>
       {form}
     </details>

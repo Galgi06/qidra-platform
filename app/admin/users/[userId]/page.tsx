@@ -18,6 +18,7 @@ import { requireAdmin } from "@/lib/access";
 import { canAccessSupportDesk, canManageManagers } from "@/lib/auth";
 import { countryName } from "@/lib/countries";
 import { getLocale, t, type Locale, type SearchParams, withLocale } from "@/lib/i18n";
+import { readKycDocuments, type KycDocumentKind } from "@/lib/kyc-documents";
 import { prisma } from "@/lib/prisma";
 import { projectSubmissionStatusLabel } from "@/lib/project-submission-status";
 import { userBlockMode } from "@/lib/user-access";
@@ -271,6 +272,7 @@ export default async function AdminUserDetailPage({
                             {isRu ? "Источник средств" : "Source of funds"}: {sourceLabel(item.sourceOfFunds, locale)}
                           </p>
                           {item.reviewerNote ? <p className="mt-2 text-14 text-qidra-grayBlue">{item.reviewerNote}</p> : null}
+                          <KycDocumentLinks applicationId={item.id} documents={readKycDocuments(item.documents)} locale={locale} />
                         </TimelineItem>
                       ))}
                     </div>
@@ -692,6 +694,49 @@ function TimelineItem({ children, meta, title, tone = "neutral" }: { children?: 
       </div>
       {children ? <div className="mt-3">{children}</div> : null}
     </article>
+  );
+}
+
+function KycDocumentLinks({
+  applicationId,
+  documents,
+  locale
+}: {
+  applicationId: string;
+  documents: ReturnType<typeof readKycDocuments>;
+  locale: Locale;
+}) {
+  const items: { kind: KycDocumentKind; label: string; name?: string }[] = [
+    {
+      kind: "identityDocument",
+      label: locale === "ru" ? "Документ личности" : "Identity document",
+      name: documents.identityDocument?.name
+    },
+    {
+      kind: "addressProof",
+      label: locale === "ru" ? "Подтверждение адреса" : "Address proof",
+      name: documents.addressProof?.name
+    }
+  ];
+  const availableItems = items.filter((item) => item.name);
+
+  if (!availableItems.length) return null;
+
+  return (
+    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+      {availableItems.map((item) => (
+        <Link
+          key={item.kind}
+          className="rounded-qidra border border-qidra-grayLight bg-white px-3 py-2 text-13 font-medium text-qidra-dark transition-colors hover:border-qidra-accent hover:text-qidra-accent"
+          href={`/api/admin/kyc/${applicationId}/documents/${item.kind}?lang=${locale}`}
+          rel="noreferrer"
+          target="_blank"
+        >
+          <span className="block">{item.label}</span>
+          <span className="mt-1 block break-words text-qidra-grayBlue">{item.name}</span>
+        </Link>
+      ))}
+    </div>
   );
 }
 

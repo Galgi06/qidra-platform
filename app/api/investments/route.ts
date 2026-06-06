@@ -1,4 +1,4 @@
-import { InvestmentStatus, KycStatus, Prisma } from "@prisma/client";
+import { InvestmentStatus, KycStatus, PaymentStatus, Prisma, ProjectStatus, TransactionType } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
@@ -119,8 +119,6 @@ export async function POST(request: NextRequest) {
   const requestedUsdt = new Prisma.Decimal(parsed.data.amount);
   const rawFreeUsdt = availableUsdt.plus(activeReservedUsdt);
   const freeUsdt = rawFreeUsdt.gt(0) ? rawFreeUsdt : zeroUsdt;
-  const isUpdate = Boolean(activeApplication);
-
   if (!wallet || freeUsdt.lt(requestedUsdt)) {
     const shortfallUsdt = requestedUsdt.minus(freeUsdt);
 
@@ -140,81 +138,83 @@ export async function POST(request: NextRequest) {
 
   try {
     await prisma.$transaction(async (tx) => {
-      const reserveDeltaUsdt = requestedUsdt.minus(activeReservedUsdt);
+      const amountFromAvailableUsdt = requestedUsdt.minus(activeReservedUsdt);
+      const availableDebitUsdt = amountFromAvailableUsdt.gt(0) ? amountFromAvailableUsdt : zeroUsdt;
+      const availableCreditUsdt = amountFromAvailableUsdt.lt(0) ? amountFromAvailableUsdt.abs() : zeroUsdt;
 
-      if (reserveDeltaUsdt.gt(0)) {
-        const reserved = await tx.wallet.updateMany({
-          where: {
-            id: wallet.id,
-            availableUsdt: { gte: reserveDeltaUsdt }
-          },
-          data: {
-            availableUsdt: { decrement: reserveDeltaUsdt },
-            reservedUsdt: { increment: reserveDeltaUsdt }
-          }
-        });
-
-        if (reserved.count !== 1) {
-          throw new Error("insufficient_available_balance");
+      const walletUpdate = await tx.wallet.updateMany({
+        where: {
+          id: wallet.id,
+          availableUsdt: { gte: availableDebitUsdt },
+          reservedUsdt: { gte: activeReservedUsdt }
+        },
+        data: {
+          ...(availableDebitUsdt.gt(0) ? { availableUsdt: { decrement: availableDebitUsdt } } : {}),
+          ...(availableCreditUsdt.gt(0) ? { availableUsdt: { increment: availableCreditUsdt } } : {}),
+          ...(activeReservedUsdt.gt(0) ? { reservedUsdt: { decrement: activeReservedUsdt } } : {})
         }
-      }
+      });
 
-      if (reserveDeltaUsdt.lt(0)) {
-        const releaseUsdt = reserveDeltaUsdt.abs();
-        await tx.wallet.update({
-          where: { id: wallet.id },
-          data: {
-            availableUsdt: { increment: releaseUsdt },
-            reservedUsdt: { decrement: releaseUsdt }
-          }
-        });
+      if (walletUpdate.count !== 1) {
+        throw new Error("insufficient_available_balance");
       }
 
       const applicationData = {
         amountUsdt: requestedUsdt,
-        reservedUsdt: requestedUsdt,
+        reservedUsdt: zeroUsdt,
+        status: InvestmentStatus.CONFIRMED,
         termsAcceptedAt: new Date(),
         contractAcceptedAt: new Date()
       };
+      let applicationId = activeApplication?.id;
 
       if (activeApplication) {
         await tx.investmentApplication.update({
           where: { id: activeApplication.id },
           data: applicationData
         });
-        await tx.adminAuditLog.create({
+      } else {
+        const application = await tx.investmentApplication.create({
           data: {
-            actorId: userId,
-            action: "investment.request.update",
-            entityType: "InvestmentApplication",
-            entityId: activeApplication.id,
-            payload: {
-              amountUsdt: requestedUsdt.toString(),
-              projectId: project.id,
-              reservedDeltaUsdt: reserveDeltaUsdt.toString()
-            }
+            userId,
+            projectId: project.id,
+            ...applicationData
           }
         });
-        return;
+        applicationId = application.id;
       }
 
-      const application = await tx.investmentApplication.create({
+      await tx.walletTransaction.create({
         data: {
-          userId,
-          projectId: project.id,
-          status: InvestmentStatus.PENDING,
-          ...applicationData
+          walletId: wallet.id,
+          type: TransactionType.INVESTMENT,
+          status: PaymentStatus.CONFIRMED,
+          amountUsdt: requestedUsdt,
+          note: `${project.titleEn} · ${applicationId}`
         }
       });
+
+      const nextFundedUsdt = project.fundedUsdt.plus(requestedUsdt);
+
+      await tx.project.update({
+        where: { id: project.id },
+        data: {
+          fundedUsdt: { increment: requestedUsdt },
+          ...(nextFundedUsdt.gte(project.targetUsdt) ? { status: ProjectStatus.FUNDED } : {})
+        }
+      });
+
       await tx.adminAuditLog.create({
         data: {
           actorId: userId,
-          action: "investment.request.create",
+          action: activeApplication ? "investment.activate.from_pending" : "investment.activate",
           entityType: "InvestmentApplication",
-          entityId: application.id,
+          entityId: applicationId,
           payload: {
             amountUsdt: requestedUsdt.toString(),
-            projectId: project.id
+            projectFundedUsdt: nextFundedUsdt.toString(),
+            projectId: project.id,
+            source: "verified_wallet_balance"
           }
         }
       });
@@ -237,14 +237,10 @@ export async function POST(request: NextRequest) {
   }
 
   return NextResponse.json({
-    title: isUpdate ? (localeRu ? "Заявка обновлена" : "Application updated") : localeRu ? "Заявка создана" : "Application created",
+    title: localeRu ? "Партнёрский контракт активирован" : "Partnership contract activated",
     message:
-      isUpdate
-        ? localeRu
-          ? "Мы обновили заявку на участие. Сумма и резерв отразятся в разделе «Моё участие»."
-          : "We updated your participation application. The amount and reserve will appear in My participation."
-        : localeRu
-          ? "Мы приняли заявку на участие. Статус появится в профиле участника после проверки профиля и условий."
-          : "We received your participation application. The status will appear in your participant profile after profile and terms review."
+      localeRu
+        ? `Участие в проекте «${project.titleRu}» на сумму ${formatUsdt(requestedUsdt)} активировано из проверенного баланса. Контракт отображается в разделе «Моё участие».`
+        : `Participation in “${project.titleEn}” for ${formatUsdt(requestedUsdt)} was activated from verified balance. The contract is shown in My participation.`
   });
 }

@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { getServerSession } from "next-auth";
 import { NextResponse, type NextRequest } from "next/server";
-import { canAccessAdmin } from "@/lib/auth";
+import { canAccessSupportDesk } from "@/lib/auth";
 import { isKycDocumentKind, readKycDocuments } from "@/lib/kyc-documents";
 import { authOptions } from "@/lib/next-auth";
 import { prisma } from "@/lib/prisma";
@@ -23,11 +23,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const localeRu = isRu(request);
   const session = (await getServerSession(authOptions)) as SessionUser | null;
 
-  if (!canAccessAdmin(session?.user?.role as "ADMIN" | "SUPER_ADMIN" | undefined)) {
+  if (!canAccessSupportDesk(session?.user?.role as "ADMIN" | "SUPER_ADMIN" | "TECH_SUPPORT" | "SALES_MANAGER" | undefined)) {
     return NextResponse.json(
       {
         title: localeRu ? "Нет доступа" : "Access denied",
-        message: localeRu ? "Документы KYC доступны только администратору." : "KYC documents are only available to an administrator."
+        message: localeRu ? "Документы KYC доступны только авторизованной команде Qidra." : "KYC documents are only available to the authorized Qidra team."
       },
       { status: 403 }
     );

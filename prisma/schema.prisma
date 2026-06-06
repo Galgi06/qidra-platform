@@ -173,6 +173,10 @@ model Project {
   summaryEn          String
   descriptionRu      String
   descriptionEn      String
+  expectedReturnRu   String?
+  expectedReturnEn   String?
+  expectedYieldRu    String?
+  expectedYieldEn    String?
   status             ProjectStatus           @default(DRAFT)
   targetUsdt         Decimal                 @db.Decimal(18, 6)
   fundedUsdt         Decimal                 @default(0) @db.Decimal(18, 6)
@@ -221,6 +225,7 @@ model ProjectSubmission {
   projectId      String?
   structure      String?
   expectedReturn String?
+  expectedYield  String?
   summary        String                  @db.Text
   documents      Json?
   status         ProjectSubmissionStatus @default(SUBMITTED)

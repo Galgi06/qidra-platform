@@ -22,8 +22,10 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
   const canManageRoles = canManageManagers(session.user?.role as "ADMIN" | "SUPER_ADMIN" | "TECH_SUPPORT" | "SALES_MANAGER" | "guest" | undefined);
   const roleFilter = parseRole(searchParamString(params.role));
   const kycFilter = parseKycFilter(searchParamString(params.kyc));
+  const query = searchParamString(params.q)?.trim() ?? "";
   const users = await prisma.user.findMany({
     include: {
+      investorProfile: true,
       wallet: true,
       kycApplications: {
         orderBy: { createdAt: "desc" },
@@ -43,8 +45,12 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
     const latestKycStatus = user.kycApplications[0]?.status;
     const roleMatches = roleFilter ? user.role === roleFilter : true;
     const kycMatches = kycFilter ? (kycFilter === "NOT_SUBMITTED" ? !latestKycStatus : latestKycStatus === kycFilter) : true;
+    const normalizedQuery = query.toLowerCase();
+    const queryMatches = normalizedQuery
+      ? [user.email, user.name, user.investorProfile?.phone].some((value) => value?.toLowerCase().includes(normalizedQuery))
+      : true;
 
-    return roleMatches && kycMatches;
+    return roleMatches && kycMatches && queryMatches;
   });
 
   return (
@@ -75,6 +81,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
             <AdminTabs activePath="/admin/users" locale={locale} />
             <UsersDashboard locale={locale} stats={stats} />
             {canManageRoles ? <CreateStaffAccountForm locale={locale} /> : null}
+            <UserSearchForm locale={locale} query={query} />
             <UsersFilters kycFilter={kycFilter} locale={locale} roleFilter={roleFilter} stats={stats} />
             {filteredUsers.length ? (
               <div className="overflow-x-auto rounded-qidra bg-white p-2 shadow-[0_0_0_1px_rgba(18,20,23,0.08)]">
@@ -86,8 +93,8 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
                       <th className="py-4">{locale === "ru" ? "Профиль" : "Profile"}</th>
                       <th className="py-4">{locale === "ru" ? "Баланс" : "Balance"}</th>
                       <th className="py-4">{locale === "ru" ? "Заявки" : "Applications"}</th>
-                      <th className="py-4">{locale === "ru" ? "Карточка" : "Client card"}</th>
-                      <th className="py-4">{locale === "ru" ? "Доступ" : "Access"}</th>
+                      <th className="py-4">{locale === "ru" ? "Досье клиента" : "Client dossier"}</th>
+                      <th className="py-4">{locale === "ru" ? "Роль и доступ" : "Role and access"}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -113,7 +120,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
                             className="inline-flex h-10 items-center justify-center rounded-qidra border border-qidra-dark px-4 text-14 font-medium text-qidra-dark transition-colors hover:bg-qidra-dark hover:text-white"
                             href={withLocale(`/admin/users/${user.id}`, locale)}
                           >
-                            {locale === "ru" ? "Открыть" : "Open"}
+                            {locale === "ru" ? "Открыть досье" : "Open dossier"}
                           </Link>
                         </td>
                         <td className="py-5">
@@ -147,6 +154,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
 type AdminUserListItem = Prisma.UserGetPayload<{
   include: {
     wallet: true;
+    investorProfile: true;
     kycApplications: {
       orderBy: {
         createdAt: "desc";
@@ -196,6 +204,27 @@ function UserStatCard({ label, tone = "neutral", value }: { label: string; tone?
       <p className="text-14 font-medium text-qidra-grayBlue">{label}</p>
       <p className={`mt-3 text-[32px] font-medium leading-tight tracking-[0] ${valueClass}`}>{formatCount(value)}</p>
     </article>
+  );
+}
+
+function UserSearchForm({ locale, query }: { locale: "ru" | "en"; query: string }) {
+  return (
+    <form action="/admin/users" className="grid gap-3 rounded-qidra border border-qidra-grayLight bg-white p-4 md:grid-cols-[1fr_auto] md:items-end">
+      <input name="lang" type="hidden" value={locale} />
+      <label className="grid gap-2 text-14 font-medium text-qidra-dark">
+        {locale === "ru" ? "Быстрый поиск клиента" : "Quick client search"}
+        <input
+          className="h-12 rounded-qidra border border-transparent bg-qidra-grayLight px-4 text-16 outline-none transition-colors placeholder:text-qidra-grayMedium focus:border-qidra-accent"
+          defaultValue={query}
+          name="q"
+          placeholder={locale === "ru" ? "Email, имя, фамилия или телефон" : "Email, name, surname or phone"}
+          type="search"
+        />
+      </label>
+      <button className="inline-flex h-12 items-center justify-center rounded-qidra bg-qidra-dark px-5 text-16 font-medium text-white transition-colors hover:bg-qidra-accent" type="submit">
+        {locale === "ru" ? "Найти клиента" : "Find client"}
+      </button>
+    </form>
   );
 }
 

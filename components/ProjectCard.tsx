@@ -56,9 +56,9 @@ export function ProjectCard({ project, locale }: { project: CatalogProject; loca
             <ProjectInfo label={isRu ? "Модель" : "Model"} value={project.structure} />
             <ProjectInfo
               label={isRu ? "Ожидаемый результат" : "Expected result"}
-              value={isRu ? "Зависит от фактических итогов проекта" : "Depends on actual project results"}
+              value={project.expectedReturn[locale]}
             />
-            <ProjectInfo label={isRu ? "Доходность" : "Returns"} value={isRu ? "Не фиксируется и не гарантируется" : "Not fixed or guaranteed"} />
+            <ProjectInfo label={isRu ? "Ориентир доходности" : "Return guidance"} value={project.expectedYield[locale]} />
           </dl>
           {project.documents.length ? (
             <div className="grid gap-2">

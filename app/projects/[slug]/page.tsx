@@ -53,6 +53,8 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                   <ProjectFact label={isRu ? "Структура" : "Structure"} value={project.structure} />
                   <ProjectFact label={isRu ? "Локация" : "Location"} value={project.location} />
                   <ProjectFact label={isRu ? "Риск" : "Risk"} value={riskLabel} />
+                  <ProjectFact label={isRu ? "Ожидаемый результат" : "Expected result"} value={project.expectedReturn[locale]} />
+                  <ProjectFact label={isRu ? "Ориентир доходности" : "Return guidance"} value={project.expectedYield[locale]} />
                 </dl>
                 <ButtonLink href={withLocale(`/invest/${project.slug}`, locale)} className="h-14">
                   {isRu ? "Подать заявку" : "Create application"}

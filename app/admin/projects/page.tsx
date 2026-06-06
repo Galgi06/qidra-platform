@@ -94,14 +94,17 @@ export default async function AdminProjectsPage({ searchParams }: { searchParams
                   defaultValue="DRAFT"
                   options={[
                     { value: "DRAFT", label: locale === "ru" ? "Черновик" : "Draft" },
-                    { value: "REVIEW", label: locale === "ru" ? "Проверка" : "Review" },
-                    { value: "ACTIVE", label: locale === "ru" ? "Активен" : "Active" }
+                    { value: "REVIEW", label: locale === "ru" ? "Проверка" : "Review" }
                   ]}
                 />
                 <Input label={locale === "ru" ? "Локация" : "Location"} name="location" placeholder="UAE" />
                 <Input label={locale === "ru" ? "Риск" : "Risk"} name="riskLevel" placeholder="Moderate" />
                 <Input label={locale === "ru" ? "Кратко RU" : "Summary RU"} name="summaryRu" required />
                 <Input label={locale === "ru" ? "Кратко EN" : "Summary EN"} name="summaryEn" required />
+                <Input label={locale === "ru" ? "Ожидаемый результат RU" : "Expected result RU"} name="expectedReturnRu" placeholder={locale === "ru" ? "Зависит от фактических итогов проекта" : "Depends on actual project results"} required />
+                <Input label={locale === "ru" ? "Ожидаемый результат EN" : "Expected result EN"} name="expectedReturnEn" placeholder="Depends on actual project results" required />
+                <Input label={locale === "ru" ? "Ориентир доходности RU" : "Return guidance RU"} name="expectedYieldRu" placeholder={locale === "ru" ? "Например: ориентировочно 30-40%, не гарантия" : "Example: approximately 30-40%, not guaranteed"} required />
+                <Input label={locale === "ru" ? "Ориентир доходности EN" : "Return guidance EN"} name="expectedYieldEn" placeholder="Example: approximately 30-40%, not guaranteed" required />
               </div>
               <Button type="submit" className="w-full sm:w-fit">
                 {locale === "ru" ? "Создать черновик" : "Create draft"}

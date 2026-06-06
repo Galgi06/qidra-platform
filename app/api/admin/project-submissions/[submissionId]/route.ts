@@ -29,6 +29,10 @@ const submissionActionSchema = z.discriminatedUnion("action", [
     confirmation: z.string().trim(),
     descriptionEn: z.string().trim().min(20).max(5000),
     descriptionRu: z.string().trim().min(20).max(5000),
+    expectedReturnEn: z.string().trim().min(5).max(180),
+    expectedReturnRu: z.string().trim().min(5).max(180),
+    expectedYieldEn: z.string().trim().min(2).max(180),
+    expectedYieldRu: z.string().trim().min(2).max(180),
     location: z.string().trim().min(2).max(120),
     note: noteSchema,
     riskLevel: z.string().trim().min(2).max(80),
@@ -236,11 +240,29 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   const data = parsed.data;
   const projectStatus = data.status as ProjectStatus;
+
+  if (projectStatus === ProjectStatus.ACTIVE) {
+    return NextResponse.json(
+      {
+        title: localeRu ? "Сначала добавьте документы" : "Add documents first",
+        message:
+          localeRu
+            ? "Проект из заявки создаётся в подготовке. После добавления публичных документов откройте сбор в управлении проектами."
+            : "A submitted project is first created in preparation. After adding public documents, open the raise in project management."
+      },
+      { status: 409 }
+    );
+  }
+
   const project = await prisma.$transaction(async (tx) => {
     const created = await tx.project.create({
       data: {
         descriptionEn: data.descriptionEn,
         descriptionRu: data.descriptionRu,
+        expectedReturnEn: data.expectedReturnEn,
+        expectedReturnRu: data.expectedReturnRu,
+        expectedYieldEn: data.expectedYieldEn,
+        expectedYieldRu: data.expectedYieldRu,
         fundedUsdt: 0,
         location: data.location,
         riskLevel: data.riskLevel,
@@ -277,6 +299,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             participantEmail: submission.user.email,
             projectId: created.id,
             projectSlug: created.slug,
+            expectedReturnRu: created.expectedReturnRu,
+            expectedYieldRu: created.expectedYieldRu,
             to: "APPROVED"
           }
         },
