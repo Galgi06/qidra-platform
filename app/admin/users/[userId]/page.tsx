@@ -797,7 +797,11 @@ function auditActionLabel(action: string, locale: Locale) {
     "payment.withdrawal.confirm": { ru: "Вывод подтвержден", en: "Withdrawal confirmed" },
     "payment.withdrawal.reject": { ru: "Вывод отклонен", en: "Withdrawal rejected" },
     "payment.withdrawal.request": { ru: "Участник запросил вывод", en: "Participant requested withdrawal" },
+    "project.create.from_submission": { ru: "Проект создан из заявки участника", en: "Project created from participant submission" },
     "project.submission.create": { ru: "Проект отправлен на размещение", en: "Project submitted for listing" },
+    "project.submission.prepare": { ru: "Заявка подготовлена к публикации", en: "Submission prepared for publishing" },
+    "project.submission.reject": { ru: "Заявка на размещение отклонена", en: "Listing submission rejected" },
+    "project.submission.review": { ru: "Заявка на размещение взята в проверку", en: "Listing submission moved to review" },
     "support.message.manager": { ru: "Менеджер ответил в чате", en: "Manager replied in chat" },
     "support.message.user": { ru: "Участник написал в чат", en: "Participant messaged support" },
     "user.role.update": { ru: "Роль пользователя изменена", en: "User role updated" },
@@ -811,6 +815,7 @@ function auditActionLabel(action: string, locale: Locale) {
 function entityLabel(entityType: string, locale: Locale) {
   if (entityType === "InvestmentApplication") return locale === "ru" ? "Заявка участия" : "Participation application";
   if (entityType === "KycApplication") return "KYC";
+  if (entityType === "Project") return locale === "ru" ? "Проект" : "Project";
   if (entityType === "ProjectSubmission") return locale === "ru" ? "Проект клиента" : "Client project";
   if (entityType === "WalletTransaction") return locale === "ru" ? "Операция кошелька" : "Wallet operation";
   if (entityType === "SupportThread") return locale === "ru" ? "Диалог" : "Thread";
