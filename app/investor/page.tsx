@@ -1,4 +1,4 @@
-import { InvestmentStatus } from "@prisma/client";
+import { InvestmentStatus, PaymentStatus, TransactionType } from "@prisma/client";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { InvestorTabs } from "@/components/InvestorTabs";
@@ -29,7 +29,19 @@ export default async function InvestorPage({ searchParams }: { searchParams?: Se
     activeContracts
   ] = await Promise.all([
     prisma.kycApplication.findFirst({ where: { userId }, orderBy: { createdAt: "desc" } }),
-    prisma.wallet.findUnique({ where: { userId } }),
+    prisma.wallet.findUnique({
+      where: { userId },
+      include: {
+        transactions: {
+          where: {
+            status: PaymentStatus.CONFIRMED,
+            type: { in: [TransactionType.INVESTMENT, TransactionType.RETURN, TransactionType.WITHDRAWAL] }
+          },
+          orderBy: { createdAt: "desc" },
+          take: 100
+        }
+      }
+    }),
     prisma.investmentApplication.count({ where: { userId, status: InvestmentStatus.PENDING } }),
     prisma.investmentApplication.count({ where: { userId, status: InvestmentStatus.CONFIRMED } }),
     prisma.investmentApplication.count({ where: { userId, status: InvestmentStatus.REJECTED } }),
@@ -51,6 +63,10 @@ export default async function InvestorPage({ searchParams }: { searchParams?: Se
   const activeApplications = pendingApplications + confirmedApplications;
   const totalApplications = activeApplications + rejectedApplications + cancelledApplications;
   const walletNotice = walletNoticeContent(profileStatus, availableUsdt, reservedUsdt, pendingUsdt, locale);
+  const portfolioTransactions = wallet?.transactions ?? [];
+  const activeContractUsdt = sumAmounts(activeContracts.map((contract) => contract.amountUsdt));
+  const accruedUsdt = sumAmounts(portfolioTransactions.filter((transaction) => transaction.type === TransactionType.RETURN).map((transaction) => transaction.amountUsdt));
+  const withdrawnUsdt = sumAmounts(portfolioTransactions.filter((transaction) => transaction.type === TransactionType.WITHDRAWAL).map((transaction) => transaction.amountUsdt));
 
   return (
     <>
@@ -160,19 +176,33 @@ export default async function InvestorPage({ searchParams }: { searchParams?: Se
                 </section>
                 <section className="rounded-[20px] bg-white p-6 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] sm:p-8">
                   <div className="flex flex-wrap items-center justify-between gap-4">
-                    <h2 className="text-[26px] font-medium leading-tight tracking-[0] text-qidra-dark">{isRu ? "Активные партнёрские контракты" : "Active partnership contracts"}</h2>
+                    <div>
+                      <h2 className="text-[26px] font-medium leading-tight tracking-[0] text-qidra-dark">{isRu ? "Активные партнёрские контракты" : "Active partnership contracts"}</h2>
+                      <p className="mt-2 text-15 text-qidra-grayBlue">
+                        {isRu ? "Контракты, активированные после подтверждения участия." : "Contracts activated after participation confirmation."}
+                      </p>
+                    </div>
                     <ButtonLink href={withLocale("/investor/investments", locale)} variant="outline" size="sm">
                       {isRu ? "Все контракты" : "All contracts"}
                     </ButtonLink>
                   </div>
+                  <div className="mt-6 grid gap-3 sm:grid-cols-3">
+                    <ContractSummaryCard label={isRu ? "Активировано" : "Activated"} value={formatUsdt(activeContractUsdt)} />
+                    <ContractSummaryCard label={isRu ? "Начислено" : "Accrued"} value={formatUsdt(accruedUsdt)} />
+                    <ContractSummaryCard label={isRu ? "Выведено" : "Withdrawn"} value={formatUsdt(withdrawnUsdt)} />
+                  </div>
                   {activeContracts.length ? (
-                    <div className="mt-6 grid gap-4">
+                    <div className="mt-6 grid gap-5">
                       {activeContracts.map((application) => (
                         <ActiveContractItem
                           key={application.id}
                           amount={formatUsdt(application.amountUsdt)}
+                          documentsHref={withLocale(`/projects/${application.project.slug}#documents`, locale)}
                           date={formatDate(application.createdAt, locale)}
+                          expectedReturn={localizedText(application.project.expectedReturnRu, application.project.expectedReturnEn, locale)}
+                          expectedYield={localizedText(application.project.expectedYieldRu, application.project.expectedYieldEn, locale)}
                           href={withLocale(`/projects/${application.project.slug}`, locale)}
+                          structure={application.project.structure}
                           title={locale === "ru" ? application.project.titleRu : application.project.titleEn}
                           locale={locale}
                         />
@@ -353,6 +383,14 @@ function formatUsdt(value: { toString(): string } | number | null | undefined) {
   return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(amount)} USDT`;
 }
 
+function sumAmounts(values: Array<{ toString(): string } | number | null | undefined>) {
+  return values.reduce<number>((sum, value) => sum + numericAmount(value), 0);
+}
+
+function localizedText(ru: string | null | undefined, en: string | null | undefined, locale: "ru" | "en") {
+  return locale === "ru" ? ru || en || "" : en || ru || "";
+}
+
 function MetricCard({ label, value, tone = "neutral" }: { label: string; value: string; tone?: "neutral" | "warning" }) {
   const isWarning = tone === "warning";
 
@@ -387,21 +425,38 @@ function ActivityItem({ label, value }: { label: string; value: string }) {
   );
 }
 
+function ContractSummaryCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-qidra bg-qidra-grayLight p-3">
+      <p className="text-13 font-medium text-qidra-grayBlue">{label}</p>
+      <p className="mt-2 text-18 font-medium leading-tight tracking-[0] text-qidra-dark">{value}</p>
+    </div>
+  );
+}
+
 function ActiveContractItem({
   amount,
   date,
+  documentsHref,
+  expectedReturn,
+  expectedYield,
   href,
   locale,
+  structure,
   title
 }: {
   amount: string;
   date: string;
+  documentsHref: string;
+  expectedReturn: string;
+  expectedYield: string;
   href: string;
   locale: "ru" | "en";
+  structure: string;
   title: string;
 }) {
   return (
-    <article className="border-b border-qidra-grayMedium/20 pb-4 last:border-b-0 last:pb-0">
+    <article className="rounded-[18px] border border-qidra-grayMedium/25 bg-white p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-14 text-qidra-grayBlue">{date}</p>
@@ -411,14 +466,30 @@ function ActiveContractItem({
         </div>
         <ProjectStatusBadge status="confirmed" locale={locale} />
       </div>
-      <div className="mt-4 grid gap-2 rounded-qidra bg-qidra-grayLight p-3 text-14 text-qidra-grayBlue">
-        <ContractLine label={locale === "ru" ? "Сумма участия" : "Participation amount"} value={amount} />
-        <ContractLine label={locale === "ru" ? "Начислено по контракту" : "Accrued by contract"} value="0 USDT" />
-        <ContractLine label={locale === "ru" ? "Выведено по контракту" : "Withdrawn by contract"} value="0 USDT" />
+      <div className="mt-4 grid gap-3 rounded-qidra bg-qidra-grayLight p-3 text-14 text-qidra-grayBlue">
+        <ContractLine label={locale === "ru" ? "Сумма контракта" : "Contract amount"} value={amount} />
+        <ContractLine label={locale === "ru" ? "Модель участия" : "Participation model"} value={structure} />
+        <ContractLine
+          label={locale === "ru" ? "Ожидаемый результат" : "Expected result"}
+          value={expectedReturn || (locale === "ru" ? "По условиям проекта" : "Per project terms")}
+        />
+        <ContractLine
+          label={locale === "ru" ? "Ориентир доходности" : "Yield guidance"}
+          value={expectedYield || (locale === "ru" ? "См. документы" : "See documents")}
+        />
+        <div className="border-t border-qidra-grayMedium/20 pt-3">
+          <ContractLine label={locale === "ru" ? "Начислено по контракту" : "Accrued by contract"} value="0 USDT" />
+          <ContractLine label={locale === "ru" ? "Выведено по контракту" : "Withdrawn by contract"} value="0 USDT" />
+        </div>
       </div>
-      <Link className="mt-3 inline-flex text-14 font-medium text-qidra-accent hover:text-qidra-dark" href={href}>
-        {locale === "ru" ? "Открыть контракт" : "Open contract"}
-      </Link>
+      <div className="mt-4 flex flex-wrap gap-3">
+        <Link className="inline-flex rounded-qidra bg-qidra-dark px-4 py-2 text-14 font-medium text-white hover:bg-qidra-accent" href={href}>
+          {locale === "ru" ? "Открыть контракт" : "Open contract"}
+        </Link>
+        <Link className="inline-flex rounded-qidra border border-qidra-grayMedium px-4 py-2 text-14 font-medium text-qidra-dark hover:border-qidra-dark" href={documentsHref}>
+          {locale === "ru" ? "Документы" : "Documents"}
+        </Link>
+      </div>
     </article>
   );
 }
