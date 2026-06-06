@@ -47,7 +47,18 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
     const kycMatches = kycFilter ? (kycFilter === "NOT_SUBMITTED" ? !latestKycStatus : latestKycStatus === kycFilter) : true;
     const normalizedQuery = query.toLowerCase();
     const queryMatches = normalizedQuery
-      ? [user.email, user.name, user.investorProfile?.phone].some((value) => value?.toLowerCase().includes(normalizedQuery))
+      ? [
+          user.email,
+          user.name,
+          user.investorProfile?.phone,
+          user.investorProfile?.phoneDialCode,
+          user.investorProfile?.country,
+          user.investorProfile?.city,
+          user.investorProfile?.citizenship,
+          user.investorProfile?.address,
+          user.kycApplications[0]?.sourceOfFunds,
+          user.kycApplications[0]?.occupation
+        ].some((value) => value?.toLowerCase().includes(normalizedQuery))
       : true;
 
     return roleMatches && kycMatches && queryMatches;
@@ -81,8 +92,8 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
             <AdminTabs activePath="/admin/users" locale={locale} />
             <UsersDashboard locale={locale} stats={stats} />
             {canManageRoles ? <CreateStaffAccountForm locale={locale} /> : null}
-            <UserSearchForm locale={locale} query={query} />
-            <UsersFilters kycFilter={kycFilter} locale={locale} roleFilter={roleFilter} stats={stats} />
+            <UserSearchForm kycFilter={kycFilter} locale={locale} query={query} resultCount={filteredUsers.length} roleFilter={roleFilter} />
+            <UsersFilters kycFilter={kycFilter} locale={locale} query={query} roleFilter={roleFilter} stats={stats} />
             {filteredUsers.length ? (
               <div className="overflow-x-auto rounded-qidra bg-white p-2 shadow-[0_0_0_1px_rgba(18,20,23,0.08)]">
                 <table className="w-full min-w-[1080px] border-collapse text-left">
@@ -207,49 +218,82 @@ function UserStatCard({ label, tone = "neutral", value }: { label: string; tone?
   );
 }
 
-function UserSearchForm({ locale, query }: { locale: "ru" | "en"; query: string }) {
+function UserSearchForm({
+  kycFilter,
+  locale,
+  query,
+  resultCount,
+  roleFilter
+}: {
+  kycFilter?: KycFilter;
+  locale: "ru" | "en";
+  query: string;
+  resultCount: number;
+  roleFilter?: Role;
+}) {
   return (
     <form action="/admin/users" className="grid gap-3 rounded-qidra border border-qidra-grayLight bg-white p-4 md:grid-cols-[1fr_auto] md:items-end">
       <input name="lang" type="hidden" value={locale} />
+      {roleFilter ? <input name="role" type="hidden" value={roleFilter.toLowerCase()} /> : null}
+      {kycFilter ? <input name="kyc" type="hidden" value={kycFilter.toLowerCase()} /> : null}
       <label className="grid gap-2 text-14 font-medium text-qidra-dark">
         {locale === "ru" ? "Быстрый поиск клиента" : "Quick client search"}
         <input
           className="h-12 rounded-qidra border border-transparent bg-qidra-grayLight px-4 text-16 outline-none transition-colors placeholder:text-qidra-grayMedium focus:border-qidra-accent"
           defaultValue={query}
           name="q"
-          placeholder={locale === "ru" ? "Email, имя, фамилия или телефон" : "Email, name, surname or phone"}
+          placeholder={locale === "ru" ? "Email, имя, телефон, страна, город или профессия" : "Email, name, phone, country, city or occupation"}
           type="search"
         />
+        <span className="text-13 font-normal text-qidra-grayBlue">
+          {query
+            ? locale === "ru"
+              ? `Найдено клиентов: ${formatCount(resultCount)}`
+              : `Clients found: ${formatCount(resultCount)}`
+            : locale === "ru"
+              ? "Поиск работает по профилю, KYC-данным, телефону и email."
+              : "Search covers profile, KYC data, phone and email."}
+        </span>
       </label>
-      <button className="inline-flex h-12 items-center justify-center rounded-qidra bg-qidra-dark px-5 text-16 font-medium text-white transition-colors hover:bg-qidra-accent" type="submit">
-        {locale === "ru" ? "Найти клиента" : "Find client"}
-      </button>
+      <div className="flex flex-col gap-3 sm:flex-row">
+        {query ? (
+          <Link
+            className="inline-flex h-12 items-center justify-center rounded-qidra border border-qidra-grayMedium px-5 text-16 font-medium text-qidra-dark transition-colors hover:border-qidra-dark"
+            href={usersFilterHref(locale, roleFilter, kycFilter)}
+          >
+            {locale === "ru" ? "Сбросить" : "Clear"}
+          </Link>
+        ) : null}
+        <button className="inline-flex h-12 items-center justify-center rounded-qidra bg-qidra-dark px-5 text-16 font-medium text-white transition-colors hover:bg-qidra-accent" type="submit">
+          {locale === "ru" ? "Найти клиента" : "Find client"}
+        </button>
+      </div>
     </form>
   );
 }
 
-function UsersFilters({ kycFilter, locale, roleFilter, stats }: { kycFilter?: KycFilter; locale: "ru" | "en"; roleFilter?: Role; stats: UserStats }) {
+function UsersFilters({ kycFilter, locale, query, roleFilter, stats }: { kycFilter?: KycFilter; locale: "ru" | "en"; query: string; roleFilter?: Role; stats: UserStats }) {
   return (
     <div className="grid gap-4 rounded-qidra border border-qidra-grayLight bg-white p-4">
       <div className="grid gap-2">
         <p className="text-14 font-medium text-qidra-grayBlue">{locale === "ru" ? "Роль" : "Role"}</p>
         <div className="flex flex-wrap gap-2">
-          <UserFilterPill active={!roleFilter} href={usersFilterHref(locale, undefined, kycFilter)}>
+          <UserFilterPill active={!roleFilter} href={usersFilterHref(locale, undefined, kycFilter, query)}>
             {locale === "ru" ? "Все" : "All"} ({formatCount(stats.totalCount)})
           </UserFilterPill>
-          <UserFilterPill active={roleFilter === Role.INVESTOR} href={usersFilterHref(locale, Role.INVESTOR, kycFilter)}>
+          <UserFilterPill active={roleFilter === Role.INVESTOR} href={usersFilterHref(locale, Role.INVESTOR, kycFilter, query)}>
             {locale === "ru" ? "Участники" : "Participants"} ({formatCount(stats.investorCount)})
           </UserFilterPill>
-          <UserFilterPill active={roleFilter === Role.TECH_SUPPORT} href={usersFilterHref(locale, Role.TECH_SUPPORT, kycFilter)}>
+          <UserFilterPill active={roleFilter === Role.TECH_SUPPORT} href={usersFilterHref(locale, Role.TECH_SUPPORT, kycFilter, query)}>
             {locale === "ru" ? "Техподдержка" : "Support"} ({formatCount(stats.techSupportCount)})
           </UserFilterPill>
-          <UserFilterPill active={roleFilter === Role.SALES_MANAGER} href={usersFilterHref(locale, Role.SALES_MANAGER, kycFilter)}>
+          <UserFilterPill active={roleFilter === Role.SALES_MANAGER} href={usersFilterHref(locale, Role.SALES_MANAGER, kycFilter, query)}>
             {locale === "ru" ? "Отдел продаж" : "Sales"} ({formatCount(stats.salesManagerCount)})
           </UserFilterPill>
-          <UserFilterPill active={roleFilter === Role.ADMIN} href={usersFilterHref(locale, Role.ADMIN, kycFilter)}>
+          <UserFilterPill active={roleFilter === Role.ADMIN} href={usersFilterHref(locale, Role.ADMIN, kycFilter, query)}>
             {locale === "ru" ? "Админы" : "Admins"} ({formatCount(stats.adminCount)})
           </UserFilterPill>
-          <UserFilterPill active={roleFilter === Role.SUPER_ADMIN} href={usersFilterHref(locale, Role.SUPER_ADMIN, kycFilter)}>
+          <UserFilterPill active={roleFilter === Role.SUPER_ADMIN} href={usersFilterHref(locale, Role.SUPER_ADMIN, kycFilter, query)}>
             {locale === "ru" ? "Главные админы" : "Super admins"} ({formatCount(stats.superAdminCount)})
           </UserFilterPill>
         </div>
@@ -257,19 +301,19 @@ function UsersFilters({ kycFilter, locale, roleFilter, stats }: { kycFilter?: Ky
       <div className="grid gap-2">
         <p className="text-14 font-medium text-qidra-grayBlue">{locale === "ru" ? "Профиль" : "Profile"}</p>
         <div className="flex flex-wrap gap-2">
-          <UserFilterPill active={!kycFilter} href={usersFilterHref(locale, roleFilter)}>
+          <UserFilterPill active={!kycFilter} href={usersFilterHref(locale, roleFilter, undefined, query)}>
             {locale === "ru" ? "Все статусы" : "All statuses"} ({formatCount(stats.totalCount)})
           </UserFilterPill>
-          <UserFilterPill active={kycFilter === "NOT_SUBMITTED"} href={usersFilterHref(locale, roleFilter, "NOT_SUBMITTED")}>
+          <UserFilterPill active={kycFilter === "NOT_SUBMITTED"} href={usersFilterHref(locale, roleFilter, "NOT_SUBMITTED", query)}>
             {locale === "ru" ? "Не отправлен" : "Not submitted"} ({formatCount(stats.notSubmittedKycCount)})
           </UserFilterPill>
-          <UserFilterPill active={kycFilter === KycStatus.SUBMITTED} href={usersFilterHref(locale, roleFilter, KycStatus.SUBMITTED)}>
+          <UserFilterPill active={kycFilter === KycStatus.SUBMITTED} href={usersFilterHref(locale, roleFilter, KycStatus.SUBMITTED, query)}>
             {locale === "ru" ? "На проверке" : "In review"} ({formatCount(stats.pendingKycCount)})
           </UserFilterPill>
-          <UserFilterPill active={kycFilter === KycStatus.APPROVED} href={usersFilterHref(locale, roleFilter, KycStatus.APPROVED)}>
+          <UserFilterPill active={kycFilter === KycStatus.APPROVED} href={usersFilterHref(locale, roleFilter, KycStatus.APPROVED, query)}>
             {locale === "ru" ? "Одобрен" : "Approved"} ({formatCount(stats.approvedKycCount)})
           </UserFilterPill>
-          <UserFilterPill active={kycFilter === KycStatus.REJECTED} href={usersFilterHref(locale, roleFilter, KycStatus.REJECTED)}>
+          <UserFilterPill active={kycFilter === KycStatus.REJECTED} href={usersFilterHref(locale, roleFilter, KycStatus.REJECTED, query)}>
             {locale === "ru" ? "Нужны правки" : "Needs updates"} ({formatCount(stats.rejectedKycCount)})
           </UserFilterPill>
         </div>
@@ -392,11 +436,12 @@ function parseKycFilter(value: string | undefined): KycFilter | undefined {
   return undefined;
 }
 
-function usersFilterHref(locale: "ru" | "en", role?: Role, kyc?: KycFilter) {
+function usersFilterHref(locale: "ru" | "en", role?: Role, kyc?: KycFilter, query?: string) {
   const params = new URLSearchParams({ lang: locale });
 
   if (role) params.set("role", role.toLowerCase());
   if (kyc) params.set("kyc", kyc.toLowerCase());
+  if (query) params.set("q", query);
 
   return `/admin/users?${params.toString()}`;
 }
