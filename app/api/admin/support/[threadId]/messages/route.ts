@@ -6,11 +6,23 @@ import { canAccessSupportDesk } from "@/lib/auth";
 import { authOptions } from "@/lib/next-auth";
 import { prisma } from "@/lib/prisma";
 
-const supportReplySchema = z.object({
-  assignedToId: z.string().trim().optional(),
-  body: z.string().trim().min(2).max(3000),
-  status: z.nativeEnum(SupportThreadStatus)
-});
+const optionalAssigneeSchema = z.preprocess((value) => {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : undefined;
+}, z.string().optional());
+
+const supportActionSchema = z.discriminatedUnion("action", [
+  z.object({
+    action: z.literal("reply"),
+    body: z.string().trim().min(2).max(3000)
+  }),
+  z.object({
+    action: z.literal("update"),
+    assignedToId: optionalAssigneeSchema,
+    status: z.nativeEnum(SupportThreadStatus)
+  })
+]);
 
 type SessionUser = {
   user?: {
@@ -38,13 +50,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
 
   const { threadId } = await params;
-  const parsed = supportReplySchema.safeParse(await request.json().catch(() => null));
+  const parsed = supportActionSchema.safeParse(await request.json().catch(() => null));
 
   if (!parsed.success) {
     return NextResponse.json(
       {
-        title: localeRu ? "Проверьте ответ" : "Check the reply",
-        message: localeRu ? "Выберите статус и напишите ответ от 2 до 3000 символов." : "Choose a status and write a reply between 2 and 3000 characters."
+        title: localeRu ? "Проверьте форму" : "Check the form",
+        message: localeRu ? "Напишите ответ от 2 до 3000 символов или отдельно обновите статус диалога." : "Write a reply between 2 and 3000 characters or update the thread status separately."
       },
       { status: 400 }
     );
@@ -64,7 +76,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     );
   }
 
-  const assignedToId = parsed.data.assignedToId || null;
+  const assignedToId = parsed.data.action === "update" ? parsed.data.assignedToId || null : null;
 
   if (assignedToId) {
     const assignee = await prisma.user.findFirst({
@@ -86,6 +98,43 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
   }
 
+  if (parsed.data.action === "update") {
+    const data = parsed.data;
+
+    await prisma.$transaction(async (tx) => {
+      const now = new Date();
+
+      await tx.supportThread.update({
+        where: { id: threadId },
+        data: {
+          assignedToId,
+          closedAt: data.status === SupportThreadStatus.CLOSED ? now : null,
+          status: data.status
+        }
+      });
+
+      await tx.adminAuditLog.create({
+        data: {
+          actorId: session?.user?.id,
+          action: "support.thread.update",
+          entityType: "SupportThread",
+          entityId: threadId,
+          payload: {
+            assignedToId,
+            status: data.status
+          }
+        }
+      });
+    });
+
+    return NextResponse.json({
+      title: localeRu ? "Диалог обновлён" : "Thread updated",
+      message: localeRu ? "Ответственный и статус сохранены в журнале действий." : "Owner and status were saved in the audit log."
+    });
+  }
+
+  const data = parsed.data;
+
   await prisma.$transaction(async (tx) => {
     const now = new Date();
 
@@ -93,17 +142,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       data: {
         threadId,
         senderId: session?.user?.id,
-        body: parsed.data.body
+        body: data.body
       }
     });
 
     await tx.supportThread.update({
       where: { id: threadId },
       data: {
-        assignedToId,
-        closedAt: parsed.data.status === SupportThreadStatus.CLOSED ? now : null,
         lastManagerMessageAt: now,
-        status: parsed.data.status
+        status: thread.status === SupportThreadStatus.CLOSED ? SupportThreadStatus.OPEN : thread.status
       }
     });
 
@@ -114,8 +161,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         entityType: "SupportThread",
         entityId: threadId,
         payload: {
-          assignedToId,
-          status: parsed.data.status
+          status: thread.status === SupportThreadStatus.CLOSED ? SupportThreadStatus.OPEN : thread.status
         }
       }
     });

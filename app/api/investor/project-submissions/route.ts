@@ -18,6 +18,7 @@ const optionalText = z.preprocess((value) => {
 const projectSubmissionSchema = z.object({
   title: z.string().trim().min(3).max(180),
   sector: optionalText,
+  sectorOther: optionalText,
   location: optionalText,
   targetUsdt: z.preprocess((value) => {
     if (typeof value !== "string" || !value.trim()) return undefined;
@@ -82,6 +83,11 @@ function sanitizeFileName(fileName: string) {
   return `${base}${extension}`;
 }
 
+function resolveSector(sector?: string, sectorOther?: string) {
+  if (sector !== "other") return sector;
+  return sectorOther;
+}
+
 async function saveProjectFile(file: File, userId: string, submissionFolder: string) {
   const uploadDir = path.join(process.cwd(), "storage", "project-submissions", userId, submissionFolder);
   await mkdir(uploadDir, { recursive: true });
@@ -138,6 +144,7 @@ export async function POST(request: NextRequest) {
   const parsed = projectSubmissionSchema.safeParse({
     title: readText(formData, "title"),
     sector: readText(formData, "sector"),
+    sectorOther: readText(formData, "sectorOther"),
     location: readText(formData, "location"),
     targetUsdt: readText(formData, "targetUsdt"),
     structure: readText(formData, "structure"),
@@ -196,13 +203,24 @@ export async function POST(request: NextRequest) {
   const submissionFolder = randomUUID();
   const savedDocuments = await Promise.all(documents.map((file) => saveProjectFile(file, userId, submissionFolder)));
   const data = parsed.data;
+  const sector = resolveSector(data.sector, data.sectorOther);
+
+  if (data.sector === "other" && !sector) {
+    return NextResponse.json(
+      {
+        title: localeRu ? "Укажите отрасль" : "Specify sector",
+        message: localeRu ? "Если выбрано «Другое», напишите название отрасли проекта." : "If you choose Other, enter the project's sector."
+      },
+      { status: 400 }
+    );
+  }
 
   const submission = await prisma.$transaction(async (tx) => {
     const created = await tx.projectSubmission.create({
       data: {
         userId,
         title: data.title,
-        sector: data.sector,
+        sector,
         location: data.location,
         targetUsdt: data.targetUsdt,
         structure: data.structure,
@@ -222,6 +240,7 @@ export async function POST(request: NextRequest) {
         entityType: "ProjectSubmission",
         entityId: created.id,
         payload: {
+          sector,
           title: data.title,
           documents: savedDocuments.map((document) => document.name)
         }

@@ -12,9 +12,10 @@ type FileUploadProps = InputHTMLAttributes<HTMLInputElement> & {
 };
 
 export function FileUpload({
+  accept = ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png",
   existingFileName,
   existingLabel = "Uploaded",
-  hint = "PDF, JPG, PNG",
+  hint = "PDF, DOCX, XLSX, PPTX, JPG, PNG",
   label,
   manyFilesLabel = "files",
   onChange,
@@ -22,6 +23,7 @@ export function FileUpload({
   ...props
 }: FileUploadProps) {
   const [selectedText, setSelectedText] = useState("");
+  const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
   const activeText = selectedText || existingFileName || "";
   const statusLabel = selectedText ? selectedLabel : existingLabel;
 
@@ -30,10 +32,13 @@ export function FileUpload({
 
     if (!files?.length) {
       setSelectedText("");
+      setSelectedFiles([]);
     } else if (files.length === 1) {
       setSelectedText(files[0]?.name ?? "");
+      setSelectedFiles(Array.from(files).map((file) => file.name));
     } else {
       setSelectedText(`${files.length} ${manyFilesLabel}`);
+      setSelectedFiles(Array.from(files).map((file) => file.name));
     }
 
     onChange?.(event);
@@ -47,11 +52,23 @@ export function FileUpload({
       </span>
       <span>{hint}</span>
       {activeText ? (
-        <span className="rounded-[10px] bg-white px-3 py-2 text-13 font-medium text-qidra-green shadow-[0_0_0_1px_rgba(58,148,97,0.18)]">
-          {statusLabel}: <span className="text-qidra-dark">{activeText}</span>
+        <span className="grid gap-2 rounded-[10px] bg-white px-3 py-2 text-13 font-medium text-qidra-green shadow-[0_0_0_1px_rgba(58,148,97,0.18)]">
+          <span>
+            {statusLabel}: <span className="text-qidra-dark">{activeText}</span>
+          </span>
+          {selectedFiles.length > 1 ? (
+            <span className="grid gap-1 text-qidra-dark">
+              {selectedFiles.slice(0, 5).map((fileName, index) => (
+                <span key={`${fileName}-${index}`} className="truncate text-12 font-medium text-qidra-grayBlue">
+                  {fileName}
+                </span>
+              ))}
+              {selectedFiles.length > 5 ? <span className="text-12 text-qidra-grayBlue">+{selectedFiles.length - 5}</span> : null}
+            </span>
+          ) : null}
         </span>
       ) : null}
-      <input accept=".pdf,.jpg,.jpeg,.png" type="file" className="sr-only" onChange={handleChange} {...props} />
+      <input accept={accept} type="file" className="sr-only" onChange={handleChange} {...props} />
     </label>
   );
 }

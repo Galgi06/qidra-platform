@@ -4,6 +4,7 @@ import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { InvestorTabs } from "@/components/InvestorTabs";
 import { NotificationCard } from "@/components/NotificationCard";
+import { ProjectSectorFields } from "@/components/ProjectSectorFields";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
@@ -73,19 +74,7 @@ export default async function NewProjectSubmissionPage({ searchParams }: { searc
                 </div>
                 <div className="grid gap-4 md:grid-cols-2">
                   <Input label={isRu ? "Название проекта" : "Project title"} name="title" placeholder={isRu ? "Например: Производство халяльной продукции" : "Example: Halal product manufacturing"} required />
-                  <Select
-                    label={isRu ? "Отрасль" : "Sector"}
-                    name="sector"
-                    options={[
-                      { value: "", label: isRu ? "Выберите" : "Select" },
-                      { value: "real-estate", label: isRu ? "Недвижимость" : "Real estate" },
-                      { value: "trade", label: isRu ? "Торговля" : "Trade" },
-                      { value: "production", label: isRu ? "Производство" : "Production" },
-                      { value: "technology", label: isRu ? "Технологии" : "Technology" },
-                      { value: "logistics", label: isRu ? "Логистика" : "Logistics" },
-                      { value: "other", label: isRu ? "Другое" : "Other" }
-                    ]}
-                  />
+                  <ProjectSectorFields locale={locale} />
                   <Input label={isRu ? "Страна / город реализации" : "Country / city"} name="location" placeholder={isRu ? "ОАЭ, Дубай" : "UAE, Dubai"} />
                   <Input label={isRu ? "Целевой объём, USDT" : "Target amount, USDT"} name="targetUsdt" inputMode="decimal" placeholder="100000" />
                   <Select
@@ -121,11 +110,11 @@ export default async function NewProjectSubmissionPage({ searchParams }: { searc
                 <FileUpload
                   hint={
                     isRu
-                      ? "Презентация, регистрационные документы, финмодель, договоры: PDF/DOCX/XLSX/PPTX/JPG/PNG"
-                      : "Presentation, registration documents, financial model, contracts: PDF/DOCX/XLSX/PPTX/JPG/PNG"
+                      ? "Можно выбрать несколько файлов: презентация, регистрационные документы, финмодель, договоры, фото. PDF/DOCX/XLSX/PPTX/JPG/PNG"
+                      : "You can select multiple files: presentation, registration documents, financial model, contracts, photos. PDF/DOCX/XLSX/PPTX/JPG/PNG"
                   }
                   label={isRu ? "Документы проекта" : "Project documents"}
-                  manyFilesLabel={isRu ? "файла" : "files"}
+                  manyFilesLabel={isRu ? "файлов" : "files"}
                   name="documents"
                   selectedLabel={isRu ? "Выбрано" : "Selected"}
                   multiple

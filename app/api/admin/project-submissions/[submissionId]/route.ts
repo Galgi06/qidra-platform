@@ -39,7 +39,7 @@ const submissionActionSchema = z.discriminatedUnion("action", [
       .min(3)
       .max(120)
       .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
-    status: z.enum(["DRAFT", "REVIEW"]).default("DRAFT"),
+    status: z.enum(["DRAFT", "REVIEW", "ACTIVE", "PAUSED"]).default("ACTIVE"),
     structure: z.enum(["Mudaraba", "Musharaka"]).default("Mudaraba"),
     summaryEn: z.string().trim().min(5).max(260),
     summaryRu: z.string().trim().min(5).max(260),
@@ -235,7 +235,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
 
   const data = parsed.data;
-  const projectStatus = data.status === "REVIEW" ? ProjectStatus.REVIEW : ProjectStatus.DRAFT;
+  const projectStatus = data.status as ProjectStatus;
   const project = await prisma.$transaction(async (tx) => {
     const created = await tx.project.create({
       data: {
@@ -300,11 +300,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   });
 
   return NextResponse.json({
-    title: localeRu ? "Черновик проекта создан" : "Project draft created",
+    title: localeRu ? "Проект создан для каталога" : "Catalog project created",
     message:
       localeRu
-        ? "Заявка одобрена, проект создан в админке. Проверьте публичные документы перед публикацией."
-        : "The submission was approved and a project was created in admin. Review public documents before publishing.",
+        ? "Заявка одобрена, проект создан в админке. Статус проекта можно менять в управлении проектами."
+        : "The submission was approved and a project was created in admin. Project status can be changed in project management.",
     projectId: project.id,
     tone: "success"
   });

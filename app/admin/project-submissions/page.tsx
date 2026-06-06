@@ -66,8 +66,8 @@ export default async function AdminProjectSubmissionsPage({ searchParams }: { se
                 title={isRu ? "Следующий этап" : "Next step"}
                 text={
                   isRu
-                    ? "После просмотра документов админ сможет перевести заявку в проверку, отклонить или подготовить проект к публикации."
-                    : "After reviewing documents, an admin can move the submission into review, reject it or prepare it for publication."
+                    ? "После просмотра документов админ переводит заявку в проверку, отклоняет или разрешает листинг проекта в каталоге."
+                    : "After reviewing documents, an admin moves the submission into review, rejects it or approves project listing in the catalog."
                 }
                 tone="info"
               />
@@ -111,11 +111,11 @@ export default async function AdminProjectSubmissionsPage({ searchParams }: { se
                       </div>
                       {submission.project ? (
                         <NotificationCard
-                          title={isRu ? "Связанный проект создан" : "Linked project created"}
+                          title={isRu ? "Проект создан для каталога" : "Catalog project created"}
                           text={
                             isRu
-                              ? `Заявка связана с черновиком: ${submission.project.titleRu}. Проверьте проект и документы перед публикацией.`
-                              : `The submission is linked to draft: ${submission.project.titleRu}. Review the project and documents before publishing.`
+                              ? `Заявка связана с проектом: ${submission.project.titleRu}. Дальше управляйте статусом проекта: сбор открыт, пауза, сбор завершён или закрыт.`
+                              : `The submission is linked to project: ${submission.project.titleRu}. Continue managing status: open raise, paused, funded or closed.`
                           }
                           tone="success"
                         />
@@ -334,19 +334,19 @@ function SubmissionActions({
       </div>
 
       {canPrepare ? (
-        <details className="rounded-[14px] bg-white p-4 shadow-[0_0_0_1px_rgba(18,20,23,0.08)]">
+        <details className="rounded-[14px] bg-white p-4 shadow-[0_0_0_1px_rgba(18,20,23,0.08)]" open={submission.status === "REVIEW"}>
           <summary className="cursor-pointer list-none text-18 font-medium text-qidra-dark">
-            {isRu ? "Создать черновик проекта для каталога" : "Create catalog project draft"}
+            {isRu ? "Финальное решение: разрешить листинг" : "Final decision: approve listing"}
           </summary>
           <FeedbackForm
             className="mt-5 grid gap-4"
             endpoint={endpoint}
             feedback={{
-              title: isRu ? "Черновик проекта создан" : "Project draft created",
+              title: isRu ? "Проект создан для каталога" : "Catalog project created",
               text:
                 isRu
-                  ? "Заявка одобрена, проект создан в админке. Проверьте публичные документы перед публикацией."
-                  : "The submission was approved and a project was created in admin. Review public documents before publishing.",
+                  ? "Заявка одобрена, проект создан в админке. Статус проекта можно менять в управлении проектами."
+                  : "The submission was approved and a project was created in admin. Project status can be changed in project management.",
               buttonLabel: isRu ? "Понятно" : "Got it",
               dismissLabel: isRu ? "Закрыть уведомление" : "Close notification",
               tone: "success"
@@ -369,12 +369,14 @@ function SubmissionActions({
                 ]}
               />
               <Select
-                label={isRu ? "Статус черновика" : "Draft status"}
+                label={isRu ? "Статус после листинга" : "Status after listing"}
                 name="status"
-                defaultValue="DRAFT"
+                defaultValue="ACTIVE"
                 options={[
-                  { value: "DRAFT", label: isRu ? "Черновик" : "Draft" },
-                  { value: "REVIEW", label: isRu ? "На проверке" : "In review" }
+                  { value: "ACTIVE", label: isRu ? "Сбор открыт / опубликован" : "Published / raise open" },
+                  { value: "REVIEW", label: isRu ? "Проверен, готовится к публикации" : "Reviewed, preparing to publish" },
+                  { value: "PAUSED", label: isRu ? "Пауза" : "Paused" },
+                  { value: "DRAFT", label: isRu ? "Черновик / не опубликован" : "Draft / not published" }
                 ]}
               />
               <Input label={isRu ? "Локация" : "Location"} name="location" defaultValue={submission.location ?? "UAE"} required />
@@ -396,11 +398,11 @@ function SubmissionActions({
             <Input label={isRu ? "Подтверждение" : "Confirmation"} name="confirmation" placeholder="CONFIRM" required />
             <p className="text-13 text-qidra-grayBlue">
               {isRu
-                ? "Загруженные участником документы остаются в заявке. Публичные документы для инвесторов добавьте отдельно в управлении проектами."
-                : "Participant uploaded documents remain in the submission. Add public investor documents separately in project management."}
+                ? "Если проект готов к каталогу, выберите «Сбор открыт». После создания в управлении проектами доступны статусы: сбор открыт, пауза, сбор завершён и закрыт. Загруженные участником документы остаются в заявке; публичные документы добавьте отдельно."
+                : "If the project is ready for the catalog, choose Published. After creation, project management can set open raise, paused, funded and closed statuses. Participant documents remain in the submission; add public documents separately."}
             </p>
             <Button className="w-full sm:w-fit" type="submit">
-              {isRu ? "Создать черновик" : "Create draft"}
+              {isRu ? "Разрешить листинг и создать проект" : "Approve listing and create project"}
             </Button>
           </FeedbackForm>
         </details>

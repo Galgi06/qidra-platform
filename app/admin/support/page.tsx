@@ -7,7 +7,7 @@ import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { NotificationCard } from "@/components/NotificationCard";
 import { AccessRecoveryForm } from "@/components/admin/AccessRecoveryForm";
-import { Button } from "@/components/ui/Button";
+import { Button, ButtonLink } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
 import { requireSupportDesk } from "@/lib/access";
 import { getLocale, t, type SearchParams, withLocale } from "@/lib/i18n";
@@ -142,6 +142,35 @@ export default async function AdminSupportPage({ searchParams }: { searchParams:
                 />
               )}
             </section>
+            <section className="rounded-[20px] bg-white p-6 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] sm:p-8">
+              <div className="flex flex-wrap items-end justify-between gap-4">
+                <div>
+                  <h2 className="text-[28px] font-medium leading-tight tracking-[0] text-qidra-dark">{isRu ? "Команда коммуникаций" : "Communications team"}</h2>
+                  <p className="mt-2 max-w-3xl text-16 text-qidra-grayBlue">
+                    {isRu
+                      ? "Менеджеры техподдержки работают с техническими обращениями, отдел продаж — с вопросами по проектам и участию. Роли выдаются в разделе пользователей."
+                      : "Support managers handle technical requests; sales managers handle project and participation requests. Roles are assigned in the users section."}
+                  </p>
+                </div>
+                <ButtonLink href={withLocale("/admin/users", locale)} variant="outline" size="sm">
+                  {isRu ? "Управлять сотрудниками" : "Manage staff"}
+                </ButtonLink>
+              </div>
+              <div className="mt-6 grid gap-4 md:grid-cols-2">
+                <ManagerGroup
+                  emptyText={isRu ? "Менеджеры техподдержки пока не назначены." : "No support managers assigned yet."}
+                  locale={locale}
+                  managers={managers.filter((manager) => manager.role === Role.TECH_SUPPORT)}
+                  title={isRu ? "Техподдержка" : "Technical support"}
+                />
+                <ManagerGroup
+                  emptyText={isRu ? "Менеджеры отдела продаж пока не назначены." : "No sales managers assigned yet."}
+                  locale={locale}
+                  managers={managers.filter((manager) => manager.role === Role.SALES_MANAGER)}
+                  title={isRu ? "Отдел продаж" : "Sales department"}
+                />
+              </div>
+            </section>
             <div className="flex flex-wrap gap-2 rounded-qidra border border-qidra-grayLight bg-white p-4">
               <FilterPill active={!statusFilter} href={supportFilterHref(locale)}>
                 {isRu ? "Все" : "All"} ({stats.totalCount})
@@ -212,30 +241,20 @@ export default async function AdminSupportPage({ searchParams }: { searchParams:
                       </details>
 
                       <FeedbackForm
-                        className="grid gap-4 border-t border-qidra-grayLight pt-5 lg:grid-cols-[1fr_240px_240px_auto] lg:items-end"
+                        className="grid gap-4 rounded-qidra border border-qidra-grayLight bg-white p-4 lg:grid-cols-[1fr_1fr_auto] lg:items-end"
                         endpoint={`/api/admin/support/${thread.id}/messages?lang=${locale}`}
                         feedback={{
-                          title: isRu ? "Ответ отправлен" : "Reply sent",
-                          text: isRu ? "Диалог обновлён и сохранён в журнале действий." : "The thread was updated and recorded in the audit log.",
+                          title: isRu ? "Диалог обновлён" : "Thread updated",
+                          text: isRu ? "Ответственный и статус сохранены в журнале действий." : "Owner and status were saved in the audit log.",
                           buttonLabel: isRu ? "Понятно" : "Got it",
                           dismissLabel: isRu ? "Закрыть уведомление" : "Close notification",
                           tone: "success"
                         }}
                         refreshOnSuccess
-                        resetOnSubmit
                       >
-                        <label className="grid gap-2 text-14 font-medium text-qidra-dark">
-                          {isRu ? "Ответ участнику" : "Reply to participant"}
-                          <textarea
-                            className="min-h-28 rounded-qidra border border-transparent bg-qidra-grayLight px-4 py-3 text-16 outline-none transition-colors placeholder:text-qidra-grayMedium focus:border-qidra-accent"
-                            maxLength={3000}
-                            name="body"
-                            placeholder={isRu ? "Напишите ответ" : "Write a reply"}
-                            required
-                          />
-                        </label>
+                        <input name="action" type="hidden" value="update" />
                         <Select
-                          label={isRu ? "Ответственный" : "Owner"}
+                          label={isRu ? "Ответственный менеджер" : "Responsible manager"}
                           name="assignedToId"
                           defaultValue={thread.assignedToId ?? ""}
                           options={[
@@ -247,15 +266,42 @@ export default async function AdminSupportPage({ searchParams }: { searchParams:
                           ]}
                         />
                         <Select
-                          label={isRu ? "Статус" : "Status"}
+                          label={isRu ? "Статус диалога" : "Thread status"}
                           name="status"
                           defaultValue={thread.status}
                           options={[
-                            { value: SupportThreadStatus.OPEN, label: isRu ? "Открыт" : "Open" },
+                            { value: SupportThreadStatus.OPEN, label: isRu ? "В работе" : "In progress" },
                             { value: SupportThreadStatus.PENDING, label: isRu ? "Ожидает участника" : "Waiting participant" },
-                            { value: SupportThreadStatus.CLOSED, label: isRu ? "Закрыт" : "Closed" }
+                            { value: SupportThreadStatus.CLOSED, label: isRu ? "Вопрос решён" : "Resolved" }
                           ]}
                         />
+                        <Button type="submit">{isRu ? "Сохранить" : "Save"}</Button>
+                      </FeedbackForm>
+
+                      <FeedbackForm
+                        className="grid gap-4 border-t border-qidra-grayLight pt-5 lg:grid-cols-[1fr_auto] lg:items-end"
+                        endpoint={`/api/admin/support/${thread.id}/messages?lang=${locale}`}
+                        feedback={{
+                          title: isRu ? "Ответ отправлен" : "Reply sent",
+                          text: isRu ? "Диалог обновлён и сохранён в журнале действий." : "The thread was updated and recorded in the audit log.",
+                          buttonLabel: isRu ? "Понятно" : "Got it",
+                          dismissLabel: isRu ? "Закрыть уведомление" : "Close notification",
+                          tone: "success"
+                        }}
+                        refreshOnSuccess
+                        resetOnSubmit
+                      >
+                        <input name="action" type="hidden" value="reply" />
+                        <label className="grid gap-2 text-14 font-medium text-qidra-dark">
+                          {isRu ? "Ответ участнику" : "Reply to participant"}
+                          <textarea
+                            className="min-h-28 rounded-qidra border border-transparent bg-qidra-grayLight px-4 py-3 text-16 outline-none transition-colors placeholder:text-qidra-grayMedium focus:border-qidra-accent"
+                            maxLength={3000}
+                            name="body"
+                            placeholder={isRu ? "Напишите ответ" : "Write a reply"}
+                            required
+                          />
+                        </label>
                         <Button type="submit">{isRu ? "Ответить" : "Reply"}</Button>
                       </FeedbackForm>
                     </article>
@@ -293,6 +339,38 @@ function ManagerMetric({ label, value }: { label: string; value: string }) {
       <p className="text-12 text-qidra-grayBlue">{label}</p>
       <p className="mt-1 font-medium text-qidra-dark">{value}</p>
     </div>
+  );
+}
+
+function ManagerGroup({
+  emptyText,
+  locale,
+  managers,
+  title
+}: {
+  emptyText: string;
+  locale: "ru" | "en";
+  managers: { email: string; id: string; name: string | null; role: Role }[];
+  title: string;
+}) {
+  return (
+    <article className="rounded-[16px] bg-qidra-grayLight p-5">
+      <h3 className="text-18 font-medium text-qidra-dark">{title}</h3>
+      {managers.length ? (
+        <div className="mt-4 grid gap-3">
+          {managers.map((manager) => (
+            <div key={manager.id} className="rounded-[12px] bg-white p-4">
+              <p className="font-medium text-qidra-dark">{manager.name || manager.email}</p>
+              <p className="mt-1 text-13 text-qidra-grayBlue">
+                {manager.email} · {roleLabel(manager.role, locale)}
+              </p>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="mt-4 text-14 text-qidra-grayBlue">{emptyText}</p>
+      )}
+    </article>
   );
 }
 
