@@ -20,9 +20,13 @@ export default async function AdminPaymentsPage({ searchParams }: { searchParams
   await requireAdmin(locale, "/admin/payments");
   const statusFilter = parsePaymentStatus(searchParamString(params.status));
   const typeFilter = parseTransactionType(searchParamString(params.type));
+  const query = searchParamString(params.q)?.trim() ?? "";
+  const userIdFilter = searchParamString(params.userId)?.trim() ?? "";
   const paymentWhere: Prisma.WalletTransactionWhereInput = {
     ...(statusFilter ? { status: statusFilter } : {}),
-    ...(typeFilter ? { type: typeFilter } : {})
+    ...(typeFilter ? { type: typeFilter } : {}),
+    ...(userIdFilter ? { wallet: { is: { userId: userIdFilter } } } : {}),
+    ...(query ? { OR: paymentSearchConditions(query) } : {})
   };
   const [payments, totalCount, pendingCount, confirmedCount, rejectedCount, depositCount, withdrawalCount] = await Promise.all([
     prisma.walletTransaction.findMany({
@@ -72,7 +76,18 @@ export default async function AdminPaymentsPage({ searchParams }: { searchParams
           <div className="container-qidra grid gap-8">
             <AdminTabs activePath="/admin/payments" locale={locale} />
             <PaymentDashboard locale={locale} stats={stats} />
-            <PaymentFilters locale={locale} stats={stats} statusFilter={statusFilter} typeFilter={typeFilter} />
+            <PaymentSearchForm locale={locale} query={query} statusFilter={statusFilter} typeFilter={typeFilter} userIdFilter={userIdFilter} />
+            <PaymentFilters locale={locale} query={query} stats={stats} statusFilter={statusFilter} typeFilter={typeFilter} userIdFilter={userIdFilter} />
+            {userIdFilter ? (
+              <NotificationCard
+                title={locale === "ru" ? "Фильтр по клиенту активен" : "Client filter is active"}
+                text={
+                  locale === "ru"
+                    ? "Показаны операции только выбранного клиента. Чтобы увидеть все платежи, сбросьте фильтр."
+                    : "Only operations for the selected client are shown. Reset the filter to see all payments."
+                }
+              />
+            ) : null}
             <div className="grid gap-8 lg:grid-cols-[1fr_0.46fr]">
               <div className="grid gap-4">
                 {payments.length ? (
@@ -84,6 +99,19 @@ export default async function AdminPaymentsPage({ searchParams }: { searchParams
                         amount={formatOperationAmount(payment.type, payment.amountUsdt)}
                         tone={paymentTone(payment.status)}
                       />
+                      <div className="grid gap-3 rounded-qidra border border-qidra-grayLight bg-qidra-grayLight p-4 md:grid-cols-[1fr_auto] md:items-center">
+                        <div>
+                          <p className="text-14 text-qidra-grayBlue">{locale === "ru" ? "Клиент" : "Client"}</p>
+                          <p className="mt-1 text-16 font-medium text-qidra-dark">{payment.wallet.user.name || (locale === "ru" ? "Без имени" : "No name")}</p>
+                          <p className="mt-1 break-all text-13 text-qidra-grayBlue">{payment.wallet.user.email}</p>
+                        </div>
+                        <Link
+                          className="inline-flex h-10 items-center justify-center rounded-qidra border border-qidra-dark px-4 text-14 font-medium text-qidra-dark transition-colors hover:bg-qidra-dark hover:text-white"
+                          href={withLocale(`/admin/users/${payment.wallet.user.id}?view=wallet`, locale)}
+                        >
+                          {locale === "ru" ? "Открыть досье" : "Open dossier"}
+                        </Link>
+                      </div>
                       {payment.type === "DEPOSIT" ? (
                         <div className="rounded-qidra border border-qidra-grayLight bg-qidra-grayLight p-4">
                           <p className="text-14 text-qidra-grayBlue">{locale === "ru" ? "Личный адрес участника" : "Participant personal address"}</p>
@@ -216,32 +244,79 @@ function PaymentStatCard({ label, tone = "neutral", value }: { label: string; to
   );
 }
 
-function PaymentFilters({
+function PaymentSearchForm({
   locale,
-  stats,
+  query,
   statusFilter,
-  typeFilter
+  typeFilter,
+  userIdFilter
 }: {
   locale: "ru" | "en";
+  query: string;
+  statusFilter?: PaymentStatus;
+  typeFilter?: TransactionType;
+  userIdFilter: string;
+}) {
+  return (
+    <form action="/admin/payments" className="grid gap-3 rounded-qidra border border-qidra-grayLight bg-white p-4 md:grid-cols-[1fr_auto] md:items-end">
+      <input name="lang" type="hidden" value={locale} />
+      {statusFilter ? <input name="status" type="hidden" value={statusFilter.toLowerCase()} /> : null}
+      {typeFilter ? <input name="type" type="hidden" value={typeFilter.toLowerCase()} /> : null}
+      {userIdFilter ? <input name="userId" type="hidden" value={userIdFilter} /> : null}
+      <label className="grid gap-2 text-14 font-medium text-qidra-dark">
+        {locale === "ru" ? "Поиск операции или клиента" : "Search operation or client"}
+        <input
+          className="h-12 rounded-qidra border border-transparent bg-qidra-grayLight px-4 text-16 outline-none transition-colors placeholder:text-qidra-grayMedium focus:border-qidra-accent"
+          defaultValue={query}
+          name="q"
+          placeholder={locale === "ru" ? "Email, имя, transaction hash, TRC20 адрес или комментарий" : "Email, name, transaction hash, TRC20 address or note"}
+        />
+      </label>
+      <div className="flex flex-wrap gap-2">
+        <Button type="submit">{locale === "ru" ? "Найти" : "Search"}</Button>
+        {query || userIdFilter ? (
+          <Link
+            className="inline-flex h-12 items-center justify-center rounded-qidra border border-qidra-grayMedium px-5 text-16 font-medium text-qidra-dark transition-colors hover:border-qidra-dark"
+            href={paymentFilterHref(locale, statusFilter, typeFilter)}
+          >
+            {locale === "ru" ? "Сбросить поиск" : "Reset search"}
+          </Link>
+        ) : null}
+      </div>
+    </form>
+  );
+}
+
+function PaymentFilters({
+  locale,
+  query,
+  stats,
+  statusFilter,
+  typeFilter,
+  userIdFilter
+}: {
+  locale: "ru" | "en";
+  query: string;
   stats: PaymentStats;
   statusFilter?: PaymentStatus;
   typeFilter?: TransactionType;
+  userIdFilter: string;
 }) {
   return (
     <div className="grid gap-4 rounded-qidra border border-qidra-grayLight bg-white p-4">
       <div className="grid gap-2">
         <p className="text-14 font-medium text-qidra-grayBlue">{locale === "ru" ? "Статус" : "Status"}</p>
         <div className="flex flex-wrap gap-2">
-          <PaymentFilterPill active={!statusFilter} href={paymentFilterHref(locale, undefined, typeFilter)}>
+          <PaymentFilterPill active={!statusFilter} href={paymentFilterHref(locale, undefined, typeFilter, query, userIdFilter)}>
             {locale === "ru" ? "Все" : "All"} ({formatCount(stats.totalCount)})
           </PaymentFilterPill>
-          <PaymentFilterPill active={statusFilter === PaymentStatus.PENDING} href={paymentFilterHref(locale, PaymentStatus.PENDING, typeFilter)}>
+          <PaymentFilterPill active={statusFilter === PaymentStatus.PENDING} href={paymentFilterHref(locale, PaymentStatus.PENDING, typeFilter, query, userIdFilter)}>
             {locale === "ru" ? "На проверке" : "Pending"} ({formatCount(stats.pendingCount)})
           </PaymentFilterPill>
-          <PaymentFilterPill active={statusFilter === PaymentStatus.CONFIRMED} href={paymentFilterHref(locale, PaymentStatus.CONFIRMED, typeFilter)}>
+          <PaymentFilterPill active={statusFilter === PaymentStatus.CONFIRMED} href={paymentFilterHref(locale, PaymentStatus.CONFIRMED, typeFilter, query, userIdFilter)}>
             {locale === "ru" ? "Подтверждено" : "Confirmed"} ({formatCount(stats.confirmedCount)})
           </PaymentFilterPill>
-          <PaymentFilterPill active={statusFilter === PaymentStatus.REJECTED} href={paymentFilterHref(locale, PaymentStatus.REJECTED, typeFilter)}>
+          <PaymentFilterPill active={statusFilter === PaymentStatus.REJECTED} href={paymentFilterHref(locale, PaymentStatus.REJECTED, typeFilter, query, userIdFilter)}>
             {locale === "ru" ? "Отклонено" : "Rejected"} ({formatCount(stats.rejectedCount)})
           </PaymentFilterPill>
         </div>
@@ -249,13 +324,13 @@ function PaymentFilters({
       <div className="grid gap-2">
         <p className="text-14 font-medium text-qidra-grayBlue">{locale === "ru" ? "Тип операции" : "Operation type"}</p>
         <div className="flex flex-wrap gap-2">
-          <PaymentFilterPill active={!typeFilter} href={paymentFilterHref(locale, statusFilter)}>
+          <PaymentFilterPill active={!typeFilter} href={paymentFilterHref(locale, statusFilter, undefined, query, userIdFilter)}>
             {locale === "ru" ? "Все операции" : "All operations"} ({formatCount(stats.totalCount)})
           </PaymentFilterPill>
-          <PaymentFilterPill active={typeFilter === TransactionType.DEPOSIT} href={paymentFilterHref(locale, statusFilter, TransactionType.DEPOSIT)}>
+          <PaymentFilterPill active={typeFilter === TransactionType.DEPOSIT} href={paymentFilterHref(locale, statusFilter, TransactionType.DEPOSIT, query, userIdFilter)}>
             {locale === "ru" ? "Пополнения" : "Deposits"} ({formatCount(stats.depositCount)})
           </PaymentFilterPill>
-          <PaymentFilterPill active={typeFilter === TransactionType.WITHDRAWAL} href={paymentFilterHref(locale, statusFilter, TransactionType.WITHDRAWAL)}>
+          <PaymentFilterPill active={typeFilter === TransactionType.WITHDRAWAL} href={paymentFilterHref(locale, statusFilter, TransactionType.WITHDRAWAL, query, userIdFilter)}>
             {locale === "ru" ? "Выводы" : "Withdrawals"} ({formatCount(stats.withdrawalCount)})
           </PaymentFilterPill>
         </div>
@@ -436,11 +511,35 @@ function parseTransactionType(value: string | undefined) {
   return undefined;
 }
 
-function paymentFilterHref(locale: "ru" | "en", status?: PaymentStatus, type?: TransactionType) {
+function paymentSearchConditions(query: string): Prisma.WalletTransactionWhereInput[] {
+  const contains = { contains: query, mode: Prisma.QueryMode.insensitive };
+
+  return [
+    { id: contains },
+    { txHash: contains },
+    { destinationAddress: contains },
+    { note: contains },
+    {
+      wallet: {
+        is: {
+          OR: [
+            { trc20Address: contains },
+            { user: { is: { email: contains } } },
+            { user: { is: { name: contains } } }
+          ]
+        }
+      }
+    }
+  ];
+}
+
+function paymentFilterHref(locale: "ru" | "en", status?: PaymentStatus, type?: TransactionType, query?: string, userId?: string) {
   const params = new URLSearchParams({ lang: locale });
 
   if (status) params.set("status", status.toLowerCase());
   if (type) params.set("type", type.toLowerCase());
+  if (query) params.set("q", query);
+  if (userId) params.set("userId", userId);
 
   return `/admin/payments?${params.toString()}`;
 }

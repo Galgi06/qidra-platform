@@ -776,7 +776,7 @@ function WalletDossierPanel({
       {transactions.length ? (
         <div className="grid gap-3">
           {transactions.map((transaction) => (
-            <WalletDossierOperation key={transaction.id} locale={locale} transaction={transaction} />
+            <WalletDossierOperation key={transaction.id} locale={locale} transaction={transaction} userId={userId} />
           ))}
         </div>
       ) : (
@@ -854,9 +854,9 @@ function WalletTransactionFilters({
   );
 }
 
-function WalletDossierOperation({ locale, transaction }: { locale: Locale; transaction: ClientWalletTransaction }) {
+function WalletDossierOperation({ locale, transaction, userId }: { locale: Locale; transaction: ClientWalletTransaction; userId: string }) {
   const isRu = locale === "ru";
-  const adminPaymentsHref = withLocale(`/admin/payments?type=${transaction.type}&status=${transaction.status}`, locale);
+  const adminPaymentsHref = withLocale(`/admin/payments?type=${transaction.type}&status=${transaction.status}&userId=${userId}`, locale);
 
   return (
     <article className="grid gap-4 rounded-qidra border border-qidra-grayLight bg-qidra-grayLight p-4">
