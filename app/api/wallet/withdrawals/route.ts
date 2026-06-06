@@ -1,4 +1,4 @@
-import { PaymentStatus, Prisma, TransactionType } from "@prisma/client";
+import { KycStatus, PaymentStatus, Prisma, TransactionType } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
@@ -63,13 +63,32 @@ export async function POST(request: NextRequest) {
 
   const amountUsdt = new Prisma.Decimal(parsed.data.amount);
   const destinationAddress = parsed.data.destinationAddress;
-  const wallet = await prisma.wallet.findUnique({
-    where: { userId },
-    select: {
-      id: true,
-      availableUsdt: true
-    }
-  });
+  const [wallet, approvedKyc] = await Promise.all([
+    prisma.wallet.findUnique({
+      where: { userId },
+      select: {
+        id: true,
+        availableUsdt: true
+      }
+    }),
+    prisma.kycApplication.findFirst({
+      where: { userId, status: KycStatus.APPROVED },
+      select: { id: true }
+    })
+  ]);
+
+  if (!approvedKyc) {
+    return NextResponse.json(
+      {
+        title: localeRu ? "Профиль не одобрен" : "Profile is not approved",
+        message:
+          localeRu
+            ? "Вывод средств доступен только после одобрения профиля и документов."
+            : "Withdrawals are available only after the profile and documents are approved."
+      },
+      { status: 403 }
+    );
+  }
 
   if (!wallet) {
     return NextResponse.json(

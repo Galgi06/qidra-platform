@@ -79,6 +79,19 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  if (project.status !== ProjectStatus.ACTIVE) {
+    return NextResponse.json(
+      {
+        title: localeRu ? "Проект недоступен" : "Project is not available",
+        message:
+          localeRu
+            ? "Заявки на участие принимаются только по опубликованным проектам с открытым сбором."
+            : "Participation applications are accepted only for published projects with an open raise."
+      },
+      { status: 409 }
+    );
+  }
+
   const reviewApplication = await prisma.kycApplication.findFirst({
     where: {
       userId,
@@ -117,6 +130,21 @@ export async function POST(request: NextRequest) {
   const availableUsdt = wallet?.availableUsdt ?? zeroUsdt;
   const activeReservedUsdt = activeApplication?.reservedUsdt ?? zeroUsdt;
   const requestedUsdt = new Prisma.Decimal(parsed.data.amount);
+  const remainingTargetUsdt = project.targetUsdt.minus(project.fundedUsdt);
+
+  if (remainingTargetUsdt.lte(0) || requestedUsdt.gt(remainingTargetUsdt)) {
+    return NextResponse.json(
+      {
+        title: localeRu ? "Сумма превышает доступный объём" : "Amount exceeds available capacity",
+        message:
+          localeRu
+            ? `По проекту доступно для участия ${formatUsdt(remainingTargetUsdt.gt(0) ? remainingTargetUsdt : zeroUsdt)}. Укажите сумму в пределах оставшегося объёма.`
+            : `${formatUsdt(remainingTargetUsdt.gt(0) ? remainingTargetUsdt : zeroUsdt)} is available for this project. Enter an amount within the remaining capacity.`
+      },
+      { status: 409 }
+    );
+  }
+
   const rawFreeUsdt = availableUsdt.plus(activeReservedUsdt);
   const freeUsdt = rawFreeUsdt.gt(0) ? rawFreeUsdt : zeroUsdt;
   if (!wallet || freeUsdt.lt(requestedUsdt)) {
@@ -194,15 +222,32 @@ export async function POST(request: NextRequest) {
         }
       });
 
-      const nextFundedUsdt = project.fundedUsdt.plus(requestedUsdt);
-
-      await tx.project.update({
-        where: { id: project.id },
+      const projectCapacityUpdate = await tx.project.updateMany({
+        where: {
+          id: project.id,
+          status: ProjectStatus.ACTIVE,
+          fundedUsdt: { lte: project.targetUsdt.minus(requestedUsdt) }
+        },
         data: {
-          fundedUsdt: { increment: requestedUsdt },
-          ...(nextFundedUsdt.gte(project.targetUsdt) ? { status: ProjectStatus.FUNDED } : {})
+          fundedUsdt: { increment: requestedUsdt }
         }
       });
+
+      if (projectCapacityUpdate.count !== 1) {
+        throw new Error("project_capacity_exceeded");
+      }
+
+      const updatedProject = await tx.project.findUnique({
+        where: { id: project.id },
+        select: { fundedUsdt: true, targetUsdt: true }
+      });
+
+      if (updatedProject && updatedProject.fundedUsdt.gte(updatedProject.targetUsdt)) {
+        await tx.project.update({
+          where: { id: project.id },
+          data: { status: ProjectStatus.FUNDED }
+        });
+      }
 
       await tx.adminAuditLog.create({
         data: {
@@ -212,7 +257,7 @@ export async function POST(request: NextRequest) {
           entityId: applicationId,
           payload: {
             amountUsdt: requestedUsdt.toString(),
-            projectFundedUsdt: nextFundedUsdt.toString(),
+            projectFundedUsdt: updatedProject?.fundedUsdt.toString() ?? null,
             projectId: project.id,
             source: "verified_wallet_balance"
           }
@@ -228,6 +273,19 @@ export async function POST(request: NextRequest) {
             localeRu
               ? "Баланс изменился во время отправки заявки. Обновите страницу и проверьте доступную сумму."
               : "The balance changed while submitting the application. Refresh the page and check the available amount."
+        },
+        { status: 409 }
+      );
+    }
+
+    if (error instanceof Error && error.message === "project_capacity_exceeded") {
+      return NextResponse.json(
+        {
+          title: localeRu ? "Свободный объём проекта изменился" : "Project capacity changed",
+          message:
+            localeRu
+              ? "Пока вы отправляли заявку, доступный объём проекта изменился. Обновите страницу и укажите сумму в пределах остатка."
+              : "The project's available capacity changed while submitting. Refresh the page and enter an amount within the remaining capacity."
         },
         { status: 409 }
       );
