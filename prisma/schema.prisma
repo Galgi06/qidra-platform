@@ -65,6 +65,11 @@ enum SupportThreadStatus {
   CLOSED
 }
 
+enum SupportQueue {
+  TECH_SUPPORT
+  SALES
+}
+
 enum DocumentKind {
   PROJECT
   LEGAL
@@ -272,6 +277,7 @@ model SupportThread {
   userId                String
   assignedToId          String?
   status                SupportThreadStatus @default(OPEN)
+  queue                 SupportQueue        @default(TECH_SUPPORT)
   subject               String?
   lastCustomerMessageAt DateTime?
   lastManagerMessageAt  DateTime?
@@ -286,6 +292,7 @@ model SupportThread {
   messages              SupportMessage[]
 
   @@index([assignedToId])
+  @@index([queue])
   @@index([rating])
   @@index([status])
   @@index([userId])

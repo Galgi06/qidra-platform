@@ -1,4 +1,4 @@
-import { SupportThreadStatus } from "@prisma/client";
+import { SupportQueue, SupportThreadStatus } from "@prisma/client";
 import { FeedbackForm } from "@/components/ActionFeedback";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
@@ -6,6 +6,7 @@ import { InvestorTabs } from "@/components/InvestorTabs";
 import { NotificationCard } from "@/components/NotificationCard";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
 import { requireAuth } from "@/lib/access";
 import { getLocale, type SearchParams } from "@/lib/i18n";
 import { prisma } from "@/lib/prisma";
@@ -71,8 +72,8 @@ export default async function InvestorSupportPage({ searchParams }: { searchPara
                 <p className="mt-2 text-16 text-qidra-grayBlue">
                   {thread
                     ? isRu
-                      ? `Статус: ${supportStatusLabel(thread.status, locale)}.`
-                      : `Status: ${supportStatusLabel(thread.status, locale)}.`
+                      ? `Статус: ${supportStatusLabel(thread.status, locale)}. Направление: ${supportQueueLabel(thread.queue, locale)}.`
+                      : `Status: ${supportStatusLabel(thread.status, locale)}. Queue: ${supportQueueLabel(thread.queue, locale)}.`
                     : isRu
                       ? "Диалог будет создан после первого сообщения."
                       : "A thread will be created after the first message."}
@@ -164,6 +165,17 @@ export default async function InvestorSupportPage({ searchParams }: { searchPara
                 popupPlacement="center"
               >
                 {!thread ? <Input label={isRu ? "Тема" : "Subject"} name="subject" placeholder={isRu ? "Например: вопрос по платежу" : "For example: payment question"} /> : null}
+                {!thread ? (
+                  <Select
+                    label={isRu ? "Направление" : "Department"}
+                    name="queue"
+                    defaultValue={SupportQueue.TECH_SUPPORT}
+                    options={[
+                      { value: SupportQueue.TECH_SUPPORT, label: isRu ? "Техподдержка" : "Technical support" },
+                      { value: SupportQueue.SALES, label: isRu ? "Отдел продаж / проекты" : "Sales / projects" }
+                    ]}
+                  />
+                ) : null}
                 <label className="grid gap-2 text-14 font-medium text-qidra-dark">
                   {isRu ? "Сообщение" : "Message"}
                   <textarea
@@ -187,6 +199,16 @@ export default async function InvestorSupportPage({ searchParams }: { searchPara
               <NotificationCard
                 title={isRu ? "Назначенный менеджер" : "Assigned manager"}
                 text={thread?.assignedTo ? thread.assignedTo.name || thread.assignedTo.email : isRu ? "Менеджер будет назначен после обработки обращения." : "A manager will be assigned after the request is reviewed."}
+              />
+              <NotificationCard
+                title={isRu ? "Направление обращения" : "Request department"}
+                text={
+                  thread
+                    ? supportQueueLabel(thread.queue, locale)
+                    : isRu
+                      ? "Выберите направление при первом сообщении: техподдержка или отдел продаж."
+                      : "Choose a department with your first message: technical support or sales."
+                }
               />
             </aside>
           </div>
@@ -215,6 +237,11 @@ function supportStatusLabel(status: string, locale: "ru" | "en") {
   if (status === "CLOSED") return locale === "ru" ? "закрыт" : "closed";
   if (status === "PENDING") return locale === "ru" ? "ожидает ответа участника" : "waiting for participant";
   return locale === "ru" ? "открыт" : "open";
+}
+
+function supportQueueLabel(queue: string, locale: "ru" | "en") {
+  if (queue === SupportQueue.SALES) return locale === "ru" ? "Отдел продаж / проекты" : "Sales / projects";
+  return locale === "ru" ? "Техподдержка" : "Technical support";
 }
 
 function formatDateTime(date: Date, locale: "ru" | "en") {

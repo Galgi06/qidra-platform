@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { KycStatus, Prisma, Role, SupportThreadStatus } from "@prisma/client";
+import { KycStatus, Prisma, Role, SupportQueue, SupportThreadStatus } from "@prisma/client";
 import { AdminTabs } from "@/components/AdminTabs";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { FeedbackForm } from "@/components/ActionFeedback";
@@ -246,6 +246,9 @@ export default async function AdminSupportPage({ searchParams }: { searchParams:
                             {isRu ? "Статус" : "Status"}: {supportStatusLabel(thread.status, locale)} · {isRu ? "Ответственный" : "Owner"}:{" "}
                             {thread.assignedTo ? thread.assignedTo.name || thread.assignedTo.email : isRu ? "не назначен" : "unassigned"}
                           </p>
+                          <p className="mt-2 text-14 font-medium text-qidra-dark">
+                            {isRu ? "Направление" : "Department"}: {supportQueueLabel(thread.queue, locale)}
+                          </p>
                           {thread.rating ? (
                             <p className="mt-2 text-14 font-medium text-qidra-green">
                               {isRu ? "Оценка участника" : "Participant rating"}: {thread.rating}/5
@@ -284,7 +287,7 @@ export default async function AdminSupportPage({ searchParams }: { searchParams:
                       </details>
 
                       <FeedbackForm
-                        className="grid gap-4 rounded-qidra border border-qidra-grayLight bg-white p-4 lg:grid-cols-[1fr_1fr_auto] lg:items-end"
+                        className="grid gap-4 rounded-qidra border border-qidra-grayLight bg-white p-4 lg:grid-cols-[1fr_1fr_1fr_auto] lg:items-end"
                         endpoint={`/api/admin/support/${thread.id}/messages?lang=${locale}`}
                         feedback={{
                           title: isRu ? "Диалог обновлён" : "Thread updated",
@@ -306,6 +309,15 @@ export default async function AdminSupportPage({ searchParams }: { searchParams:
                               value: manager.id,
                               label: `${manager.name || manager.email} · ${roleLabel(manager.role, locale)}`
                             }))
+                          ]}
+                        />
+                        <Select
+                          label={isRu ? "Направление" : "Department"}
+                          name="queue"
+                          defaultValue={thread.queue}
+                          options={[
+                            { value: SupportQueue.TECH_SUPPORT, label: isRu ? "Техподдержка" : "Technical support" },
+                            { value: SupportQueue.SALES, label: isRu ? "Отдел продаж / проекты" : "Sales / projects" }
                           ]}
                         />
                         <Select
@@ -591,15 +603,11 @@ function buildSupportWhere({
   }
 
   if (queueFilter === "tech") {
-    and.push({
-      OR: [{ assignedTo: { is: { role: Role.TECH_SUPPORT } } }, { assignedToId: null }]
-    });
+    and.push({ queue: SupportQueue.TECH_SUPPORT });
   }
 
   if (queueFilter === "sales") {
-    and.push({
-      OR: [{ assignedTo: { is: { role: Role.SALES_MANAGER } } }, { assignedToId: null }]
-    });
+    and.push({ queue: SupportQueue.SALES });
   }
 
   if (queueFilter === "unassigned") {
@@ -612,13 +620,13 @@ function buildSupportWhere({
 
   if (sessionRole === Role.TECH_SUPPORT && sessionUserId) {
     and.push({
-      OR: [{ assignedToId: sessionUserId }, { assignedToId: null }, { assignedTo: { is: { role: Role.TECH_SUPPORT } } }]
+      OR: [{ assignedToId: sessionUserId }, { queue: SupportQueue.TECH_SUPPORT }]
     });
   }
 
   if (sessionRole === Role.SALES_MANAGER && sessionUserId) {
     and.push({
-      OR: [{ assignedToId: sessionUserId }, { assignedToId: null }, { assignedTo: { is: { role: Role.SALES_MANAGER } } }]
+      OR: [{ assignedToId: sessionUserId }, { queue: SupportQueue.SALES }]
     });
   }
 
@@ -662,6 +670,11 @@ function supportStatusLabel(status: string, locale: "ru" | "en") {
   if (status === SupportThreadStatus.CLOSED) return locale === "ru" ? "Закрыт" : "Closed";
   if (status === SupportThreadStatus.PENDING) return locale === "ru" ? "Ожидает участника" : "Waiting participant";
   return locale === "ru" ? "Открыт" : "Open";
+}
+
+function supportQueueLabel(queue: string, locale: "ru" | "en") {
+  if (queue === SupportQueue.SALES) return locale === "ru" ? "Отдел продаж / проекты" : "Sales / projects";
+  return locale === "ru" ? "Техподдержка" : "Technical support";
 }
 
 function formatDateTime(date: Date, locale: "ru" | "en") {

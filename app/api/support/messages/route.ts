@@ -1,4 +1,4 @@
-import { SupportThreadStatus } from "@prisma/client";
+import { SupportQueue, SupportThreadStatus } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 
 const messageSchema = z.object({
   body: z.string().trim().min(2).max(3000),
+  queue: z.nativeEnum(SupportQueue).optional(),
   subject: z.string().trim().max(160).optional()
 });
 
@@ -60,6 +61,7 @@ export async function POST(request: NextRequest) {
       openThread ??
       (await tx.supportThread.create({
         data: {
+          queue: parsed.data.queue ?? SupportQueue.TECH_SUPPORT,
           userId,
           subject: parsed.data.subject || (localeRu ? "Обращение участника" : "Participant request")
         }
@@ -89,6 +91,7 @@ export async function POST(request: NextRequest) {
         entityType: "SupportThread",
         entityId: supportThread.id,
         payload: {
+          queue: supportThread.queue,
           subject: parsed.data.subject || supportThread.subject
         }
       }

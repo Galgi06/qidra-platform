@@ -1,4 +1,4 @@
-import { Role, SupportThreadStatus } from "@prisma/client";
+import { Role, SupportQueue, SupportThreadStatus } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
@@ -20,6 +20,7 @@ const supportActionSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("update"),
     assignedToId: optionalAssigneeSchema,
+    queue: z.nativeEnum(SupportQueue),
     status: z.nativeEnum(SupportThreadStatus)
   })
 ]);
@@ -109,6 +110,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         data: {
           assignedToId,
           closedAt: data.status === SupportThreadStatus.CLOSED ? now : null,
+          queue: data.queue,
           status: data.status
         }
       });
@@ -120,9 +122,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           entityType: "SupportThread",
           entityId: threadId,
           payload: {
-            assignedToId,
-            status: data.status
-          }
+          assignedToId,
+          queue: data.queue,
+          status: data.status
+        }
         }
       });
     });
