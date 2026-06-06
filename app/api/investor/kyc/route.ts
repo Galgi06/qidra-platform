@@ -1,10 +1,10 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { getServerSession } from "next-auth";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { countryCodes, dialCodes } from "@/lib/countries";
+import { saveUploadedFile } from "@/lib/file-storage";
 import { readKycDocuments, type KycDocumentKind, type KycDocuments, type KycFileMeta } from "@/lib/kyc-documents";
 import { authOptions } from "@/lib/next-auth";
 import { prisma } from "@/lib/prisma";
@@ -77,20 +77,21 @@ function parseDate(value: string | undefined) {
 }
 
 async function saveKycFile(file: File, userId: string, kind: KycDocumentKind): Promise<KycFileMeta> {
-  const userUploadDir = path.join(process.cwd(), "storage", "kyc", userId);
-  await mkdir(userUploadDir, { recursive: true });
-
   const safeName = sanitizeFileName(file.name);
   const storedName = `${Date.now()}-${randomUUID()}-${kind}-${safeName}`;
-  const absolutePath = path.join(userUploadDir, storedName);
-
-  await writeFile(absolutePath, Buffer.from(await file.arrayBuffer()));
+  const type = file.type || contentTypeFromName(file.name);
+  const storagePath = await saveUploadedFile({
+    contentType: type,
+    directory: `kyc/${userId}`,
+    file,
+    storedName
+  });
 
   return {
     name: file.name,
     size: file.size,
-    storagePath: path.relative(process.cwd(), absolutePath),
-    type: file.type || contentTypeFromName(file.name)
+    storagePath,
+    type
   };
 }
 

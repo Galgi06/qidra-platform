@@ -1,10 +1,10 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { getServerSession } from "next-auth";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { authOptions } from "@/lib/next-auth";
+import { saveUploadedFile } from "@/lib/file-storage";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
@@ -90,20 +90,22 @@ function resolveSector(sector?: string, sectorOther?: string) {
 }
 
 async function saveProjectFile(file: File, userId: string, submissionFolder: string) {
-  const uploadDir = path.join(process.cwd(), "storage", "project-submissions", userId, submissionFolder);
-  await mkdir(uploadDir, { recursive: true });
-
   const safeName = sanitizeFileName(file.name);
   const storedName = `${Date.now()}-${randomUUID()}-${safeName}`;
-  const absolutePath = path.join(uploadDir, storedName);
+  const type = file.type || "application/octet-stream";
+  const storagePath = await saveUploadedFile({
+    contentType: type,
+    directory: `project-submissions/${userId}/${submissionFolder}`,
+    file,
+    storedName
+  });
 
-  await writeFile(absolutePath, Buffer.from(await file.arrayBuffer()));
 
   return {
     name: file.name,
     size: file.size,
-    storagePath: path.relative(process.cwd(), absolutePath),
-    type: file.type || "application/octet-stream"
+    storagePath,
+    type
   };
 }
 

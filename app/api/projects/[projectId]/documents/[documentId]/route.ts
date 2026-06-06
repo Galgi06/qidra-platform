@@ -1,7 +1,6 @@
-import { readFile } from "node:fs/promises";
-import path from "node:path";
 import { NextResponse, type NextRequest } from "next/server";
 import { ProjectStatus } from "@prisma/client";
+import { readStoredFile } from "@/lib/file-storage";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
@@ -62,25 +61,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json({ message: "Document not found" }, { status: 404 });
   }
 
-  const uploadRoot = path.join(process.cwd(), "storage", "project-submissions");
-  const normalizedStoragePath = document.storagePath.split(/[\\/]+/).join(path.sep);
-  const storagePrefix = `storage${path.sep}project-submissions${path.sep}`;
-
-  if (!normalizedStoragePath.startsWith(storagePrefix)) {
-    return NextResponse.json({ message: "Document not found" }, { status: 404 });
-  }
-
-  const relativeFilePath = normalizedStoragePath.slice(storagePrefix.length);
-  const filePath = path.resolve(uploadRoot, relativeFilePath);
-
-  if (!filePath.startsWith(`${uploadRoot}${path.sep}`)) {
-    return NextResponse.json({ message: "Document not found" }, { status: 404 });
-  }
-
   try {
-    const file = await readFile(filePath);
+    const file = await readStoredFile(document.storagePath, "project-submissions");
 
-    return new NextResponse(file, {
+    return new NextResponse(new Uint8Array(file.body), {
       headers: {
         "Content-Disposition": `inline; filename*=UTF-8''${encodeURIComponent(document.name)}`,
         "Content-Type": document.type

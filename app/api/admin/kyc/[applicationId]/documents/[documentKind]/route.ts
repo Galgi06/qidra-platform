@@ -1,8 +1,7 @@
-import { readFile } from "node:fs/promises";
-import path from "node:path";
 import { getServerSession } from "next-auth";
 import { NextResponse, type NextRequest } from "next/server";
 import { canAccessSupportDesk } from "@/lib/auth";
+import { readStoredFile } from "@/lib/file-storage";
 import { isKycDocumentKind, readKycDocuments } from "@/lib/kyc-documents";
 import { authOptions } from "@/lib/next-auth";
 import { prisma } from "@/lib/prisma";
@@ -61,47 +60,28 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     );
   }
 
-  const uploadRoot = path.join(process.cwd(), "storage", "kyc");
-  const normalizedStoragePath = document.storagePath.split(/[\\/]+/).join(path.sep);
-  const storagePrefix = `storage${path.sep}kyc${path.sep}`;
-
-  if (!normalizedStoragePath.startsWith(storagePrefix)) {
-    return NextResponse.json(
-      {
-        title: localeRu ? "Файл недоступен" : "File unavailable",
-        message: localeRu ? "Путь к документу не прошёл проверку безопасности." : "The document path failed the security check."
-      },
-      { status: 404 }
-    );
-  }
-
-  const relativeFilePath = normalizedStoragePath.slice(storagePrefix.length);
-  const filePath = path.resolve(uploadRoot, relativeFilePath);
-
-  if (!filePath.startsWith(`${uploadRoot}${path.sep}`)) {
-    return NextResponse.json(
-      {
-        title: localeRu ? "Файл недоступен" : "File unavailable",
-        message: localeRu ? "Путь к документу не прошёл проверку безопасности." : "The document path failed the security check."
-      },
-      { status: 404 }
-    );
-  }
-
   try {
-    const file = await readFile(filePath);
+    const file = await readStoredFile(document.storagePath, "kyc");
 
-    return new NextResponse(file, {
+    return new NextResponse(new Uint8Array(file.body), {
       headers: {
         "Content-Disposition": `inline; filename*=UTF-8''${encodeURIComponent(document.name)}`,
         "Content-Type": document.type
       }
     });
-  } catch {
+  } catch (error) {
+    const invalidPath = error instanceof Error && error.message === "invalid_storage_path";
+
     return NextResponse.json(
       {
-        title: localeRu ? "Файл не найден" : "File not found",
-        message: localeRu ? "Файл отсутствует в локальном хранилище. Попросите участника загрузить документ повторно." : "The file is missing from local storage. Ask the participant to upload the document again."
+        title: invalidPath ? (localeRu ? "Файл недоступен" : "File unavailable") : localeRu ? "Файл не найден" : "File not found",
+        message: invalidPath
+          ? localeRu
+            ? "Путь к документу не прошёл проверку безопасности."
+            : "The document path failed the security check."
+          : localeRu
+            ? "Файл отсутствует в хранилище. Попросите участника загрузить документ повторно."
+            : "The file is missing from storage. Ask the participant to upload the document again."
       },
       { status: 404 }
     );

@@ -13,6 +13,17 @@ import { isUserBlocked } from "@/lib/user-access";
 const googleEnabled = isSocialProviderConfigured(process.env.GOOGLE_CLIENT_ID) && isSocialProviderConfigured(process.env.GOOGLE_CLIENT_SECRET);
 const telegramToken = isSocialProviderConfigured(process.env.TELEGRAM_BOT_TOKEN) ? process.env.TELEGRAM_BOT_TOKEN : undefined;
 
+function requireAuthSecret() {
+  const secret = process.env.NEXTAUTH_SECRET?.trim();
+  const placeholder = !secret || secret.toLowerCase().includes("replace-with") || secret.length < 32;
+
+  if (process.env.NODE_ENV === "production" && placeholder) {
+    throw new Error("Set NEXTAUTH_SECRET to a secure random value with at least 32 characters before production launch.");
+  }
+
+  return secret;
+}
+
 function toAdapterUser(user: PrismaUser): AdapterUser {
   return {
     id: user.id,
@@ -215,6 +226,7 @@ async function authorizeTelegram(credentials?: Record<string, unknown>) {
 
 export const authOptions: NextAuthOptions = {
   adapter: createQidraAdapter(),
+  secret: requireAuthSecret(),
   providers: [
     ...(googleEnabled
       ? [
