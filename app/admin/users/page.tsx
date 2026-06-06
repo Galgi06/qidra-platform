@@ -3,13 +3,11 @@ import type { ReactNode } from "react";
 import { KycStatus, Prisma, Role } from "@prisma/client";
 import { AdminTabs } from "@/components/AdminTabs";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
-import { FeedbackForm } from "@/components/ActionFeedback";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { NotificationCard } from "@/components/NotificationCard";
 import { UserAvatar } from "@/components/UserAvatar";
-import { Button } from "@/components/ui/Button";
-import { Select } from "@/components/ui/Select";
+import { RoleManagementForm } from "@/components/admin/RoleManagementForm";
 import { requireAdmin } from "@/lib/access";
 import { canManageManagers } from "@/lib/auth";
 import { getLocale, t, type SearchParams, withLocale } from "@/lib/i18n";
@@ -116,7 +114,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
                         </td>
                         <td className="py-5">
                           {canManageRoles && user.id !== session.user?.id ? (
-                            <RoleForm currentRole={user.role} endpoint={`/api/admin/users/${user.id}/role?lang=${locale}`} locale={locale} />
+                            <RoleManagementForm compact currentRole={user.role} endpoint={`/api/admin/users/${user.id}/role?lang=${locale}`} locale={locale} />
                           ) : (
                             <span className="text-14 text-qidra-grayBlue">
                               {user.id === session.user?.id ? (locale === "ru" ? "Ваш аккаунт" : "Your account") : locale === "ru" ? "Только просмотр" : "View only"}
@@ -257,41 +255,6 @@ function UserFilterPill({ active, children, href }: { active: boolean; children:
     >
       {children}
     </Link>
-  );
-}
-
-function RoleForm({ currentRole, endpoint, locale }: { currentRole: string; endpoint: string; locale: "ru" | "en" }) {
-  return (
-    <FeedbackForm
-      className="flex min-w-[260px] items-end gap-2"
-      endpoint={endpoint}
-      feedback={{
-        title: locale === "ru" ? "Роль обновлена" : "Role updated",
-        text: locale === "ru" ? "Доступ пользователя обновлён и сохранён в журнале." : "The user's access was updated and saved in the audit log.",
-        buttonLabel: locale === "ru" ? "Понятно" : "Got it",
-        dismissLabel: locale === "ru" ? "Закрыть уведомление" : "Close notification",
-        tone: "success"
-      }}
-      refreshOnSuccess
-    >
-      <Select
-        aria-label={locale === "ru" ? "Роль пользователя" : "User role"}
-        className="h-10 text-14"
-        label={locale === "ru" ? "Роль" : "Role"}
-        name="role"
-        defaultValue={currentRole}
-        options={[
-          { value: "INVESTOR", label: locale === "ru" ? "Участник" : "Participant" },
-          { value: "TECH_SUPPORT", label: locale === "ru" ? "Менеджер техподдержки" : "Technical support manager" },
-          { value: "SALES_MANAGER", label: locale === "ru" ? "Менеджер отдела продаж" : "Sales manager" },
-          { value: "ADMIN", label: locale === "ru" ? "Админ" : "Admin" },
-          { value: "SUPER_ADMIN", label: locale === "ru" ? "Главный админ" : "Super admin" }
-        ]}
-      />
-      <Button size="sm" type="submit">
-        {locale === "ru" ? "Сохранить" : "Save"}
-      </Button>
-    </FeedbackForm>
   );
 }
 

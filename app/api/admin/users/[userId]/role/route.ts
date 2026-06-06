@@ -7,6 +7,8 @@ import { authOptions } from "@/lib/next-auth";
 import { prisma } from "@/lib/prisma";
 
 const roleSchema = z.object({
+  confirmation: z.string().trim(),
+  reason: z.string().trim().min(12).max(600),
   role: z.nativeEnum(Role)
 });
 
@@ -52,8 +54,21 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (!parsed.success) {
     return NextResponse.json(
       {
-        title: localeRu ? "Проверьте роль" : "Check role",
-        message: localeRu ? "Выберите корректную роль пользователя." : "Choose a valid user role."
+        title: localeRu ? "Проверьте форму" : "Check the form",
+        message:
+          localeRu
+            ? "Выберите роль, укажите причину не короче 12 символов и подтверждение CONFIRM."
+            : "Choose a role, provide a reason of at least 12 characters and the CONFIRM confirmation."
+      },
+      { status: 400 }
+    );
+  }
+
+  if (parsed.data.confirmation !== "CONFIRM") {
+    return NextResponse.json(
+      {
+        title: localeRu ? "Нужно подтверждение" : "Confirmation required",
+        message: localeRu ? "Введите CONFIRM, чтобы изменить роль пользователя." : "Enter CONFIRM to change the user's role."
       },
       { status: 400 }
     );
@@ -71,6 +86,33 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     );
   }
 
+  if (user.role === parsed.data.role) {
+    return NextResponse.json(
+      {
+        title: localeRu ? "Роль уже установлена" : "Role already set",
+        message: localeRu ? "Пользователь уже находится в выбранной роли." : "The user already has the selected role."
+      },
+      { status: 409 }
+    );
+  }
+
+  if (user.role === Role.SUPER_ADMIN && parsed.data.role !== Role.SUPER_ADMIN) {
+    const superAdminCount = await prisma.user.count({ where: { role: Role.SUPER_ADMIN } });
+
+    if (superAdminCount <= 1) {
+      return NextResponse.json(
+        {
+          title: localeRu ? "Нельзя убрать последнего главного админа" : "Cannot remove the last super admin",
+          message:
+            localeRu
+              ? "Сначала назначьте другого главного администратора, затем измените роль этого пользователя."
+              : "Assign another super administrator first, then change this user's role."
+        },
+        { status: 409 }
+      );
+    }
+  }
+
   await prisma.$transaction([
     prisma.user.update({
       where: { id: user.id },
@@ -84,6 +126,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         entityId: user.id,
         payload: {
           from: user.role,
+          reason: parsed.data.reason,
+          targetEmail: user.email,
           to: parsed.data.role
         }
       }

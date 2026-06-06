@@ -8,10 +8,12 @@ import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { NotificationCard } from "@/components/NotificationCard";
 import { UserAvatar } from "@/components/UserAvatar";
+import { RoleManagementForm } from "@/components/admin/RoleManagementForm";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { requireAdmin } from "@/lib/access";
+import { canManageManagers } from "@/lib/auth";
 import { countryName } from "@/lib/countries";
 import { getLocale, t, type Locale, type SearchParams, withLocale } from "@/lib/i18n";
 import { prisma } from "@/lib/prisma";
@@ -30,6 +32,7 @@ export default async function AdminUserDetailPage({
   const session = await requireAdmin(locale, `/admin/users/${userId}`);
   const isRu = locale === "ru";
   const canAdjustBalance = session.user?.role === Role.SUPER_ADMIN;
+  const canManageRoles = canManageManagers(session.user?.role as "ADMIN" | "SUPER_ADMIN" | "TECH_SUPPORT" | "SALES_MANAGER" | "guest" | undefined);
   const user = await prisma.user.findUnique({
     where: { id: userId },
     include: {
@@ -147,6 +150,7 @@ export default async function AdminUserDetailPage({
   const displayName = user.name || user.email;
   const wallet = user.wallet;
   const adjustmentEndpoint = `/api/admin/users/${user.id}/adjustments?lang=${locale}`;
+  const roleEndpoint = `/api/admin/users/${user.id}/role?lang=${locale}`;
   const pendingPaymentTransactions =
     wallet?.transactions.filter((transaction) => transaction.status === PaymentStatus.PENDING && (transaction.type === TransactionType.DEPOSIT || transaction.type === TransactionType.WITHDRAWAL)) ?? [];
 
@@ -217,6 +221,24 @@ export default async function AdminUserDetailPage({
                     <InfoBlock label={isRu ? "Провайдеры входа" : "Sign-in providers"} value={authProviders(user.accounts, locale)} locale={locale} />
                     <InfoBlock label={isRu ? "Активные сессии" : "Active sessions"} value={formatCount(user._count.sessions)} locale={locale} />
                   </div>
+                  {canManageRoles && user.id !== session.user?.id ? (
+                    <div className="mt-5">
+                      <RoleManagementForm currentRole={user.role} endpoint={roleEndpoint} locale={locale} />
+                    </div>
+                  ) : (
+                    <NotificationCard
+                      title={user.id === session.user?.id ? (isRu ? "Это ваш аккаунт" : "This is your account") : isRu ? "Роль только для просмотра" : "Role is view-only"}
+                      text={
+                        user.id === session.user?.id
+                          ? isRu
+                            ? "Изменение собственной роли заблокировано, чтобы не потерять административный доступ."
+                            : "Changing your own role is blocked to avoid losing administrator access."
+                          : isRu
+                            ? "Назначать роли менеджеров и администраторов может только главный администратор."
+                            : "Only a super administrator can assign manager and administrator roles."
+                      }
+                    />
+                  )}
                 </Panel>
               </section>
 
