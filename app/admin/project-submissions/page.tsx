@@ -7,6 +7,7 @@ import { Header } from "@/components/Header";
 import { NotificationCard } from "@/components/NotificationCard";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { ProjectStatusBadge, type BadgeStatus } from "@/components/ui/ProjectStatusBadge";
 import { Select } from "@/components/ui/Select";
 import { requireAdmin } from "@/lib/access";
 import { getLocale, type SearchParams, withLocale } from "@/lib/i18n";
@@ -30,7 +31,7 @@ export default async function AdminProjectSubmissionsPage({ searchParams }: { se
     prisma.projectSubmission.findMany({
       where: statusFilter ? { status: statusFilter } : undefined,
       include: {
-        project: { select: { id: true, slug: true, titleRu: true } },
+        project: { select: { fundedUsdt: true, id: true, slug: true, status: true, targetUsdt: true, titleRu: true } },
         user: { select: { email: true, id: true, name: true } }
       },
       orderBy: { createdAt: "desc" },
@@ -170,7 +171,10 @@ export default async function AdminProjectSubmissionsPage({ searchParams }: { se
                           id: submission.id,
                           location: submission.location,
                           projectId: submission.projectId,
+                          projectFundedUsdt: submission.project?.fundedUsdt.toString(),
                           projectSlug: submission.project?.slug,
+                          projectStatus: submission.project?.status,
+                          projectTargetUsdt: submission.project?.targetUsdt.toString(),
                           status: submission.status,
                           structure: submission.structure,
                           summary: submission.summary,
@@ -259,7 +263,10 @@ function SubmissionActions({
     id: string;
     location: string | null;
     projectId: string | null;
+    projectFundedUsdt?: string;
     projectSlug?: string;
+    projectStatus?: string;
+    projectTargetUsdt?: string;
     status: string;
     structure: string | null;
     summary: string;
@@ -288,9 +295,14 @@ function SubmissionActions({
       </div>
 
       {submission.projectId && submission.projectSlug ? (
-        <ButtonLink href={withLocale(`/admin/projects`, locale)} variant="outline" className="w-full sm:w-fit">
-          {isRu ? "Открыть управление проектами" : "Open project management"}
-        </ButtonLink>
+        <ProjectListingControls
+          fundedUsdt={submission.projectFundedUsdt}
+          locale={locale}
+          projectId={submission.projectId}
+          projectSlug={submission.projectSlug}
+          status={submission.projectStatus ?? "REVIEW"}
+          targetUsdt={submission.projectTargetUsdt}
+        />
       ) : null}
 
       <div className="grid gap-4 xl:grid-cols-2">
@@ -447,6 +459,136 @@ function SubmissionActions({
       ) : null}
     </section>
   );
+}
+
+function ProjectListingControls({
+  fundedUsdt,
+  locale,
+  projectId,
+  projectSlug,
+  status,
+  targetUsdt
+}: {
+  fundedUsdt?: string;
+  locale: "ru" | "en";
+  projectId: string;
+  projectSlug: string;
+  status: string;
+  targetUsdt?: string;
+}) {
+  const isRu = locale === "ru";
+  const currentStatus = status.toLowerCase() as BadgeStatus;
+  const endpoint = `/api/admin/projects/${projectId}/status?lang=${locale}`;
+  const statusActions = [
+    {
+      status: "ACTIVE",
+      label: isRu ? "Открыть сбор" : "Open raise",
+      text: isRu ? "Проект опубликован и доступен участникам." : "The project is published and available to participants."
+    },
+    {
+      status: "PAUSED",
+      label: isRu ? "Поставить на паузу" : "Pause",
+      text: isRu ? "Приём новых заявок временно остановлен." : "New applications are temporarily stopped."
+    },
+    {
+      status: "FUNDED",
+      label: isRu ? "Сбор завершён" : "Mark funded",
+      text: isRu ? "Проект отмечен как собранный." : "The project is marked as funded."
+    },
+    {
+      status: "CLOSED",
+      label: isRu ? "Закрыть проект" : "Close project",
+      text: isRu ? "Проект закрыт для публичного участия." : "The project is closed for public participation."
+    },
+    {
+      status: "REVIEW",
+      label: isRu ? "Вернуть на подготовку" : "Return to review",
+      text: isRu ? "Проект снят с публикации и возвращён на подготовку." : "The project is unpublished and returned to review."
+    }
+  ];
+
+  return (
+    <div className="grid gap-4 rounded-[14px] bg-qidra-grayLight p-4">
+      <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-start">
+        <div>
+          <div className="flex flex-wrap items-center gap-3">
+            <h3 className="text-20 font-medium text-qidra-dark">{isRu ? "Управление листингом" : "Listing management"}</h3>
+            <ProjectStatusBadge status={currentStatus in statusLabels ? currentStatus : "review"} locale={locale} />
+          </div>
+          <p className="mt-2 text-14 text-qidra-grayBlue">
+            {isRu
+              ? "После первичной проверки управляйте жизненным циклом проекта: публикация, пауза, завершение сбора или закрытие."
+              : "After initial review, manage the project lifecycle: publish, pause, funded or closed."}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <ButtonLink href={withLocale(`/invest/${projectSlug}`, locale)} size="sm" variant="outline">
+            {isRu ? "Публичная страница" : "Public page"}
+          </ButtonLink>
+          <ButtonLink href={withLocale("/admin/projects", locale)} size="sm" variant="outline">
+            {isRu ? "Все проекты" : "All projects"}
+          </ButtonLink>
+        </div>
+      </div>
+
+      <dl className="grid gap-3 text-14 text-qidra-grayBlue md:grid-cols-3">
+        <Fact label={isRu ? "Текущий статус" : "Current status"} value={projectStatusLabel(status, locale)} />
+        <Fact label={isRu ? "Собрано" : "Funded"} value={formatUsdtString(fundedUsdt)} />
+        <Fact label={isRu ? "Цель" : "Target"} value={formatUsdtString(targetUsdt)} />
+      </dl>
+
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+        {statusActions.map((action) => (
+          <FeedbackForm
+            key={action.status}
+            endpoint={endpoint}
+            feedback={{
+              title: isRu ? "Статус проекта обновлён" : "Project status updated",
+              text: action.text,
+              buttonLabel: isRu ? "Понятно" : "Got it",
+              dismissLabel: isRu ? "Закрыть уведомление" : "Close notification",
+              tone: action.status === "PAUSED" || action.status === "CLOSED" ? "warning" : "success"
+            }}
+            refreshOnSuccess
+          >
+            <input name="status" type="hidden" value={action.status} />
+            <Button className="w-full" disabled={status === action.status} size="sm" type="submit" variant={action.status === "ACTIVE" ? "primary" : "outline"}>
+              {action.label}
+            </Button>
+          </FeedbackForm>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+const statusLabels = {
+  active: true,
+  closed: true,
+  draft: true,
+  funded: true,
+  paused: true,
+  review: true
+} as const;
+
+function projectStatusLabel(status: string, locale: "ru" | "en") {
+  const labels: Record<string, { en: string; ru: string }> = {
+    ACTIVE: { ru: "Сбор открыт / опубликован", en: "Published / raise open" },
+    CLOSED: { ru: "Закрыт", en: "Closed" },
+    DRAFT: { ru: "Черновик", en: "Draft" },
+    FUNDED: { ru: "Сбор завершён", en: "Funded" },
+    PAUSED: { ru: "Пауза", en: "Paused" },
+    REVIEW: { ru: "Подготовка / проверка", en: "Preparation / review" }
+  };
+
+  return labels[status]?.[locale] ?? status;
+}
+
+function formatUsdtString(value?: string) {
+  if (!value) return "0 USDT";
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return `${value} USDT`;
+  return `${amount.toLocaleString("en-US", { maximumFractionDigits: 2 })} USDT`;
 }
 
 function ReasonField({ defaultValue = "", label, name, required = true }: { defaultValue?: string; label: string; name: string; required?: boolean }) {
