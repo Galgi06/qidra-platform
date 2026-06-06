@@ -52,10 +52,15 @@ export default async function AdminUserDetailPage({
       investorProfile: true,
       investments: {
         include: {
-          project: true
+          project: {
+            include: {
+              documents: true,
+              reports: true
+            }
+          }
         },
         orderBy: { createdAt: "desc" },
-        take: 12
+        take: 50
       },
       kycApplications: {
         orderBy: { createdAt: "desc" },
@@ -108,7 +113,7 @@ export default async function AdminUserDetailPage({
               }
             },
             orderBy: { createdAt: "desc" },
-            take: 12
+            take: 80
           }
         }
       },
@@ -167,6 +172,9 @@ export default async function AdminUserDetailPage({
   const accessRecoveryDocumentLinks = approvedKycApplication
     ? kycDocumentLinkItems(approvedKycApplication.id, readKycDocuments(approvedKycApplication.documents), locale)
     : [];
+  const confirmedContractUsdt = sumUsdt(user.investments.filter((item) => item.status === InvestmentStatus.CONFIRMED).map((item) => item.amountUsdt));
+  const pendingContractUsdt = sumUsdt(user.investments.filter((item) => item.status === InvestmentStatus.PENDING).map((item) => item.amountUsdt));
+  const walletTransactions = wallet?.transactions ?? [];
 
   return (
     <>
@@ -381,37 +389,29 @@ export default async function AdminUserDetailPage({
             ) : null}
 
             {view === "contracts" ? (
-            <Panel title={isRu ? "Заявки на участие" : "Participation applications"} description={isRu ? "Все последние заявки участника по проектам." : "Recent participant applications across projects."}>
+            <Panel
+              title={isRu ? "Партнёрские контракты клиента" : "Client partnership contracts"}
+              description={
+                isRu
+                  ? "Здесь видна вся история участия клиента: активированные контракты, заявки на проверке, суммы, документы проекта и связанные операции кошелька."
+                  : "This view shows the client's participation history: active contracts, pending applications, amounts, project documents and linked wallet operations."
+              }
+            >
+              <div className="grid gap-4 md:grid-cols-3">
+                <InfoBlock label={isRu ? "Активировано в проектах" : "Activated in projects"} value={formatUsdt(confirmedContractUsdt)} locale={locale} />
+                <InfoBlock label={isRu ? "Заявки на проверке" : "Pending applications"} value={formatUsdt(pendingContractUsdt)} locale={locale} />
+                <InfoBlock label={isRu ? "Всего контрактов и заявок" : "Total contracts and applications"} value={formatCount(user.investments.length)} locale={locale} />
+              </div>
               {user.investments.length ? (
-                <div className="overflow-x-auto rounded-qidra border border-qidra-grayLight bg-white">
-                  <table className="w-full min-w-[900px] border-collapse text-left">
-                    <thead>
-                      <tr className="border-b border-qidra-grayLight text-14 font-medium text-qidra-grayBlue">
-                        <th className="px-4 py-3">{isRu ? "Дата" : "Date"}</th>
-                        <th className="px-4 py-3">{isRu ? "Проект" : "Project"}</th>
-                        <th className="px-4 py-3">{isRu ? "Сумма" : "Amount"}</th>
-                        <th className="px-4 py-3">{isRu ? "Резерв" : "Reserve"}</th>
-                        <th className="px-4 py-3">{isRu ? "Статус" : "Status"}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {user.investments.map((item) => (
-                        <tr key={item.id} className="border-b border-qidra-grayLight last:border-b-0">
-                          <td className="px-4 py-4 text-14 text-qidra-grayBlue">{formatDateTime(item.createdAt, locale)}</td>
-                          <td className="px-4 py-4">
-                            <Link className="text-16 font-medium text-qidra-dark hover:text-qidra-accent" href={withLocale(`/projects/${item.project.slug}`, locale)}>
-                              {isRu ? item.project.titleRu : item.project.titleEn}
-                            </Link>
-                          </td>
-                          <td className="px-4 py-4 text-16 font-medium text-qidra-dark">{formatUsdt(item.amountUsdt)}</td>
-                          <td className="px-4 py-4 text-16 text-qidra-grayBlue">{formatUsdt(item.reservedUsdt)}</td>
-                          <td className="px-4 py-4">
-                            <StatusPill label={investmentStatusLabel(item.status, locale)} tone={investmentTone(item.status)} />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div className="grid gap-4">
+                  {user.investments.map((item) => (
+                    <ContractDossierCard
+                      key={item.id}
+                      application={item}
+                      locale={locale}
+                      transactions={walletTransactions.filter((transaction) => contractRelatedTransaction(transaction, item.id))}
+                    />
+                  ))}
                 </div>
               ) : (
                 <NotificationCard title={isRu ? "Заявок нет" : "No applications"} text={isRu ? "Участник ещё не подавал заявки на проекты." : "The participant has not applied to projects yet."} />
@@ -680,6 +680,166 @@ function SafeAdjustmentsPanel({
         </div>
       </div>
     </Panel>
+  );
+}
+
+type ContractApplication = {
+  adminNote: string | null;
+  amountUsdt: { toString(): string };
+  contractAcceptedAt: Date | null;
+  createdAt: Date;
+  id: string;
+  project: {
+    documents: { fileUrl: string; id: string; titleEn: string; titleRu: string }[];
+    expectedReturnEn: string | null;
+    expectedReturnRu: string | null;
+    expectedYieldEn: string | null;
+    expectedYieldRu: string | null;
+    fundedUsdt: { toString(): string };
+    location: string | null;
+    reports: { fileUrl: string; id: string; period: string; publishedAt: Date | null; titleEn: string; titleRu: string }[];
+    riskLevel: string | null;
+    slug: string;
+    status: string;
+    structure: string;
+    targetUsdt: { toString(): string };
+    titleEn: string;
+    titleRu: string;
+  };
+  reservedUsdt: { toString(): string };
+  status: InvestmentStatus;
+  termsAcceptedAt: Date | null;
+  updatedAt: Date;
+};
+
+type ClientWalletTransaction = {
+  amountUsdt: { toString(): string };
+  createdAt: Date;
+  destinationAddress: string | null;
+  id: string;
+  note: string | null;
+  status: PaymentStatus;
+  txHash: string | null;
+  type: TransactionType;
+};
+
+function ContractDossierCard({
+  application,
+  locale,
+  transactions
+}: {
+  application: ContractApplication;
+  locale: Locale;
+  transactions: ClientWalletTransaction[];
+}) {
+  const isRu = locale === "ru";
+  const projectTitle = isRu ? application.project.titleRu : application.project.titleEn;
+  const linkedReturns = transactions.filter((transaction) => transaction.type === TransactionType.RETURN && transaction.status === PaymentStatus.CONFIRMED);
+  const linkedWithdrawals = transactions.filter((transaction) => transaction.type === TransactionType.WITHDRAWAL && transaction.status === PaymentStatus.CONFIRMED);
+  const accruedUsdt = sumUsdt(linkedReturns.map((transaction) => transaction.amountUsdt));
+  const withdrawnUsdt = sumUsdt(linkedWithdrawals.map((transaction) => transaction.amountUsdt));
+
+  return (
+    <article className="grid gap-5 rounded-qidra border border-qidra-grayLight bg-qidra-grayLight p-5">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-12 font-medium uppercase text-qidra-accent">{isRu ? "Партнёрский контракт" : "Partnership contract"}</p>
+          <h3 className="mt-2 text-[28px] font-medium leading-tight tracking-[0] text-qidra-dark">{projectTitle}</h3>
+          <p className="mt-2 text-13 text-qidra-grayBlue">
+            {isRu ? "ID заявки" : "Application ID"}: <span className="break-all">{application.id}</span>
+          </p>
+        </div>
+        <StatusPill label={investmentStatusLabel(application.status, locale)} tone={investmentTone(application.status)} />
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <InfoBlock label={isRu ? "Сумма участия" : "Participation amount"} value={formatUsdt(application.amountUsdt)} locale={locale} />
+        <InfoBlock label={isRu ? "Резерв заявки" : "Application reserve"} value={formatUsdt(application.reservedUsdt)} locale={locale} />
+        <InfoBlock label={isRu ? "Начислено по контракту" : "Accrued by contract"} value={formatUsdt(accruedUsdt)} locale={locale} />
+        <InfoBlock label={isRu ? "Выведено по контракту" : "Withdrawn by contract"} value={formatUsdt(withdrawnUsdt)} locale={locale} />
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <InfoBlock label={isRu ? "Дата заявки" : "Application date"} value={formatDateTime(application.createdAt, locale)} locale={locale} />
+        <InfoBlock label={isRu ? "Активация договора" : "Contract activation"} value={application.contractAcceptedAt ? formatDateTime(application.contractAcceptedAt, locale) : null} locale={locale} />
+        <InfoBlock label={isRu ? "Структура" : "Structure"} value={application.project.structure} locale={locale} />
+        <InfoBlock label={isRu ? "Риск" : "Risk"} value={application.project.riskLevel} locale={locale} />
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2">
+        <InfoBlock
+          label={isRu ? "Ожидаемый результат проекта" : "Expected project result"}
+          value={(isRu ? application.project.expectedReturnRu : application.project.expectedReturnEn) || (isRu ? "Уточняется по условиям проекта" : "Clarified by project terms")}
+          locale={locale}
+        />
+        <InfoBlock
+          label={isRu ? "Ориентир доходности" : "Return guidance"}
+          value={(isRu ? application.project.expectedYieldRu : application.project.expectedYieldEn) || (isRu ? "Не фиксируется и не гарантируется" : "Not fixed or guaranteed")}
+          locale={locale}
+        />
+      </div>
+
+      {application.adminNote ? (
+        <div className="rounded-qidra border border-qidra-grayLight bg-white p-4">
+          <p className="text-14 font-semibold text-qidra-dark">{isRu ? "Комментарий администратора" : "Administrator note"}</p>
+          <p className="mt-2 whitespace-pre-wrap text-14 text-qidra-grayBlue">{application.adminNote}</p>
+        </div>
+      ) : null}
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="rounded-qidra border border-qidra-grayLight bg-white p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-16 font-semibold text-qidra-dark">{isRu ? "Документы проекта" : "Project documents"}</p>
+            <Link className="text-13 font-medium text-qidra-accent hover:text-qidra-dark" href={withLocale(`/projects/${application.project.slug}/documents`, locale)}>
+              {isRu ? "Открыть раздел" : "Open section"}
+            </Link>
+          </div>
+          {application.project.documents.length ? (
+            <div className="mt-3 grid gap-2">
+              {application.project.documents.slice(0, 6).map((document) => (
+                <a
+                  key={document.id}
+                  className="rounded-qidra border border-qidra-grayLight bg-qidra-grayLight px-3 py-2 text-13 font-medium text-qidra-dark transition-colors hover:border-qidra-accent hover:text-qidra-accent"
+                  href={document.fileUrl}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  {isRu ? document.titleRu : document.titleEn}
+                </a>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-3 text-14 text-qidra-grayBlue">{isRu ? "Публичные документы по проекту пока не добавлены." : "Public project documents have not been added yet."}</p>
+          )}
+        </div>
+
+        <div className="rounded-qidra border border-qidra-grayLight bg-white p-4">
+          <p className="text-16 font-semibold text-qidra-dark">{isRu ? "Связанные операции кошелька" : "Linked wallet operations"}</p>
+          {transactions.length ? (
+            <div className="mt-3 grid gap-2">
+              {transactions.map((transaction) => (
+                <div key={transaction.id} className="rounded-qidra bg-qidra-grayLight p-3">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-14 font-medium text-qidra-dark">{transactionTitle(transaction.type, locale)}</p>
+                      <p className="mt-1 break-all text-12 text-qidra-grayBlue">{transactionMeta(transaction.createdAt, transaction.status, transaction.txHash ?? transaction.destinationAddress, locale)}</p>
+                    </div>
+                    <strong className="text-14 text-qidra-dark">{transactionAmount(transaction.type, transaction.amountUsdt)}</strong>
+                  </div>
+                  {transaction.note ? <p className="mt-2 break-words text-12 text-qidra-grayBlue">{transaction.note}</p> : null}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-3 text-14 text-qidra-grayBlue">
+              {isRu
+                ? "Связанные операции появятся после активации, начислений или вывода именно по этому контракту."
+                : "Linked operations will appear after activation, accruals or withdrawals for this specific contract."}
+            </p>
+          )}
+        </div>
+      </div>
+    </article>
   );
 }
 
@@ -987,6 +1147,8 @@ function supportTone(status: SupportThreadStatus): Tone {
 function auditActionLabel(action: string, locale: Locale) {
   const labels: Record<string, Record<Locale, string>> = {
     "investment.confirm": { ru: "Заявка участия подтверждена", en: "Participation request confirmed" },
+    "investment.activate": { ru: "Партнёрский контракт активирован автоматически", en: "Partnership contract activated automatically" },
+    "investment.activate.from_pending": { ru: "Заявка на участие активирована из резерва", en: "Participation request activated from reserve" },
     "investment.reject": { ru: "Заявка участия отклонена", en: "Participation request rejected" },
     "investment.request.cancel": { ru: "Участник отменил заявку", en: "Participant cancelled request" },
     "investment.request.create": { ru: "Участник создал заявку", en: "Participant created request" },
@@ -1014,6 +1176,7 @@ function auditActionLabel(action: string, locale: Locale) {
     "user.block.permanent": { ru: "Пользователь заблокирован постоянно", en: "User permanently blocked" },
     "user.block.temporary": { ru: "Пользователь заблокирован временно", en: "User temporarily blocked" },
     "user.block.unblock": { ru: "Пользователь разблокирован", en: "User unblocked" },
+    "user.password_reset.identity_mismatch": { ru: "Восстановление доступа отклонено: документы не совпали", en: "Access recovery rejected: documents did not match" },
     "user.password_reset.link_sent": { ru: "Ссылка восстановления доступа отправлена", en: "Access recovery link sent" },
     "user.role.update": { ru: "Роль пользователя изменена", en: "User role updated" },
     "wallet.adjustment.credit": { ru: "Баланс увеличен корректировкой", en: "Balance increased by adjustment" },
@@ -1032,6 +1195,14 @@ function entityLabel(entityType: string, locale: Locale) {
   if (entityType === "SupportThread") return locale === "ru" ? "Диалог" : "Thread";
   if (entityType === "User") return locale === "ru" ? "Пользователь" : "User";
   return entityType;
+}
+
+function contractRelatedTransaction(transaction: ClientWalletTransaction, applicationId: string) {
+  return Boolean(transaction.note?.includes(applicationId));
+}
+
+function sumUsdt(values: { toString(): string }[]) {
+  return values.reduce<number>((total, value) => total + Number(value.toString()), 0);
 }
 
 function formatUsdt(value: { toString(): string } | number) {
