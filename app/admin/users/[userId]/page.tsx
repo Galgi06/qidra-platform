@@ -36,6 +36,8 @@ export default async function AdminUserDetailPage({
   const session = await requireAdmin(locale, `/admin/users/${userId}`);
   const isRu = locale === "ru";
   const view = parseDossierView(searchParamString(searchParams?.view));
+  const walletTypeFilter = parseWalletType(searchParamString(searchParams?.walletType));
+  const walletStatusFilter = parseWalletStatus(searchParamString(searchParams?.walletStatus));
   const canAdjustBalance = session.user?.role === Role.SUPER_ADMIN;
   const canManageBlock = session.user?.role === Role.SUPER_ADMIN;
   const canManageRoles = canManageManagers(session.user?.role as "ADMIN" | "SUPER_ADMIN" | "TECH_SUPPORT" | "SALES_MANAGER" | "guest" | undefined);
@@ -175,6 +177,12 @@ export default async function AdminUserDetailPage({
   const confirmedContractUsdt = sumUsdt(user.investments.filter((item) => item.status === InvestmentStatus.CONFIRMED).map((item) => item.amountUsdt));
   const pendingContractUsdt = sumUsdt(user.investments.filter((item) => item.status === InvestmentStatus.PENDING).map((item) => item.amountUsdt));
   const walletTransactions = wallet?.transactions ?? [];
+  const filteredWalletTransactions = walletTransactions.filter((transaction) => {
+    const typeMatches = walletTypeFilter ? transaction.type === walletTypeFilter : true;
+    const statusMatches = walletStatusFilter ? transaction.status === walletStatusFilter : true;
+
+    return typeMatches && statusMatches;
+  });
 
   return (
     <>
@@ -365,6 +373,18 @@ export default async function AdminUserDetailPage({
                   <AccessRecoveryForm endpoint={accessRecoveryEndpoint} hasApprovedKyc={hasApprovedKyc} kycDocumentLinks={accessRecoveryDocumentLinks} locale={locale} />
                 ) : null}
               </Panel>
+            ) : null}
+
+            {view === "wallet" ? (
+              <WalletDossierPanel
+                allTransactions={walletTransactions}
+                locale={locale}
+                transactions={filteredWalletTransactions}
+                userId={user.id}
+                wallet={wallet}
+                walletStatusFilter={walletStatusFilter}
+                walletTypeFilter={walletTypeFilter}
+              />
             ) : null}
 
             {view === "overview" || view === "kyc" || view === "wallet" ? (
@@ -683,6 +703,218 @@ function SafeAdjustmentsPanel({
   );
 }
 
+function WalletDossierPanel({
+  allTransactions,
+  locale,
+  transactions,
+  userId,
+  wallet,
+  walletStatusFilter,
+  walletTypeFilter
+}: {
+  allTransactions: ClientWalletTransaction[];
+  locale: Locale;
+  transactions: ClientWalletTransaction[];
+  userId: string;
+  wallet:
+    | {
+        availableUsdt: { toString(): string };
+        pendingUsdt: { toString(): string };
+        reservedUsdt: { toString(): string };
+        trc20Address: string | null;
+      }
+    | null;
+  walletStatusFilter: PaymentStatus | undefined;
+  walletTypeFilter: TransactionType | undefined;
+}) {
+  const isRu = locale === "ru";
+  const confirmedDepositsUsdt = sumUsdt(
+    allTransactions.filter((transaction) => transaction.type === TransactionType.DEPOSIT && transaction.status === PaymentStatus.CONFIRMED).map((transaction) => transaction.amountUsdt)
+  );
+  const confirmedWithdrawalsUsdt = sumUsdt(
+    allTransactions.filter((transaction) => transaction.type === TransactionType.WITHDRAWAL && transaction.status === PaymentStatus.CONFIRMED).map((transaction) => transaction.amountUsdt)
+  );
+  const confirmedInvestmentsUsdt = sumUsdt(
+    allTransactions.filter((transaction) => transaction.type === TransactionType.INVESTMENT && transaction.status === PaymentStatus.CONFIRMED).map((transaction) => transaction.amountUsdt)
+  );
+  const confirmedReturnsUsdt = sumUsdt(
+    allTransactions.filter((transaction) => transaction.type === TransactionType.RETURN && transaction.status === PaymentStatus.CONFIRMED).map((transaction) => transaction.amountUsdt)
+  );
+
+  return (
+    <Panel
+      title={isRu ? "Кошелёк, платежи и сверка операций" : "Wallet, payments and operation reconciliation"}
+      description={
+        isRu
+          ? "Финансовая история клиента: пополнения, выводы, участия, начисления, корректировки и спорные операции."
+          : "Client financial history: deposits, withdrawals, participations, accruals, adjustments and disputed operations."
+      }
+    >
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <InfoBlock label={isRu ? "Свободный баланс" : "Available balance"} value={formatUsdt(wallet?.availableUsdt ?? 0)} locale={locale} />
+        <InfoBlock label={isRu ? "Зарезервировано" : "Reserved"} value={formatUsdt(wallet?.reservedUsdt ?? 0)} locale={locale} />
+        <InfoBlock label={isRu ? "Переводы на проверке" : "Transfers in review"} value={formatUsdt(wallet?.pendingUsdt ?? 0)} locale={locale} />
+        <InfoBlock label={isRu ? "Всего операций" : "Total operations"} value={formatCount(allTransactions.length)} locale={locale} />
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <InfoBlock label={isRu ? "Зачислено подтверждённых" : "Confirmed credited"} value={formatUsdt(confirmedDepositsUsdt)} locale={locale} />
+        <InfoBlock label={isRu ? "Выведено подтверждённых" : "Confirmed withdrawn"} value={formatUsdt(confirmedWithdrawalsUsdt)} locale={locale} />
+        <InfoBlock label={isRu ? "Активировано в проектах" : "Activated in projects"} value={formatUsdt(confirmedInvestmentsUsdt)} locale={locale} />
+        <InfoBlock label={isRu ? "Начислено возвратов" : "Returns accrued"} value={formatUsdt(confirmedReturnsUsdt)} locale={locale} />
+      </div>
+
+      <div className="rounded-qidra border border-qidra-grayLight bg-qidra-grayLight p-4">
+        <p className="text-14 font-semibold text-qidra-dark">{isRu ? "Личный USDT TRC20 адрес клиента" : "Client personal USDT TRC20 address"}</p>
+        <code className="mt-2 block break-all rounded-qidra bg-white px-3 py-2 text-12 text-qidra-dark">
+          {wallet?.trc20Address || (isRu ? "Адрес ещё не выдан" : "Address has not been issued yet")}
+        </code>
+      </div>
+
+      <WalletTransactionFilters locale={locale} userId={userId} walletStatusFilter={walletStatusFilter} walletTypeFilter={walletTypeFilter} />
+
+      {transactions.length ? (
+        <div className="grid gap-3">
+          {transactions.map((transaction) => (
+            <WalletDossierOperation key={transaction.id} locale={locale} transaction={transaction} />
+          ))}
+        </div>
+      ) : (
+        <NotificationCard
+          title={isRu ? "Операции не найдены" : "No operations found"}
+          text={isRu ? "Измените фильтр по типу или статусу операции." : "Change the operation type or status filter."}
+        />
+      )}
+    </Panel>
+  );
+}
+
+function WalletTransactionFilters({
+  locale,
+  userId,
+  walletStatusFilter,
+  walletTypeFilter
+}: {
+  locale: Locale;
+  userId: string;
+  walletStatusFilter: PaymentStatus | undefined;
+  walletTypeFilter: TransactionType | undefined;
+}) {
+  const isRu = locale === "ru";
+  const typeItems: { label: string; value?: TransactionType }[] = [
+    { label: isRu ? "Все типы" : "All types" },
+    { label: isRu ? "Пополнения" : "Deposits", value: TransactionType.DEPOSIT },
+    { label: isRu ? "Выводы" : "Withdrawals", value: TransactionType.WITHDRAWAL },
+    { label: isRu ? "Участия" : "Participations", value: TransactionType.INVESTMENT },
+    { label: isRu ? "Начисления" : "Accruals", value: TransactionType.RETURN },
+    { label: isRu ? "Корректировки" : "Adjustments", value: TransactionType.ADJUSTMENT }
+  ];
+  const statusItems: { label: string; value?: PaymentStatus }[] = [
+    { label: isRu ? "Все статусы" : "All statuses" },
+    { label: paymentStatusLabel(PaymentStatus.PENDING, locale), value: PaymentStatus.PENDING },
+    { label: paymentStatusLabel(PaymentStatus.CONFIRMED, locale), value: PaymentStatus.CONFIRMED },
+    { label: paymentStatusLabel(PaymentStatus.REJECTED, locale), value: PaymentStatus.REJECTED }
+  ];
+
+  return (
+    <div className="grid gap-4 rounded-qidra border border-qidra-grayLight bg-white p-4">
+      <div>
+        <p className="text-16 font-semibold text-qidra-dark">{isRu ? "Фильтры операций" : "Operation filters"}</p>
+        <p className="mt-1 text-13 text-qidra-grayBlue">
+          {isRu ? "Быстро отделите пополнения, выводы, участия, начисления и спорные операции." : "Quickly isolate deposits, withdrawals, participations, accruals and disputed operations."}
+        </p>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {typeItems.map((item) => (
+          <Link
+            key={item.value ?? "all-types"}
+            className={`inline-flex h-10 items-center rounded-qidra px-3 text-13 font-medium transition-colors ${
+              walletTypeFilter === item.value ? "bg-qidra-dark text-white" : "border border-qidra-grayLight text-qidra-grayBlue hover:border-qidra-dark hover:text-qidra-dark"
+            }`}
+            href={walletFilterHref(userId, locale, item.value, walletStatusFilter)}
+          >
+            {item.label}
+          </Link>
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {statusItems.map((item) => (
+          <Link
+            key={item.value ?? "all-statuses"}
+            className={`inline-flex h-10 items-center rounded-qidra px-3 text-13 font-medium transition-colors ${
+              walletStatusFilter === item.value ? "bg-qidra-accent text-white" : "border border-qidra-grayLight text-qidra-grayBlue hover:border-qidra-accent hover:text-qidra-accent"
+            }`}
+            href={walletFilterHref(userId, locale, walletTypeFilter, item.value)}
+          >
+            {item.label}
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function WalletDossierOperation({ locale, transaction }: { locale: Locale; transaction: ClientWalletTransaction }) {
+  const isRu = locale === "ru";
+  const adminPaymentsHref = withLocale(`/admin/payments?type=${transaction.type}&status=${transaction.status}`, locale);
+
+  return (
+    <article className="grid gap-4 rounded-qidra border border-qidra-grayLight bg-qidra-grayLight p-4">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-18 font-semibold text-qidra-dark">{transactionTitle(transaction.type, locale)}</p>
+          <p className="mt-1 text-13 text-qidra-grayBlue">{formatDateTime(transaction.createdAt, locale)}</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusPill label={paymentStatusLabel(transaction.status, locale)} tone={paymentTone(transaction.status, transaction.type)} />
+          <strong className="text-18 text-qidra-dark">{transactionAmount(transaction.type, transaction.amountUsdt)}</strong>
+        </div>
+      </div>
+      <div className="grid gap-3 lg:grid-cols-2">
+        <InfoBlock compact label="Transaction hash" value={transaction.txHash} locale={locale} />
+        <InfoBlock compact label={isRu ? "Адрес получателя/назначения" : "Recipient/destination address"} value={transaction.destinationAddress} locale={locale} />
+      </div>
+      {transaction.note ? (
+        <div className="rounded-qidra border border-qidra-grayLight bg-white p-3">
+          <p className="text-13 font-medium text-qidra-dark">{isRu ? "Комментарий операции" : "Operation note"}</p>
+          <p className="mt-1 break-words text-13 text-qidra-grayBlue">{transaction.note}</p>
+        </div>
+      ) : null}
+      <div className="flex flex-wrap gap-2 border-t border-qidra-grayLight pt-4">
+        <ButtonLink href={adminPaymentsHref} size="sm" variant="outline">
+          {isRu ? "Открыть в платежах" : "Open in payments"}
+        </ButtonLink>
+        {transaction.status === PaymentStatus.PENDING && transaction.type === TransactionType.DEPOSIT ? (
+          <TronGridDossierCheckForm endpoint={`/api/admin/payments/${transaction.id}/trongrid?lang=${locale}`} locale={locale} />
+        ) : null}
+      </div>
+    </article>
+  );
+}
+
+function TronGridDossierCheckForm({ endpoint, locale }: { endpoint: string; locale: Locale }) {
+  const isRu = locale === "ru";
+
+  return (
+    <FeedbackForm
+      endpoint={endpoint}
+      feedback={{
+        title: isRu ? "Платёж проверен" : "Payment checked",
+        text: isRu ? "Qidra сверила transaction hash, сеть, сумму и личный адрес клиента." : "Qidra checked the transaction hash, network, amount and client personal address.",
+        buttonLabel: isRu ? "Понятно" : "Got it",
+        dismissLabel: isRu ? "Закрыть уведомление" : "Close notification",
+        tone: "success"
+      }}
+      popupPlacement="center"
+      refreshOnSuccess
+    >
+      <Button size="sm" type="submit">
+        {isRu ? "Проверить через TronGrid" : "Check via TronGrid"}
+      </Button>
+    </FeedbackForm>
+  );
+}
+
 type ContractApplication = {
   adminNote: string | null;
   amountUsdt: { toString(): string };
@@ -874,6 +1106,36 @@ function parseDossierView(value: string | undefined): DossierView {
   }
 
   return "overview";
+}
+
+function parseWalletType(value: string | undefined) {
+  if (
+    value === TransactionType.ADJUSTMENT ||
+    value === TransactionType.DEPOSIT ||
+    value === TransactionType.INVESTMENT ||
+    value === TransactionType.RETURN ||
+    value === TransactionType.WITHDRAWAL
+  ) {
+    return value;
+  }
+
+  return undefined;
+}
+
+function parseWalletStatus(value: string | undefined) {
+  if (value === PaymentStatus.CONFIRMED || value === PaymentStatus.PENDING || value === PaymentStatus.REJECTED) {
+    return value;
+  }
+
+  return undefined;
+}
+
+function walletFilterHref(userId: string, locale: Locale, type?: TransactionType, status?: PaymentStatus) {
+  const params = new URLSearchParams({ view: "wallet" });
+  if (type) params.set("walletType", type);
+  if (status) params.set("walletStatus", status);
+
+  return withLocale(`/admin/users/${userId}?${params.toString()}`, locale);
 }
 
 function DossierTabs({ activeView, locale, userId }: { activeView: DossierView; locale: Locale; userId: string }) {
