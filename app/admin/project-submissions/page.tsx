@@ -271,7 +271,7 @@ function SubmissionActions({
   const endpoint = `/api/admin/project-submissions/${submission.id}?lang=${locale}`;
   const canReview = submission.status === "SUBMITTED";
   const canReject = submission.status !== "REJECTED" && submission.status !== "APPROVED";
-  const canPrepare = submission.status !== "APPROVED" && submission.status !== "REJECTED" && !submission.projectId;
+  const canPrepare = submission.status !== "APPROVED" && submission.status !== "REJECTED" && !submission.projectId && documentsCount > 0;
   const preparedSlug = slugFromTitle(submission.title);
   const summary = compactText(submission.summary, 240);
   const structure = submission.structure === "Musharaka" ? "Musharaka" : "Mudaraba";
@@ -337,6 +337,14 @@ function SubmissionActions({
         ) : null}
       </div>
 
+      {!documentsCount ? (
+        <NotificationCard
+          title={isRu ? "Листинг заблокирован" : "Listing blocked"}
+          text={isRu ? "Нельзя разрешить листинг без документов проекта. Участник должен прикрепить материалы и отправить заявку заново." : "Listing cannot be approved without project documents. The participant must attach materials and submit again."}
+          tone="warning"
+        />
+      ) : null}
+
       {canPrepare ? (
         <details className="rounded-[14px] bg-white p-4 shadow-[0_0_0_1px_rgba(18,20,23,0.08)]" open={submission.status === "REVIEW"}>
           <summary className="cursor-pointer list-none text-18 font-medium text-qidra-dark">
@@ -375,10 +383,10 @@ function SubmissionActions({
               <Select
                 label={isRu ? "Статус после листинга" : "Status after listing"}
                 name="status"
-                defaultValue="REVIEW"
+                defaultValue="ACTIVE"
                 options={[
-                  { value: "REVIEW", label: isRu ? "Проверен, готовится к публикации" : "Reviewed, preparing to publish" },
                   { value: "ACTIVE", label: isRu ? "Сбор открыт / опубликован" : "Published / raise open" },
+                  { value: "REVIEW", label: isRu ? "Проверен, готовится к публикации" : "Reviewed, preparing to publish" },
                   { value: "PAUSED", label: isRu ? "Пауза" : "Paused" },
                   { value: "DRAFT", label: isRu ? "Черновик / не опубликован" : "Draft / not published" }
                 ]}
@@ -428,8 +436,8 @@ function SubmissionActions({
             <Input label={isRu ? "Подтверждение" : "Confirmation"} name="confirmation" placeholder="CONFIRM" required />
             <p className="text-13 text-qidra-grayBlue">
               {isRu
-                ? "Сначала создайте проект в статусе подготовки, добавьте публичные документы в управлении проектами и только после этого открывайте сбор. Загруженные участником документы остаются в заявке для внутренней проверки."
-                : "First create the project in preparation status, add public documents in project management and only then open the raise. Participant documents remain in the submission for internal review."}
+                ? "После подтверждения заявка станет проектом каталога. Проверенные файлы участника будут опубликованы как документы проекта; при необходимости статус можно изменить в управлении проектами."
+                : "After confirmation, the submission becomes a catalog project. Reviewed participant files will be published as project documents; status can be changed later in project management."}
             </p>
             <Button className="w-full sm:w-fit" type="submit">
               {isRu ? "Разрешить листинг и создать проект" : "Approve listing and create project"}

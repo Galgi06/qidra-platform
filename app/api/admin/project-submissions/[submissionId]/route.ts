@@ -1,4 +1,4 @@
-import { Prisma, ProjectStatus } from "@prisma/client";
+import { DocumentKind, Prisma, ProjectStatus } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
@@ -53,6 +53,13 @@ const submissionActionSchema = z.discriminatedUnion("action", [
   })
 ]);
 
+type SubmissionDocument = {
+  name: string;
+  size: number;
+  storagePath: string;
+  type: string;
+};
+
 type SessionUser = {
   user?: {
     id?: string;
@@ -62,6 +69,18 @@ type SessionUser = {
 
 function isRu(request: NextRequest) {
   return request.nextUrl.searchParams.get("lang") !== "en";
+}
+
+function readSubmissionDocuments(value: unknown): SubmissionDocument[] {
+  if (!value || typeof value !== "object" || !("files" in value)) return [];
+  const files = (value as { files?: unknown }).files;
+  return Array.isArray(files) ? files.filter(isSubmissionDocument) : [];
+}
+
+function isSubmissionDocument(value: unknown): value is SubmissionDocument {
+  if (!value || typeof value !== "object") return false;
+  const document = value as Partial<SubmissionDocument>;
+  return typeof document.name === "string" && typeof document.storagePath === "string" && typeof document.size === "number" && typeof document.type === "string";
 }
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ submissionId: string }> }) {
@@ -240,15 +259,16 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   const data = parsed.data;
   const projectStatus = data.status as ProjectStatus;
+  const submissionDocuments = readSubmissionDocuments(submission.documents);
 
-  if (projectStatus === ProjectStatus.ACTIVE) {
+  if (!submissionDocuments.length) {
     return NextResponse.json(
       {
-        title: localeRu ? "Сначала добавьте документы" : "Add documents first",
+        title: localeRu ? "Нет документов заявки" : "No submission documents",
         message:
           localeRu
-            ? "Проект из заявки создаётся в подготовке. После добавления публичных документов откройте сбор в управлении проектами."
-            : "A submitted project is first created in preparation. After adding public documents, open the raise in project management."
+            ? "Разрешить листинг можно только после загрузки и проверки документов проекта."
+            : "Listing can be approved only after project documents are uploaded and reviewed."
       },
       { status: 409 }
     );
@@ -276,6 +296,28 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         titleRu: data.titleRu
       }
     });
+    const projectDocuments = [];
+
+    for (const [index, document] of submissionDocuments.entries()) {
+      const createdDocument = await tx.projectDocument.create({
+        data: {
+          fileUrl: "#pending",
+          kind: DocumentKind.PROJECT,
+          projectId: created.id,
+          titleEn: documentTitle(document.name, index, false),
+          titleRu: documentTitle(document.name, index, true)
+        }
+      });
+
+      projectDocuments.push(
+        await tx.projectDocument.update({
+          where: { id: createdDocument.id },
+          data: {
+            fileUrl: `/api/projects/${created.id}/documents/${createdDocument.id}?source=${index}`
+          }
+        })
+      );
+    }
 
     await tx.projectSubmission.update({
       where: { id: submission.id },
@@ -299,6 +341,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             participantEmail: submission.user.email,
             projectId: created.id,
             projectSlug: created.slug,
+            publishedDocuments: projectDocuments.map((document) => document.titleRu),
             expectedReturnRu: created.expectedReturnRu,
             expectedYieldRu: created.expectedYieldRu,
             to: "APPROVED"
@@ -332,4 +375,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     projectId: project.id,
     tone: "success"
   });
+}
+
+function documentTitle(fileName: string, index: number, ru: boolean) {
+  const cleaned = fileName.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").trim();
+  const fallback = ru ? `Документ проекта ${index + 1}` : `Project document ${index + 1}`;
+  return cleaned || fallback;
 }
