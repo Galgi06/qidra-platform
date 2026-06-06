@@ -40,6 +40,7 @@ const actionLabels: Record<string, Record<Locale, string>> = {
   "project.submission.review": { ru: "Заявка на размещение взята в проверку", en: "Listing submission moved to review" },
   "support.message.manager": { ru: "Менеджер ответил в чате", en: "Manager replied in chat" },
   "support.message.user": { ru: "Участник написал в чат", en: "Participant messaged support" },
+  "user.password_reset.link_sent": { ru: "Ссылка восстановления доступа отправлена", en: "Access recovery link sent" },
   "user.role.update": { ru: "Роль пользователя изменена", en: "User role updated" },
   "wallet.adjustment.credit": { ru: "Баланс увеличен корректировкой", en: "Balance increased by adjustment" },
   "wallet.adjustment.debit": { ru: "Баланс уменьшен корректировкой", en: "Balance decreased by adjustment" }

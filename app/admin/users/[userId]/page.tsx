@@ -8,12 +8,13 @@ import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { NotificationCard } from "@/components/NotificationCard";
 import { UserAvatar } from "@/components/UserAvatar";
+import { AccessRecoveryForm } from "@/components/admin/AccessRecoveryForm";
 import { RoleManagementForm } from "@/components/admin/RoleManagementForm";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { requireAdmin } from "@/lib/access";
-import { canManageManagers } from "@/lib/auth";
+import { canAccessSupportDesk, canManageManagers } from "@/lib/auth";
 import { countryName } from "@/lib/countries";
 import { getLocale, t, type Locale, type SearchParams, withLocale } from "@/lib/i18n";
 import { prisma } from "@/lib/prisma";
@@ -33,6 +34,7 @@ export default async function AdminUserDetailPage({
   const isRu = locale === "ru";
   const canAdjustBalance = session.user?.role === Role.SUPER_ADMIN;
   const canManageRoles = canManageManagers(session.user?.role as "ADMIN" | "SUPER_ADMIN" | "TECH_SUPPORT" | "SALES_MANAGER" | "guest" | undefined);
+  const canSendAccessRecovery = canAccessSupportDesk(session.user?.role as "ADMIN" | "SUPER_ADMIN" | "TECH_SUPPORT" | "SALES_MANAGER" | "guest" | undefined);
   const user = await prisma.user.findUnique({
     where: { id: userId },
     include: {
@@ -151,8 +153,10 @@ export default async function AdminUserDetailPage({
   const wallet = user.wallet;
   const adjustmentEndpoint = `/api/admin/users/${user.id}/adjustments?lang=${locale}`;
   const roleEndpoint = `/api/admin/users/${user.id}/role?lang=${locale}`;
+  const accessRecoveryEndpoint = `/api/admin/users/${user.id}/password-reset?lang=${locale}`;
   const pendingPaymentTransactions =
     wallet?.transactions.filter((transaction) => transaction.status === PaymentStatus.PENDING && (transaction.type === TransactionType.DEPOSIT || transaction.type === TransactionType.WITHDRAWAL)) ?? [];
+  const hasApprovedKyc = user.kycApplications.some((application) => application.status === KycStatus.APPROVED);
 
   return (
     <>
@@ -239,6 +243,9 @@ export default async function AdminUserDetailPage({
                       }
                     />
                   )}
+                  {canSendAccessRecovery ? (
+                    <AccessRecoveryForm endpoint={accessRecoveryEndpoint} hasApprovedKyc={hasApprovedKyc} locale={locale} />
+                  ) : null}
                 </Panel>
               </section>
 
@@ -826,6 +833,7 @@ function auditActionLabel(action: string, locale: Locale) {
     "project.submission.review": { ru: "Заявка на размещение взята в проверку", en: "Listing submission moved to review" },
     "support.message.manager": { ru: "Менеджер ответил в чате", en: "Manager replied in chat" },
     "support.message.user": { ru: "Участник написал в чат", en: "Participant messaged support" },
+    "user.password_reset.link_sent": { ru: "Ссылка восстановления доступа отправлена", en: "Access recovery link sent" },
     "user.role.update": { ru: "Роль пользователя изменена", en: "User role updated" },
     "wallet.adjustment.credit": { ru: "Баланс увеличен корректировкой", en: "Balance increased by adjustment" },
     "wallet.adjustment.debit": { ru: "Баланс уменьшен корректировкой", en: "Balance decreased by adjustment" }

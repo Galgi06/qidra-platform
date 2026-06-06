@@ -1,11 +1,12 @@
 import type { ReactNode } from "react";
-import { Role, SupportThreadStatus } from "@prisma/client";
+import { KycStatus, Role, SupportThreadStatus } from "@prisma/client";
 import { AdminTabs } from "@/components/AdminTabs";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { FeedbackForm } from "@/components/ActionFeedback";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { NotificationCard } from "@/components/NotificationCard";
+import { AccessRecoveryForm } from "@/components/admin/AccessRecoveryForm";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
 import { requireSupportDesk } from "@/lib/access";
@@ -49,7 +50,12 @@ export default async function AdminSupportPage({ searchParams }: { searchParams:
             id: true,
             name: true,
             email: true,
-            role: true
+            role: true,
+            kycApplications: {
+              orderBy: { createdAt: "desc" },
+              select: { status: true },
+              take: 5
+            }
           }
         }
       },
@@ -154,6 +160,17 @@ export default async function AdminSupportPage({ searchParams }: { searchParams:
                           </div>
                         ))}
                       </div>
+
+                      <details className="rounded-qidra border border-qidra-grayLight bg-white p-4">
+                        <summary className="cursor-pointer list-none text-16 font-medium text-qidra-dark">
+                          {isRu ? "Помощь со входом" : "Sign-in assistance"}
+                        </summary>
+                        <AccessRecoveryForm
+                          endpoint={`/api/admin/users/${thread.user.id}/password-reset?lang=${locale}`}
+                          hasApprovedKyc={thread.user.kycApplications.some((application) => application.status === KycStatus.APPROVED)}
+                          locale={locale}
+                        />
+                      </details>
 
                       <FeedbackForm
                         className="grid gap-4 border-t border-qidra-grayLight pt-5 lg:grid-cols-[1fr_240px_240px_auto] lg:items-end"
