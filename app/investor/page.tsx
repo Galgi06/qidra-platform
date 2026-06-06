@@ -201,7 +201,7 @@ export default async function InvestorPage({ searchParams }: { searchParams?: Se
                           date={formatDate(application.createdAt, locale)}
                           expectedReturn={localizedText(application.project.expectedReturnRu, application.project.expectedReturnEn, locale)}
                           expectedYield={localizedText(application.project.expectedYieldRu, application.project.expectedYieldEn, locale)}
-                          href={withLocale(`/projects/${application.project.slug}`, locale)}
+                          href={withLocale(`/investor/investments/${application.id}`, locale)}
                           structure={application.project.structure}
                           title={locale === "ru" ? application.project.titleRu : application.project.titleEn}
                           locale={locale}

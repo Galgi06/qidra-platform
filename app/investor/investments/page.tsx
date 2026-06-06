@@ -102,6 +102,14 @@ export default async function InvestmentsPage({ searchParams }: { searchParams?:
                           {isRu ? "Документы" : "Documents"}
                         </ButtonLink>
                       </div>
+                      <div className="mt-5 flex flex-wrap gap-3">
+                        <ButtonLink href={withLocale(`/investor/investments/${application.id}`, locale)} size="sm">
+                          {isRu ? "Открыть контракт" : "Open contract"}
+                        </ButtonLink>
+                        <ButtonLink href={withLocale(`/projects/${application.project.slug}`, locale)} variant="outline" size="sm">
+                          {isRu ? "Страница проекта" : "Project page"}
+                        </ButtonLink>
+                      </div>
                       {balanceWarning ? (
                         <div className="mt-5 grid gap-3 rounded-qidra border border-qidra-gold bg-yellow-50 p-4 lg:grid-cols-[1fr_auto_auto] lg:items-center">
                           <div>
