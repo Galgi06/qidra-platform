@@ -6,10 +6,12 @@ import { NotificationCard } from "@/components/NotificationCard";
 import type { Locale } from "@/lib/i18n";
 
 export function AccessRecoveryForm({
+  kycDocumentLinks = [],
   endpoint,
   hasApprovedKyc,
   locale
 }: {
+  kycDocumentLinks?: { href: string; label: string; name: string }[];
   endpoint: string;
   hasApprovedKyc: boolean;
   locale: Locale;
@@ -26,6 +28,30 @@ export function AccessRecoveryForm({
             : "Staff do not set a new password for the client. After identity verification, the system sends a one-time link to the client's email."}
         </p>
       </div>
+      {kycDocumentLinks.length ? (
+        <div className="rounded-qidra border border-qidra-grayLight bg-white p-4">
+          <p className="text-14 font-semibold text-qidra-dark">{isRu ? "Первичные KYC-документы клиента" : "Client's original KYC documents"}</p>
+          <p className="mt-1 text-13 text-qidra-grayBlue">
+            {isRu
+              ? "Откройте документы и сверяйте их с тем, что клиент предоставляет при обращении."
+              : "Open these documents and compare them with what the client provides during the support request."}
+          </p>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {kycDocumentLinks.map((item) => (
+              <a
+                key={item.href}
+                className="rounded-qidra border border-qidra-grayLight bg-qidra-grayLight px-3 py-2 text-13 font-medium text-qidra-dark transition-colors hover:border-qidra-accent hover:text-qidra-accent"
+                href={item.href}
+                rel="noreferrer"
+                target="_blank"
+              >
+                <span className="block">{item.label}</span>
+                <span className="mt-1 block break-words text-qidra-grayBlue">{item.name}</span>
+              </a>
+            ))}
+          </div>
+        </div>
+      ) : null}
       {hasApprovedKyc ? (
         <FeedbackForm
           className="grid gap-3"
@@ -47,6 +73,10 @@ export function AccessRecoveryForm({
               {
                 label: isRu ? "Документы клиента совпадают с одобренной KYC-анкетой" : "Client documents match the approved KYC profile",
                 value: "KYC_DOCUMENTS_MATCH"
+              },
+              {
+                label: isRu ? "Документы клиента НЕ совпадают с одобренной KYC-анкетой" : "Client documents do NOT match the approved KYC profile",
+                value: "KYC_DOCUMENTS_MISMATCH"
               }
             ]}
             required

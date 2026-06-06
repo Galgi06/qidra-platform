@@ -10,7 +10,7 @@ import { createRawToken, expiresIn, hashToken } from "@/lib/tokens";
 
 const accessRecoverySchema = z.object({
   confirmation: z.string().trim(),
-  identityCheck: z.literal("KYC_DOCUMENTS_MATCH"),
+  identityCheck: z.enum(["KYC_DOCUMENTS_MATCH", "KYC_DOCUMENTS_MISMATCH"]),
   reason: z.string().trim().min(12).max(800)
 });
 
@@ -95,6 +95,35 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           localeRu
             ? "Ссылка восстановления через поддержку доступна только после подтверждённой KYC-анкеты клиента."
             : "Support-assisted recovery links are available only after the client's KYC profile has been approved."
+      },
+      { status: 409 }
+    );
+  }
+
+  if (parsed.data.identityCheck === "KYC_DOCUMENTS_MISMATCH") {
+    await prisma.adminAuditLog.create({
+      data: {
+        actorId: session?.user?.id,
+        action: "user.password_reset.identity_mismatch",
+        entityId: user.id,
+        entityType: "User",
+        payload: {
+          identityCheck: parsed.data.identityCheck,
+          kycApplicationId: approvedKyc.id,
+          reason: parsed.data.reason,
+          targetEmail: user.email
+        }
+      }
+    });
+
+    return NextResponse.json(
+      {
+        title: localeRu ? "Документы не совпадают" : "Documents do not match",
+        message:
+          localeRu
+            ? "Ссылка восстановления не отправлена. Событие зафиксировано в журнале действий клиента."
+            : "The recovery link was not sent. The event was recorded in the client's audit log.",
+        tone: "warning"
       },
       { status: 409 }
     );

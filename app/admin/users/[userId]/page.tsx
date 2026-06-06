@@ -35,6 +35,7 @@ export default async function AdminUserDetailPage({
   const [{ userId }, locale] = await Promise.all([params, getLocale(searchParams)]);
   const session = await requireAdmin(locale, `/admin/users/${userId}`);
   const isRu = locale === "ru";
+  const view = parseDossierView(searchParamString(searchParams?.view));
   const canAdjustBalance = session.user?.role === Role.SUPER_ADMIN;
   const canManageBlock = session.user?.role === Role.SUPER_ADMIN;
   const canManageRoles = canManageManagers(session.user?.role as "ADMIN" | "SUPER_ADMIN" | "TECH_SUPPORT" | "SALES_MANAGER" | "guest" | undefined);
@@ -162,6 +163,10 @@ export default async function AdminUserDetailPage({
   const pendingPaymentTransactions =
     wallet?.transactions.filter((transaction) => transaction.status === PaymentStatus.PENDING && (transaction.type === TransactionType.DEPOSIT || transaction.type === TransactionType.WITHDRAWAL)) ?? [];
   const hasApprovedKyc = user.kycApplications.some((application) => application.status === KycStatus.APPROVED);
+  const approvedKycApplication = user.kycApplications.find((application) => application.status === KycStatus.APPROVED);
+  const accessRecoveryDocumentLinks = approvedKycApplication
+    ? kycDocumentLinkItems(approvedKycApplication.id, readKycDocuments(approvedKycApplication.documents), locale)
+    : [];
 
   return (
     <>
@@ -210,7 +215,9 @@ export default async function AdminUserDetailPage({
         <section className="section">
           <div className="container-qidra grid gap-8">
             <AdminTabs activePath="/admin/users" locale={locale} />
+            <DossierTabs activeView={view} locale={locale} userId={user.id} />
 
+            {view === "overview" ? (
             <div className="grid gap-8 xl:grid-cols-[0.82fr_1.18fr]">
               <section className="grid content-start gap-6">
                 <Panel title={isRu ? "Профиль участника" : "Participant profile"} description={isRu ? "Основные данные, которые участник отправляет для проверки." : "Core data submitted by the participant for review."}>
@@ -251,7 +258,7 @@ export default async function AdminUserDetailPage({
                     />
                   )}
                   {canSendAccessRecovery ? (
-                    <AccessRecoveryForm endpoint={accessRecoveryEndpoint} hasApprovedKyc={hasApprovedKyc} locale={locale} />
+                    <AccessRecoveryForm endpoint={accessRecoveryEndpoint} hasApprovedKyc={hasApprovedKyc} kycDocumentLinks={accessRecoveryDocumentLinks} locale={locale} />
                   ) : null}
                   <UserBlockForm canManageBlock={canManageBlock} endpoint={blockEndpoint} isOwnAccount={user.id === session.user?.id} locale={locale} user={user} />
                 </Panel>
@@ -315,7 +322,44 @@ export default async function AdminUserDetailPage({
                 </Panel>
               </section>
             </div>
+            ) : null}
 
+            {view === "kyc" ? (
+              <Panel
+                title={isRu ? "KYC, документы и восстановление доступа" : "KYC, documents and access recovery"}
+                description={
+                  isRu
+                    ? "Здесь сотрудник сверяет первичные документы клиента, историю анкет и принимает решение по восстановлению доступа."
+                    : "Staff can review original client documents, profile history and access recovery decisions here."
+                }
+              >
+                {user.kycApplications.length ? (
+                  <div className="grid gap-3">
+                    {user.kycApplications.map((item) => (
+                      <TimelineItem
+                        key={item.id}
+                        title={kycStatusLabel(item.status, locale)}
+                        meta={`${formatDateTime(item.createdAt, locale)} · ${item.occupation || (isRu ? "профессия не указана" : "occupation not provided")}`}
+                        tone={item.status === KycStatus.APPROVED ? "success" : item.status === KycStatus.REJECTED ? "danger" : "warning"}
+                      >
+                        <p className="text-14 text-qidra-grayBlue">
+                          {isRu ? "Источник средств" : "Source of funds"}: {sourceLabel(item.sourceOfFunds, locale)}
+                        </p>
+                        {item.reviewerNote ? <p className="mt-2 text-14 text-qidra-grayBlue">{item.reviewerNote}</p> : null}
+                        <KycDocumentLinks applicationId={item.id} documents={readKycDocuments(item.documents)} locale={locale} />
+                      </TimelineItem>
+                    ))}
+                  </div>
+                ) : (
+                  <NotificationCard title={isRu ? "Анкета не отправлена" : "KYC not submitted"} text={isRu ? "Участник пока не отправил профиль на проверку." : "The participant has not submitted a profile for review yet."} />
+                )}
+                {canSendAccessRecovery ? (
+                  <AccessRecoveryForm endpoint={accessRecoveryEndpoint} hasApprovedKyc={hasApprovedKyc} kycDocumentLinks={accessRecoveryDocumentLinks} locale={locale} />
+                ) : null}
+              </Panel>
+            ) : null}
+
+            {view === "overview" || view === "kyc" || view === "wallet" ? (
             <SafeAdjustmentsPanel
               canAdjustBalance={canAdjustBalance}
               endpoint={adjustmentEndpoint}
@@ -334,7 +378,9 @@ export default async function AdminUserDetailPage({
               }))}
               walletAvailable={wallet?.availableUsdt}
             />
+            ) : null}
 
+            {view === "contracts" ? (
             <Panel title={isRu ? "Заявки на участие" : "Participation applications"} description={isRu ? "Все последние заявки участника по проектам." : "Recent participant applications across projects."}>
               {user.investments.length ? (
                 <div className="overflow-x-auto rounded-qidra border border-qidra-grayLight bg-white">
@@ -371,7 +417,9 @@ export default async function AdminUserDetailPage({
                 <NotificationCard title={isRu ? "Заявок нет" : "No applications"} text={isRu ? "Участник ещё не подавал заявки на проекты." : "The participant has not applied to projects yet."} />
               )}
             </Panel>
+            ) : null}
 
+            {view === "projects" ? (
             <Panel title={isRu ? "Проекты клиента" : "Client projects"} description={isRu ? "Заявки участника на размещение собственных проектов." : "Participant submissions for listing their own projects."}>
               {user.projectSubmissions.length ? (
                 <div className="grid gap-3">
@@ -396,8 +444,9 @@ export default async function AdminUserDetailPage({
                 <NotificationCard title={isRu ? "Проектов нет" : "No projects"} text={isRu ? "Участник ещё не отправлял свой проект на размещение." : "The participant has not submitted a project listing yet."} />
               )}
             </Panel>
+            ) : null}
 
-            <div className="grid gap-8 xl:grid-cols-2">
+            {view === "support" ? (
               <Panel title={isRu ? "Коммуникации" : "Communications"} description={isRu ? "Последние личные диалоги с участником." : "Recent personal threads with the participant."}>
                 {user.supportThreads.length ? (
                   <div className="grid gap-4">
@@ -429,7 +478,9 @@ export default async function AdminUserDetailPage({
                   <NotificationCard title={isRu ? "Диалогов нет" : "No threads"} text={isRu ? "Участник пока не писал в поддержку." : "The participant has not contacted support yet."} />
                 )}
               </Panel>
+            ) : null}
 
+            {view === "audit" ? (
               <Panel title={isRu ? "Журнал по клиенту" : "Client audit"} description={isRu ? "Последние события, связанные с этим клиентом и его объектами." : "Recent events linked to this client and their records."}>
                 {auditLogs.length ? (
                   <div className="grid gap-3">
@@ -446,7 +497,7 @@ export default async function AdminUserDetailPage({
                   <NotificationCard title={isRu ? "Событий нет" : "No events"} text={isRu ? "Связанные события появятся после решений по KYC, платежам, заявкам или чату." : "Related events will appear after KYC, payment, application or chat decisions."} />
                 )}
               </Panel>
-            </div>
+            ) : null}
           </div>
         </section>
       </main>
@@ -650,6 +701,63 @@ function ReasonField({ label, locale, name, placeholder }: { label: string; loca
 }
 
 type Tone = "accent" | "danger" | "neutral" | "success" | "warning";
+type DossierView = "audit" | "contracts" | "kyc" | "overview" | "projects" | "support" | "wallet";
+
+function searchParamString(value: string | string[] | undefined) {
+  if (Array.isArray(value)) return value[0];
+  return value;
+}
+
+function parseDossierView(value: string | undefined): DossierView {
+  if (value === "kyc" || value === "wallet" || value === "contracts" || value === "projects" || value === "support" || value === "audit") {
+    return value;
+  }
+
+  return "overview";
+}
+
+function DossierTabs({ activeView, locale, userId }: { activeView: DossierView; locale: Locale; userId: string }) {
+  const tabs: { label: string; view: DossierView }[] = [
+    { label: locale === "ru" ? "Обзор" : "Overview", view: "overview" },
+    { label: locale === "ru" ? "KYC и документы" : "KYC and documents", view: "kyc" },
+    { label: locale === "ru" ? "Кошелёк" : "Wallet", view: "wallet" },
+    { label: locale === "ru" ? "Контракты" : "Contracts", view: "contracts" },
+    { label: locale === "ru" ? "Проекты" : "Projects", view: "projects" },
+    { label: locale === "ru" ? "Чаты" : "Chats", view: "support" },
+    { label: locale === "ru" ? "Журнал" : "Audit", view: "audit" }
+  ];
+
+  return (
+    <nav className="flex flex-wrap gap-2 rounded-qidra border border-qidra-grayLight bg-white p-2">
+      {tabs.map((tab) => (
+        <Link
+          key={tab.view}
+          className={`inline-flex h-11 items-center rounded-qidra px-4 text-14 font-medium transition-colors ${
+            activeView === tab.view ? "bg-qidra-dark text-white" : "text-qidra-grayBlue hover:bg-qidra-grayLight hover:text-qidra-dark"
+          }`}
+          href={withLocale(`/admin/users/${userId}${tab.view === "overview" ? "" : `?view=${tab.view}`}`, locale)}
+        >
+          {tab.label}
+        </Link>
+      ))}
+    </nav>
+  );
+}
+
+function kycDocumentLinkItems(applicationId: string, documents: ReturnType<typeof readKycDocuments>, locale: Locale) {
+  return [
+    {
+      href: `/api/admin/kyc/${applicationId}/documents/identityDocument?lang=${locale}`,
+      label: locale === "ru" ? "Документ личности" : "Identity document",
+      name: documents.identityDocument?.name
+    },
+    {
+      href: `/api/admin/kyc/${applicationId}/documents/addressProof?lang=${locale}`,
+      label: locale === "ru" ? "Подтверждение адреса" : "Address proof",
+      name: documents.addressProof?.name
+    }
+  ].filter((item): item is { href: string; label: string; name: string } => Boolean(item.name));
+}
 
 function Panel({ children, description, title }: { children: React.ReactNode; description?: string; title: string }) {
   return (
