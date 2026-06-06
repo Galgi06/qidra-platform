@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { KycStatus, Role, SupportThreadStatus } from "@prisma/client";
+import { KycStatus, Prisma, Role, SupportThreadStatus } from "@prisma/client";
 import { AdminTabs } from "@/components/AdminTabs";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { FeedbackForm } from "@/components/ActionFeedback";
@@ -18,10 +18,21 @@ export default async function AdminSupportPage({ searchParams }: { searchParams:
   const locale = await getLocale(params);
   const session = await requireSupportDesk(locale, "/admin/support");
   const statusFilter = parseSupportStatus(searchParamString(params.status));
+  const queueFilter = parseSupportQueue(searchParamString(params.queue));
+  const ownerFilter = parseOwnerFilter(searchParamString(params.owner));
+  const query = searchParamString(params.q)?.trim() ?? "";
   const isRu = locale === "ru";
+  const supportWhere = buildSupportWhere({
+    ownerFilter,
+    query,
+    queueFilter,
+    sessionRole: session.user?.role,
+    sessionUserId: session.user?.id,
+    statusFilter
+  });
   const [threads, managers, stats] = await Promise.all([
     prisma.supportThread.findMany({
-      where: statusFilter ? { status: statusFilter } : {},
+      where: supportWhere,
       include: {
         assignedTo: {
           select: {
@@ -104,6 +115,7 @@ export default async function AdminSupportPage({ searchParams }: { searchParams:
         <section className="section">
           <div className="container-qidra grid gap-8">
             <AdminTabs activePath="/admin/support" locale={locale} role={session.user?.role} />
+            <SupportSearchForm locale={locale} ownerFilter={ownerFilter} query={query} queueFilter={queueFilter} statusFilter={statusFilter} />
             <div className="grid gap-4 md:grid-cols-4">
               <StatCard label={isRu ? "Открытые" : "Open"} value={stats.openCount} tone="accent" />
               <StatCard label={isRu ? "Ожидают участника" : "Waiting participant"} value={stats.pendingCount} />
@@ -172,17 +184,34 @@ export default async function AdminSupportPage({ searchParams }: { searchParams:
               </div>
             </section>
             <div className="flex flex-wrap gap-2 rounded-qidra border border-qidra-grayLight bg-white p-4">
-              <FilterPill active={!statusFilter} href={supportFilterHref(locale)}>
+              <FilterPill active={!statusFilter} href={supportFilterHref(locale, undefined, queueFilter, ownerFilter, query)}>
                 {isRu ? "Все" : "All"} ({stats.totalCount})
               </FilterPill>
-              <FilterPill active={statusFilter === SupportThreadStatus.OPEN} href={supportFilterHref(locale, SupportThreadStatus.OPEN)}>
+              <FilterPill active={statusFilter === SupportThreadStatus.OPEN} href={supportFilterHref(locale, SupportThreadStatus.OPEN, queueFilter, ownerFilter, query)}>
                 {isRu ? "Открытые" : "Open"} ({stats.openCount})
               </FilterPill>
-              <FilterPill active={statusFilter === SupportThreadStatus.PENDING} href={supportFilterHref(locale, SupportThreadStatus.PENDING)}>
+              <FilterPill active={statusFilter === SupportThreadStatus.PENDING} href={supportFilterHref(locale, SupportThreadStatus.PENDING, queueFilter, ownerFilter, query)}>
                 {isRu ? "Ожидают участника" : "Waiting participant"} ({stats.pendingCount})
               </FilterPill>
-              <FilterPill active={statusFilter === SupportThreadStatus.CLOSED} href={supportFilterHref(locale, SupportThreadStatus.CLOSED)}>
+              <FilterPill active={statusFilter === SupportThreadStatus.CLOSED} href={supportFilterHref(locale, SupportThreadStatus.CLOSED, queueFilter, ownerFilter, query)}>
                 {isRu ? "Закрытые" : "Closed"} ({stats.closedCount})
+              </FilterPill>
+            </div>
+            <div className="flex flex-wrap gap-2 rounded-qidra border border-qidra-grayLight bg-white p-4">
+              <FilterPill active={!queueFilter} href={supportFilterHref(locale, statusFilter, undefined, ownerFilter, query)}>
+                {isRu ? "Все направления" : "All queues"}
+              </FilterPill>
+              <FilterPill active={queueFilter === "tech"} href={supportFilterHref(locale, statusFilter, "tech", ownerFilter, query)}>
+                {isRu ? "Техподдержка" : "Technical support"}
+              </FilterPill>
+              <FilterPill active={queueFilter === "sales"} href={supportFilterHref(locale, statusFilter, "sales", ownerFilter, query)}>
+                {isRu ? "Отдел продаж" : "Sales"}
+              </FilterPill>
+              <FilterPill active={queueFilter === "unassigned"} href={supportFilterHref(locale, statusFilter, "unassigned", ownerFilter, query)}>
+                {isRu ? "Без ответственного" : "Unassigned"}
+              </FilterPill>
+              <FilterPill active={ownerFilter === "mine"} href={supportFilterHref(locale, statusFilter, queueFilter, "mine", query)}>
+                {isRu ? "Мои обращения" : "My threads"}
               </FilterPill>
             </div>
 
@@ -200,6 +229,14 @@ export default async function AdminSupportPage({ searchParams }: { searchParams:
                             {thread.user.name || thread.user.email}
                           </h2>
                           <p className="mt-1 text-14 text-qidra-grayBlue">{thread.user.email}</p>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <ButtonLink href={withLocale(`/admin/users/${thread.user.id}?view=overview`, locale)} variant="outline" size="sm">
+                              {isRu ? "Открыть досье клиента" : "Open client dossier"}
+                            </ButtonLink>
+                            <ButtonLink href={withLocale(`/admin/users/${thread.user.id}?view=support`, locale)} variant="outline" size="sm">
+                              {isRu ? "История чатов" : "Chat history"}
+                            </ButtonLink>
+                          </div>
                           <p className="mt-3 text-14 text-qidra-grayBlue">
                             {isRu ? "Статус" : "Status"}: {supportStatusLabel(thread.status, locale)} · {isRu ? "Ответственный" : "Owner"}:{" "}
                             {thread.assignedTo ? thread.assignedTo.name || thread.assignedTo.email : isRu ? "не назначен" : "unassigned"}
@@ -387,6 +424,46 @@ function FilterPill({ active, children, href }: { active: boolean; children: Rea
   );
 }
 
+function SupportSearchForm({
+  locale,
+  ownerFilter,
+  query,
+  queueFilter,
+  statusFilter
+}: {
+  locale: "ru" | "en";
+  ownerFilter?: SupportOwnerFilter;
+  query: string;
+  queueFilter?: SupportQueueFilter;
+  statusFilter?: SupportThreadStatus;
+}) {
+  const isRu = locale === "ru";
+  const resetHref = supportFilterHref(locale, statusFilter, queueFilter, ownerFilter);
+
+  return (
+    <form action="/admin/support" className="grid gap-4 rounded-qidra bg-white p-5 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] md:grid-cols-[1fr_auto_auto] md:items-end">
+      <input name="lang" type="hidden" value={locale} />
+      {statusFilter ? <input name="status" type="hidden" value={statusFilter.toLowerCase()} /> : null}
+      {queueFilter ? <input name="queue" type="hidden" value={queueFilter} /> : null}
+      {ownerFilter ? <input name="owner" type="hidden" value={ownerFilter} /> : null}
+      <label className="grid gap-2 text-14 font-medium text-qidra-dark">
+        {isRu ? "Поиск обращения или клиента" : "Search request or client"}
+        <input
+          className="h-12 rounded-qidra border border-transparent bg-qidra-grayLight px-4 text-16 outline-none transition-colors placeholder:text-qidra-grayMedium focus:border-qidra-accent"
+          defaultValue={query}
+          name="q"
+          placeholder={isRu ? "Email, имя, тема или текст сообщения" : "Email, name, subject or message text"}
+          type="search"
+        />
+      </label>
+      <Button type="submit">{isRu ? "Найти" : "Search"}</Button>
+      <ButtonLink href={resetHref} variant="outline">
+        {isRu ? "Сбросить" : "Reset"}
+      </ButtonLink>
+    </form>
+  );
+}
+
 async function buildSupportStats(locale: "ru" | "en") {
   const [totalCount, openCount, pendingCount, closedCount, ratingAggregate, managerRows] = await Promise.all([
     prisma.supportThread.count(),
@@ -460,10 +537,95 @@ function parseSupportStatus(value: string | undefined) {
   return undefined;
 }
 
-function supportFilterHref(locale: "ru" | "en", status?: SupportThreadStatus) {
+type SupportQueueFilter = "sales" | "tech" | "unassigned";
+type SupportOwnerFilter = "mine";
+
+function parseSupportQueue(value: string | undefined): SupportQueueFilter | undefined {
+  if (value === "sales" || value === "tech" || value === "unassigned") return value;
+  return undefined;
+}
+
+function parseOwnerFilter(value: string | undefined): SupportOwnerFilter | undefined {
+  return value === "mine" ? "mine" : undefined;
+}
+
+function buildSupportWhere({
+  ownerFilter,
+  query,
+  queueFilter,
+  sessionRole,
+  sessionUserId,
+  statusFilter
+}: {
+  ownerFilter?: SupportOwnerFilter;
+  query: string;
+  queueFilter?: SupportQueueFilter;
+  sessionRole?: string;
+  sessionUserId?: string;
+  statusFilter?: SupportThreadStatus;
+}) {
+  const and: Prisma.SupportThreadWhereInput[] = [];
+
+  if (statusFilter) {
+    and.push({ status: statusFilter });
+  }
+
+  if (query) {
+    const contains = { contains: query, mode: Prisma.QueryMode.insensitive };
+
+    and.push({
+      OR: [
+        { id: contains },
+        { subject: contains },
+        { user: { is: { email: contains } } },
+        { user: { is: { name: contains } } },
+        { messages: { some: { body: contains } } }
+      ]
+    });
+  }
+
+  if (queueFilter === "tech") {
+    and.push({
+      OR: [{ assignedTo: { is: { role: Role.TECH_SUPPORT } } }, { assignedToId: null }]
+    });
+  }
+
+  if (queueFilter === "sales") {
+    and.push({
+      OR: [{ assignedTo: { is: { role: Role.SALES_MANAGER } } }, { assignedToId: null }]
+    });
+  }
+
+  if (queueFilter === "unassigned") {
+    and.push({ assignedToId: null });
+  }
+
+  if (ownerFilter === "mine" && sessionUserId) {
+    and.push({ assignedToId: sessionUserId });
+  }
+
+  if (sessionRole === Role.TECH_SUPPORT && sessionUserId) {
+    and.push({
+      OR: [{ assignedToId: sessionUserId }, { assignedToId: null }, { assignedTo: { is: { role: Role.TECH_SUPPORT } } }]
+    });
+  }
+
+  if (sessionRole === Role.SALES_MANAGER && sessionUserId) {
+    and.push({
+      OR: [{ assignedToId: sessionUserId }, { assignedToId: null }, { assignedTo: { is: { role: Role.SALES_MANAGER } } }]
+    });
+  }
+
+  return and.length ? { AND: and } : {};
+}
+
+function supportFilterHref(locale: "ru" | "en", status?: SupportThreadStatus, queue?: SupportQueueFilter, owner?: SupportOwnerFilter, query?: string) {
   const params = new URLSearchParams({ lang: locale });
 
   if (status) params.set("status", status.toLowerCase());
+  if (queue) params.set("queue", queue);
+  if (owner) params.set("owner", owner);
+  if (query) params.set("q", query);
   return `/admin/support?${params.toString()}`;
 }
 
