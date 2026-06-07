@@ -20,6 +20,14 @@ export function ProjectCard({ project, locale }: { project: CatalogProject; loca
         <span className="w-fit rounded-full bg-white px-4 py-2 text-14 font-medium text-qidra-accent shadow-[0_0_0_1px_rgba(86,87,246,0.16)]">{project.structure}</span>
       </div>
       <p className="max-w-3xl text-18 text-qidra-grayBlue">{project.summary[locale]}</p>
+      {project.initiator ? (
+        <a
+          className="w-fit rounded-full bg-white px-4 py-2 text-14 font-medium text-qidra-dark shadow-[0_0_0_1px_rgba(18,20,23,0.08)] transition-colors hover:text-qidra-accent"
+          href={withLocale(`/profiles/${project.initiator.id}`, locale)}
+        >
+          {isRu ? "Инициатор" : "Initiator"}: {project.initiator.name || (isRu ? "Участник Qidra" : "Qidra participant")}
+        </a>
+      ) : null}
       <dl className="grid gap-3 text-14 text-qidra-grayBlue sm:grid-cols-3">
         <div className="rounded-[12px] bg-white p-4">
           <dt>{isRu ? "Локация" : "Location"}</dt>

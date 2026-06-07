@@ -62,6 +62,18 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                   <ProjectFact label={isRu ? "Ожидаемый результат" : "Expected result"} value={project.expectedReturn[locale]} />
                   <ProjectFact label={isRu ? "Ориентир доходности" : "Return guidance"} value={project.expectedYield[locale]} />
                 </dl>
+                {project.initiator ? (
+                  <a
+                    className="rounded-qidra border border-qidra-grayMedium/40 bg-qidra-grayLight p-4 text-15 text-qidra-grayBlue transition-colors hover:border-qidra-accent/50 hover:text-qidra-dark"
+                    href={withLocale(`/profiles/${project.initiator.id}`, locale)}
+                  >
+                    <span className="block text-13 uppercase text-qidra-accent">{isRu ? "Инициатор проекта" : "Project initiator"}</span>
+                    <span className="mt-1 block text-18 font-medium text-qidra-dark">{project.initiator.name || (isRu ? "Участник Qidra" : "Qidra participant")}</span>
+                    <span className="mt-1 block">
+                      {[project.initiator.country, project.initiator.city].filter(Boolean).join(", ") || (isRu ? "Профиль участника" : "Participant profile")}
+                    </span>
+                  </a>
+                ) : null}
                 {canApply ? (
                   <ButtonLink href={withLocale(`/invest/${project.slug}`, locale)} className="h-14">
                     {isRu ? "Подать заявку" : "Create application"}

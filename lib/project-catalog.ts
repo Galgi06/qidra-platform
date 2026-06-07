@@ -29,6 +29,12 @@ export type CatalogProject = {
   targetUsdt: number;
   title: Record<Locale, string>;
   description: Record<Locale, string>;
+  initiator: {
+    city: string | null;
+    country: string | null;
+    id: string;
+    name: string | null;
+  } | null;
 };
 
 export function projectStatusToDb(status: ContentProject["status"]) {
@@ -116,10 +122,34 @@ async function createBaseDocuments(projectId: string, project: ContentProject) {
   });
 }
 
-export function mapProject(project: DbProject & { documents?: ProjectDocument[] }): CatalogProject {
+type ProjectWithPublicRelations = DbProject & {
+  documents?: ProjectDocument[];
+  projectSubmissions?: {
+    status?: string;
+    user?: {
+      id: string;
+      name: string | null;
+      investorProfile?: {
+        city: string | null;
+        country: string | null;
+      } | null;
+    } | null;
+  }[];
+};
+
+export function mapProject(project: ProjectWithPublicRelations): CatalogProject {
   const fundedUsdt = Number(project.fundedUsdt.toString());
   const targetUsdt = Number(project.targetUsdt.toString());
   const effectiveStatus = project.status === ProjectStatus.ACTIVE && fundedUsdt >= targetUsdt ? ProjectStatus.FUNDED : project.status;
+  const initiatorSubmission = project.projectSubmissions?.find((submission) => submission.status === "APPROVED" && submission.user);
+  const initiator = initiatorSubmission?.user
+    ? {
+        id: initiatorSubmission.user.id,
+        name: initiatorSubmission.user.name,
+        country: initiatorSubmission.user.investorProfile?.country ?? null,
+        city: initiatorSubmission.user.investorProfile?.city ?? null
+      }
+    : null;
 
   return {
     id: project.id,
@@ -163,6 +193,7 @@ export function mapProject(project: DbProject & { documents?: ProjectDocument[] 
     location: project.location ?? "UAE",
     structure: project.structure,
     riskLevel: project.riskLevel ?? "Moderate",
+    initiator,
     documents:
       project.documents?.map((document) => ({
         title: { ru: document.titleRu, en: document.titleEn },
@@ -219,7 +250,8 @@ function mapContentProject(project: ContentProject): CatalogProject {
     location: project.location,
     structure: project.structure,
     riskLevel: project.riskLevel,
-    documents: project.documents
+    documents: project.documents,
+    initiator: null
   };
 }
 
@@ -263,7 +295,7 @@ export async function getAdminProjects() {
   await ensureBaseProjects();
 
   const projects = await prisma.project.findMany({
-    include: { documents: true },
+    include: { documents: true, projectSubmissions: publicInitiatorInclude() },
     orderBy: { createdAt: "desc" }
   });
 
@@ -279,7 +311,7 @@ export async function getPublicProjects() {
         status: { in: [ProjectStatus.ACTIVE, ProjectStatus.FUNDED] },
         documents: { some: {} }
       },
-      include: { documents: true },
+      include: { documents: true, projectSubmissions: publicInitiatorInclude() },
       orderBy: { createdAt: "desc" }
     });
 
@@ -299,7 +331,7 @@ export async function getProjectBySlug(slug: string) {
 
     const project = await prisma.project.findUnique({
       where: { slug },
-      include: { documents: true }
+      include: { documents: true, projectSubmissions: publicInitiatorInclude() }
     });
 
     return project ? mapProject(project) : fallbackProjectBySlug(slug);
@@ -310,4 +342,25 @@ export async function getProjectBySlug(slug: string) {
 
     throw error;
   }
+}
+
+function publicInitiatorInclude() {
+  return {
+    where: { status: "APPROVED" as const },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          investorProfile: {
+            select: {
+              city: true,
+              country: true
+            }
+          }
+        }
+      }
+    },
+    take: 1
+  };
 }
