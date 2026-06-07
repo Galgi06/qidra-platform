@@ -11,6 +11,7 @@ const adminSections = [
   { path: "/admin/investments", label: { ru: "Заявки", en: "Applications" } },
   { path: "/admin/payments", label: { ru: "Платежи", en: "Payments" } },
   { path: "/admin/support", label: { ru: "Коммуникации", en: "Communications" } },
+  { path: "/admin/security", label: { ru: "Безопасность", en: "Security" } },
   { path: "/admin/audit", label: { ru: "Журнал", en: "Audit" } }
 ];
 

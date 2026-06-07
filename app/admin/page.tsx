@@ -47,6 +47,14 @@ const sections = [
     text: { ru: "Личные диалоги с участниками, поддержкой и продажами.", en: "Personal participant threads for support and sales." }
   },
   {
+    href: "/admin/security",
+    label: { ru: "Безопасность", en: "Security" },
+    text: {
+      ru: "Production-чеклист: домен, секреты, SMTP, файловое хранилище и TRC20.",
+      en: "Production checklist: domain, secrets, SMTP, file storage and TRC20."
+    }
+  },
+  {
     href: "/admin/audit",
     label: { ru: "Журнал действий", en: "Audit log" },
     text: { ru: "История изменений, проверок и финансовых решений.", en: "History of changes, reviews and financial decisions." }

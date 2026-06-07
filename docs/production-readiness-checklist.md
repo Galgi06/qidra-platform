@@ -62,6 +62,7 @@
 - [x] Нельзя заблокировать собственный аккаунт.
 - [x] В карточке клиента доступны профиль, KYC, документы, платежи, участие, аудит и восстановление доступа.
 - [x] Восстановление доступа через поддержку отправляет ссылку, а не задает пароль вручную.
+- [x] В админ-панель добавлена страница диагностики production-безопасности без раскрытия секретов.
 
 Критично перед продом:
 
@@ -113,6 +114,7 @@
 - [ ] `FILE_STORAGE_DRIVER=s3` подключен к приватному bucket с выключенным публичным доступом.
 - [ ] Dependency audit разобран без `npm audit fix --force`; опасные транзитивные зависимости обновлены отдельным тестируемым планом.
 - [x] Security headers включены в Next config: CSP без `unsafe-eval` в production, HSTS, frame protection, referrer policy, MIME sniffing protection, permissions policy.
+- [x] Админ видит production-блокеры по secrets, SMTP, OAuth, S3 и TRC20 на странице `/admin/security`.
 - [ ] Настроить внешний WAF/rate limit на уровне Cloudflare/Vercel/nginx для `/api/auth/*`, `/api/wallet/*`, `/api/investments`, `/api/support/*`.
 - [ ] Логи ошибок и бизнес-аудит доступны администратору.
 - [ ] Настроен rollback-план деплоя.
