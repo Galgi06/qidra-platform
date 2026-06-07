@@ -291,6 +291,8 @@ export const authOptions: NextAuthOptions = {
     signIn: "/auth/sign-in"
   },
   session: {
+    maxAge: 8 * 60 * 60,
+    updateAge: 15 * 60,
     strategy: "jwt"
   },
   callbacks: {
