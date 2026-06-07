@@ -118,6 +118,11 @@ export default async function InvestorContractPage({
                     <InfoBlock label={isRu ? "Локация" : "Location"} value={application.project.location} />
                     <InfoBlock label={isRu ? "Риск" : "Risk"} value={application.project.riskLevel} />
                     <InfoBlock label={isRu ? "Статус проекта" : "Project status"} value={application.project.status} />
+                    <InfoBlock label={isRu ? "Стадия проекта" : "Project stage"} value={localizedText(application.project.stageRu, application.project.stageEn, locale) || (isRu ? "Уточняется" : "To be confirmed")} />
+                    <InfoBlock label={isRu ? "Период сбора" : "Raise period"} value={formatOptionalDateRange(application.project.fundraisingStartAt, application.project.fundraisingEndAt, locale)} />
+                    <InfoBlock label={isRu ? "План запуска" : "Planned launch"} value={formatOptionalDate(application.project.plannedLaunchAt, locale)} />
+                    <InfoBlock label={isRu ? "Первые выплаты" : "First distributions"} value={formatOptionalDate(application.project.plannedDividendAt, locale)} />
+                    <InfoBlock label={isRu ? "Срок участия" : "Participation term"} value={localizedText(application.project.participationTermRu, application.project.participationTermEn, locale) || (isRu ? "По условиям проекта" : "Per project terms")} />
                   </div>
                   <div className="grid gap-4 md:grid-cols-2">
                     <InfoBlock label={isRu ? "Ожидаемый результат" : "Expected result"} value={expectedReturn || (isRu ? "По условиям проекта" : "Per project terms")} />
@@ -129,6 +134,16 @@ export default async function InvestorContractPage({
                       <p className="mt-2 whitespace-pre-wrap text-14 text-qidra-grayBlue">{application.adminNote}</p>
                     </div>
                   ) : null}
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <InfoBlock
+                      label={isRu ? "Что сделано сейчас" : "Current progress"}
+                      value={localizedText(application.project.currentProgressRu, application.project.currentProgressEn, locale) || (isRu ? "Смотрите документы проекта" : "See project documents")}
+                    />
+                    <InfoBlock
+                      label={isRu ? "План сбора" : "Raise plan"}
+                      value={localizedText(application.project.raisePlanRu, application.project.raisePlanEn, locale) || (isRu ? "По условиям проекта" : "Per project terms")}
+                    />
+                  </div>
                 </Panel>
 
                 <Panel title={isRu ? "Документы проекта" : "Project documents"}>
@@ -302,6 +317,16 @@ function formatDate(date: Date, locale: "ru" | "en") {
     month: "short",
     year: "numeric"
   }).format(date);
+}
+
+function formatOptionalDate(date: Date | null, locale: "ru" | "en") {
+  return date ? formatDate(date, locale) : locale === "ru" ? "Уточняется" : "To be confirmed";
+}
+
+function formatOptionalDateRange(start: Date | null, end: Date | null, locale: "ru" | "en") {
+  if (!start && !end) return locale === "ru" ? "Уточняется" : "To be confirmed";
+  if (start && end) return `${formatDate(start, locale)} - ${formatDate(end, locale)}`;
+  return formatOptionalDate(start ?? end, locale);
 }
 
 function formatDateTime(date: Date, locale: "ru" | "en") {

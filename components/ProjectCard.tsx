@@ -54,12 +54,21 @@ export function ProjectCard({ project, locale }: { project: CatalogProject; loca
           <dl className="grid gap-3 sm:grid-cols-2">
             <ProjectInfo label={isRu ? "Целевой объём" : "Target"} value={`${project.targetUsdt.toLocaleString()} USDT`} />
             <ProjectInfo label={isRu ? "Модель" : "Model"} value={project.structure} />
+            <ProjectInfo label={isRu ? "Стадия" : "Stage"} value={project.lifecycle.stage[locale]} />
+            <ProjectInfo label={isRu ? "Период сбора" : "Raise period"} value={formatDateRange(project.lifecycle.fundraisingStartAt, project.lifecycle.fundraisingEndAt, locale)} />
+            <ProjectInfo label={isRu ? "План запуска" : "Planned launch"} value={formatDate(project.lifecycle.plannedLaunchAt, locale)} />
+            <ProjectInfo label={isRu ? "Первые выплаты" : "First distributions"} value={formatDate(project.lifecycle.plannedDividendAt, locale)} />
+            <ProjectInfo label={isRu ? "Срок участия" : "Participation term"} value={project.lifecycle.participationTerm[locale]} />
             <ProjectInfo
               label={isRu ? "Ожидаемый результат" : "Expected result"}
               value={project.expectedReturn[locale]}
             />
             <ProjectInfo label={isRu ? "Ориентир доходности" : "Return guidance"} value={project.expectedYield[locale]} />
           </dl>
+          <div className="rounded-[10px] bg-qidra-grayLight px-3 py-2 text-14">
+            <p className="font-medium text-qidra-dark">{isRu ? "Что сделано сейчас" : "Current progress"}</p>
+            <p className="mt-1">{project.lifecycle.currentProgress[locale]}</p>
+          </div>
           {project.documents.length ? (
             <div className="grid gap-2">
               <p className="text-13 font-medium uppercase text-qidra-grayBlue">{isRu ? "Документы для ознакомления" : "Documents to review"}</p>
@@ -111,4 +120,15 @@ function ProjectInfo({ label, value }: { label: string; value: string }) {
       <dd className="mt-1 font-medium text-qidra-dark">{value}</dd>
     </div>
   );
+}
+
+function formatDate(value: string | null, locale: Locale) {
+  if (!value) return locale === "ru" ? "Уточняется" : "To be confirmed";
+  return new Intl.DateTimeFormat(locale === "ru" ? "ru-RU" : "en-US", { dateStyle: "medium" }).format(new Date(value));
+}
+
+function formatDateRange(start: string | null, end: string | null, locale: Locale) {
+  if (!start && !end) return locale === "ru" ? "Уточняется" : "To be confirmed";
+  if (start && end) return `${formatDate(start, locale)} - ${formatDate(end, locale)}`;
+  return formatDate(start ?? end, locale);
 }

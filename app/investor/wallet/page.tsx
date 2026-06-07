@@ -105,8 +105,13 @@ export default async function WalletPage({ searchParams }: { searchParams?: Sear
                     title={isRu ? "Перед отправкой" : "Before submitting"}
                     text={isRu ? "Qidra примет только подтверждённый входящий USDT TRC20-перевод на ваш личный адрес и с точно такой же суммой." : "Qidra will accept only a confirmed incoming USDT TRC20 transfer to your personal address with the exact submitted amount."}
                   />
-                  <Input label="Transaction hash" name="txHash" placeholder="TRC20 transaction hash" required />
-                  <Input label="Amount USDT" name="amount" inputMode="decimal" placeholder="1000" required defaultValue={prefilledAmount} />
+                  <Input
+                    label={isRu ? "Хэш транзакции" : "Transaction hash"}
+                    name="txHash"
+                    placeholder={isRu ? "Введите TRC20 transaction hash" : "TRC20 transaction hash"}
+                    required
+                  />
+                  <Input label={isRu ? "Сумма USDT" : "Amount USDT"} name="amount" inputMode="decimal" placeholder="1000" required defaultValue={prefilledAmount} />
                   <Button disabled={!depositAddress || !tronPayment.verificationConfigured} type="submit">
                     {isRu ? "Проверить и пополнить" : "Verify and deposit"}
                   </Button>
@@ -138,7 +143,7 @@ export default async function WalletPage({ searchParams }: { searchParams?: Sear
                     }
                   />
                   <Input label={isRu ? "Адрес получателя USDT TRC20" : "Recipient USDT TRC20 address"} name="destinationAddress" placeholder="T..." required />
-                  <Input label="Amount USDT" name="amount" inputMode="decimal" placeholder="100" required />
+                  <Input label={isRu ? "Сумма USDT" : "Amount USDT"} name="amount" inputMode="decimal" placeholder="100" required />
                   <Button disabled={decimalToNumber(availableUsdt) <= 0} type="submit">
                     {isRu ? "Отправить заявку на вывод" : "Submit withdrawal request"}
                   </Button>

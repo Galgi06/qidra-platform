@@ -128,11 +128,32 @@ export default async function AdminProjectSubmissionsPage({ searchParams }: { se
                         <Fact label={isRu ? "Цель" : "Target"} value={submission.targetUsdt ? `${Number(submission.targetUsdt.toString()).toLocaleString()} USDT` : isRu ? "Не указано" : "Not set"} />
                         <Fact label={isRu ? "Ожидаемый результат" : "Expected result"} value={submission.expectedReturn || (isRu ? "Не указано" : "Not set")} />
                         <Fact label={isRu ? "Ориентир доходности" : "Return guidance"} value={submission.expectedYield || (isRu ? "Не указано" : "Not set")} />
+                        <Fact label={isRu ? "Стадия" : "Stage"} value={submission.stage || (isRu ? "Не указано" : "Not set")} />
+                        <Fact label={isRu ? "Период сбора" : "Raise period"} value={formatDateRange(submission.fundraisingStartAt, submission.fundraisingEndAt, locale)} />
+                        <Fact label={isRu ? "План запуска" : "Planned launch"} value={submission.plannedLaunchAt ? formatDate(submission.plannedLaunchAt, locale) : isRu ? "Не указано" : "Not set"} />
+                        <Fact label={isRu ? "Первые выплаты" : "First distributions"} value={submission.plannedDividendAt ? formatDate(submission.plannedDividendAt, locale) : isRu ? "Не указано" : "Not set"} />
+                        <Fact label={isRu ? "Срок участия" : "Participation term"} value={submission.participationTerm || (isRu ? "Не указано" : "Not set")} />
                       </dl>
                       <div>
                         <h3 className="text-18 font-medium text-qidra-dark">{isRu ? "Описание участника" : "Participant description"}</h3>
                         <p className="mt-3 whitespace-pre-line text-16 text-qidra-grayBlue">{submission.summary}</p>
                       </div>
+                      {submission.currentProgress || submission.raisePlan ? (
+                        <div className="grid gap-4 lg:grid-cols-2">
+                          {submission.currentProgress ? (
+                            <div className="rounded-[12px] bg-qidra-grayLight p-4">
+                              <h3 className="text-16 font-medium text-qidra-dark">{isRu ? "Что уже сделано" : "Current progress"}</h3>
+                              <p className="mt-2 whitespace-pre-line text-14 text-qidra-grayBlue">{submission.currentProgress}</p>
+                            </div>
+                          ) : null}
+                          {submission.raisePlan ? (
+                            <div className="rounded-[12px] bg-qidra-grayLight p-4">
+                              <h3 className="text-16 font-medium text-qidra-dark">{isRu ? "План сбора" : "Raise plan"}</h3>
+                              <p className="mt-2 whitespace-pre-line text-14 text-qidra-grayBlue">{submission.raisePlan}</p>
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
                       {submission.adminNote ? (
                         <div className="rounded-[12px] bg-qidra-grayLight p-4">
                           <h3 className="text-16 font-medium text-qidra-dark">{isRu ? "Последняя заметка администратора" : "Latest admin note"}</h3>
@@ -179,7 +200,15 @@ export default async function AdminProjectSubmissionsPage({ searchParams }: { se
                           structure: submission.structure,
                           summary: submission.summary,
                           targetUsdt: submission.targetUsdt?.toString() ?? "",
-                          title: submission.title
+                          title: submission.title,
+                          stage: submission.stage,
+                          currentProgress: submission.currentProgress,
+                          fundraisingStartAt: submission.fundraisingStartAt,
+                          fundraisingEndAt: submission.fundraisingEndAt,
+                          plannedLaunchAt: submission.plannedLaunchAt,
+                          plannedDividendAt: submission.plannedDividendAt,
+                          participationTerm: submission.participationTerm,
+                          raisePlan: submission.raisePlan
                         }}
                       />
                     </article>
@@ -272,6 +301,14 @@ function SubmissionActions({
     summary: string;
     targetUsdt: string;
     title: string;
+    stage: string | null;
+    currentProgress: string | null;
+    fundraisingStartAt: Date | null;
+    fundraisingEndAt: Date | null;
+    plannedLaunchAt: Date | null;
+    plannedDividendAt: Date | null;
+    participationTerm: string | null;
+    raisePlan: string | null;
   };
 }) {
   const isRu = locale === "ru";
@@ -381,7 +418,13 @@ function SubmissionActions({
             <div className="grid gap-4 lg:grid-cols-2">
               <Input label={isRu ? "Название RU" : "Title RU"} name="titleRu" defaultValue={submission.title} required />
               <Input label={isRu ? "Название EN" : "Title EN"} name="titleEn" defaultValue={submission.title} required />
-              <Input label="Slug" name="slug" defaultValue={preparedSlug} required />
+              <Input
+                label={isRu ? "Адрес проекта (латиницей)" : "Project URL address"}
+                name="slug"
+                defaultValue={preparedSlug}
+                placeholder={isRu ? "Например: qidra-new-project" : "Example: qidra-new-project"}
+                required
+              />
               <Input label={isRu ? "Цель USDT" : "Target USDT"} name="targetUsdt" defaultValue={decimalInput(submission.targetUsdt)} inputMode="decimal" required />
               <Select
                 label={isRu ? "Структура" : "Structure"}
@@ -403,8 +446,8 @@ function SubmissionActions({
                   { value: "DRAFT", label: isRu ? "Черновик / не опубликован" : "Draft / not published" }
                 ]}
               />
-              <Input label={isRu ? "Локация" : "Location"} name="location" defaultValue={submission.location ?? "UAE"} required />
-              <Input label={isRu ? "Риск" : "Risk"} name="riskLevel" defaultValue="Moderate" required />
+              <Input label={isRu ? "Локация" : "Location"} name="location" defaultValue={submission.location ?? "UAE"} placeholder={isRu ? "Например: ОАЭ, Дубай" : "Example: UAE, Dubai"} required />
+              <Input label={isRu ? "Риск" : "Risk"} name="riskLevel" defaultValue="Moderate" placeholder={isRu ? "Например: средний" : "Example: moderate"} required />
               <Input label={isRu ? "Кратко RU" : "Summary RU"} name="summaryRu" defaultValue={summary} required />
               <Input label={isRu ? "Кратко EN" : "Summary EN"} name="summaryEn" defaultValue={summary} required />
               <Input
@@ -417,6 +460,7 @@ function SubmissionActions({
                 label={isRu ? "Ожидаемый результат EN" : "Expected result EN"}
                 name="expectedReturnEn"
                 defaultValue={submission.expectedReturn ?? "Depends on actual project results"}
+                placeholder={isRu ? "Напишите английскую версию ожидаемого результата" : "Depends on actual project results"}
                 required
               />
               <Input
@@ -430,9 +474,23 @@ function SubmissionActions({
                 label={isRu ? "Ориентир доходности EN" : "Return guidance EN"}
                 name="expectedYieldEn"
                 defaultValue={submission.expectedYield ?? ""}
-                placeholder="Example: approximately 30-40% by project outcome, not guaranteed"
+                placeholder={isRu ? "Напишите английскую версию ориентира доходности" : "Example: approximately 30-40% by project outcome, not guaranteed"}
                 required
               />
+              <Input label={isRu ? "Стадия проекта RU" : "Project stage RU"} name="stageRu" defaultValue={submission.stage ?? ""} placeholder={isRu ? "Например: действующий бизнес, расширение" : "Example: operating business, expansion"} />
+              <Input label={isRu ? "Стадия проекта EN" : "Project stage EN"} name="stageEn" defaultValue={submission.stage ?? ""} placeholder={isRu ? "Напишите английскую версию стадии проекта" : "Example: operating business, expansion"} />
+              <Input label={isRu ? "Начало сбора" : "Fundraising start"} name="fundraisingStartAt" type="date" defaultValue={dateInput(submission.fundraisingStartAt)} />
+              <Input label={isRu ? "Окончание сбора" : "Fundraising end"} name="fundraisingEndAt" type="date" defaultValue={dateInput(submission.fundraisingEndAt)} />
+              <Input label={isRu ? "План запуска" : "Planned launch"} name="plannedLaunchAt" type="date" defaultValue={dateInput(submission.plannedLaunchAt)} />
+              <Input label={isRu ? "Первые выплаты" : "First distributions"} name="plannedDividendAt" type="date" defaultValue={dateInput(submission.plannedDividendAt)} />
+              <Input label={isRu ? "Срок участия RU" : "Participation term RU"} name="participationTermRu" defaultValue={submission.participationTerm ?? ""} placeholder={isRu ? "Например: 12 месяцев после запуска" : "Example: 12 months after launch"} />
+              <Input label={isRu ? "Срок участия EN" : "Participation term EN"} name="participationTermEn" defaultValue={submission.participationTerm ?? ""} placeholder={isRu ? "Напишите английскую версию срока участия" : "Example: 12 months after launch"} />
+            </div>
+            <div className="grid gap-4 lg:grid-cols-2">
+              <DescriptionField label={isRu ? "Что сделано сейчас RU" : "Current progress RU"} name="currentProgressRu" defaultValue={submission.currentProgress ?? ""} />
+              <DescriptionField label={isRu ? "Что сделано сейчас EN" : "Current progress EN"} name="currentProgressEn" defaultValue={submission.currentProgress ?? ""} />
+              <DescriptionField label={isRu ? "План сбора RU" : "Raise plan RU"} name="raisePlanRu" defaultValue={submission.raisePlan ?? ""} required={false} />
+              <DescriptionField label={isRu ? "План сбора EN" : "Raise plan EN"} name="raisePlanEn" defaultValue={submission.raisePlan ?? ""} required={false} />
             </div>
             <DescriptionField label={isRu ? "Описание RU" : "Description RU"} name="descriptionRu" defaultValue={submission.summary} />
             <DescriptionField label={isRu ? "Описание EN" : "Description EN"} name="descriptionEn" defaultValue={submission.summary} />
@@ -607,7 +665,7 @@ function ReasonField({ defaultValue = "", label, name, required = true }: { defa
   );
 }
 
-function DescriptionField({ defaultValue, label, name }: { defaultValue: string; label: string; name: string }) {
+function DescriptionField({ defaultValue, label, name, required = true }: { defaultValue: string; label: string; name: string; required?: boolean }) {
   return (
     <label className="grid gap-2 text-14 font-medium text-qidra-dark">
       {label}
@@ -615,12 +673,23 @@ function DescriptionField({ defaultValue, label, name }: { defaultValue: string;
         className="min-h-[180px] rounded-qidra border border-transparent bg-qidra-grayLight px-4 py-3 text-16 outline-none transition-colors placeholder:text-qidra-grayMedium focus:border-qidra-accent"
         defaultValue={defaultValue}
         maxLength={5000}
-        minLength={20}
+        minLength={required ? 20 : undefined}
         name={name}
-        required
+        required={required}
       />
     </label>
   );
+}
+
+function dateInput(value: Date | null) {
+  if (!value) return "";
+  return value.toISOString().slice(0, 10);
+}
+
+function formatDateRange(start: Date | null, end: Date | null, locale: "ru" | "en") {
+  if (!start && !end) return locale === "ru" ? "Не указано" : "Not set";
+  if (start && end) return `${formatDate(start, locale)} - ${formatDate(end, locale)}`;
+  return formatDate(start ?? end ?? new Date(), locale);
 }
 
 function compactText(value: string, maxLength: number) {

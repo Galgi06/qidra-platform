@@ -15,6 +15,18 @@ const amountSchema = z
 
 const noteSchema = z.string().trim().min(12).max(800);
 
+const optionalText = z.preprocess((value) => {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : undefined;
+}, z.string().max(5000).optional());
+
+const optionalDate = z.preprocess((value) => {
+  if (typeof value !== "string" || !value.trim()) return undefined;
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return Number.isNaN(date.getTime()) ? value : date;
+}, z.date().optional());
+
 const submissionActionSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("review"),
@@ -33,6 +45,18 @@ const submissionActionSchema = z.discriminatedUnion("action", [
     expectedReturnRu: z.string().trim().min(5).max(180),
     expectedYieldEn: z.string().trim().min(2).max(180),
     expectedYieldRu: z.string().trim().min(2).max(180),
+    stageRu: optionalText,
+    stageEn: optionalText,
+    currentProgressRu: optionalText,
+    currentProgressEn: optionalText,
+    fundraisingStartAt: optionalDate,
+    fundraisingEndAt: optionalDate,
+    plannedLaunchAt: optionalDate,
+    plannedDividendAt: optionalDate,
+    participationTermRu: optionalText,
+    participationTermEn: optionalText,
+    raisePlanRu: optionalText,
+    raisePlanEn: optionalText,
     location: z.string().trim().min(2).max(120),
     note: noteSchema,
     riskLevel: z.string().trim().min(2).max(80),
@@ -111,6 +135,20 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       },
       { status: 400 }
     );
+  }
+
+  if (parsed.data.action === "prepare" && parsed.data.fundraisingStartAt && parsed.data.fundraisingEndAt) {
+    const fundraisingDays = Math.ceil((parsed.data.fundraisingEndAt.getTime() - parsed.data.fundraisingStartAt.getTime()) / 86_400_000);
+
+    if (fundraisingDays < 1 || fundraisingDays > 93) {
+      return NextResponse.json(
+        {
+          title: localeRu ? "Проверьте срок сбора" : "Check fundraising period",
+          message: localeRu ? "Срок сбора должен быть от 1 до 93 дней." : "Fundraising period must be between 1 and 93 days."
+        },
+        { status: 400 }
+      );
+    }
   }
 
   const submission = await prisma.projectSubmission.findUnique({
@@ -250,8 +288,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (existingProject) {
     return NextResponse.json(
       {
-        title: localeRu ? "Slug уже занят" : "Slug already exists",
-        message: localeRu ? "Выберите другой slug для проекта." : "Choose another slug for the project."
+        title: localeRu ? "Адрес проекта уже занят" : "Project address already exists",
+        message: localeRu ? "Выберите другой адрес проекта латиницей." : "Choose another latin project address."
       },
       { status: 409 }
     );
@@ -283,6 +321,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         expectedReturnRu: data.expectedReturnRu,
         expectedYieldEn: data.expectedYieldEn,
         expectedYieldRu: data.expectedYieldRu,
+        stageRu: data.stageRu,
+        stageEn: data.stageEn,
+        currentProgressRu: data.currentProgressRu,
+        currentProgressEn: data.currentProgressEn,
+        fundraisingStartAt: data.fundraisingStartAt,
+        fundraisingEndAt: data.fundraisingEndAt,
+        plannedLaunchAt: data.plannedLaunchAt,
+        plannedDividendAt: data.plannedDividendAt,
+        participationTermRu: data.participationTermRu,
+        participationTermEn: data.participationTermEn,
+        raisePlanRu: data.raisePlanRu,
+        raisePlanEn: data.raisePlanEn,
         fundedUsdt: 0,
         location: data.location,
         riskLevel: data.riskLevel,

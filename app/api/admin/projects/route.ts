@@ -13,6 +13,18 @@ const amountSchema = z
   .refine((value) => /^\d+(\.\d{1,6})?$/.test(value), "invalid")
   .refine((value) => new Prisma.Decimal(value).gt(0), "positive");
 
+const optionalText = z.preprocess((value) => {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : undefined;
+}, z.string().max(5000).optional());
+
+const optionalDate = z.preprocess((value) => {
+  if (typeof value !== "string" || !value.trim()) return undefined;
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return Number.isNaN(date.getTime()) ? value : date;
+}, z.date().optional());
+
 const projectSchema = z.object({
   titleRu: z.string().trim().min(2).max(160),
   titleEn: z.string().trim().min(2).max(160),
@@ -33,7 +45,31 @@ const projectSchema = z.object({
   expectedReturnRu: z.string().trim().min(5).max(180),
   expectedReturnEn: z.string().trim().min(5).max(180),
   expectedYieldRu: z.string().trim().min(2).max(180),
-  expectedYieldEn: z.string().trim().min(2).max(180)
+  expectedYieldEn: z.string().trim().min(2).max(180),
+  stageRu: optionalText,
+  stageEn: optionalText,
+  currentProgressRu: optionalText,
+  currentProgressEn: optionalText,
+  fundraisingStartAt: optionalDate,
+  fundraisingEndAt: optionalDate,
+  plannedLaunchAt: optionalDate,
+  plannedDividendAt: optionalDate,
+  participationTermRu: optionalText,
+  participationTermEn: optionalText,
+  raisePlanRu: optionalText,
+  raisePlanEn: optionalText
+}).superRefine((data, context) => {
+  if (data.fundraisingStartAt && data.fundraisingEndAt) {
+    const days = Math.ceil((data.fundraisingEndAt.getTime() - data.fundraisingStartAt.getTime()) / 86_400_000);
+
+    if (days < 1 || days > 93) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "fundraising_period",
+        path: ["fundraisingEndAt"]
+      });
+    }
+  }
 });
 
 type SessionUser = {
@@ -69,8 +105,8 @@ export async function POST(request: NextRequest) {
         title: localeRu ? "Проверьте проект" : "Check the project",
         message:
           localeRu
-            ? "Заполните название, slug, сумму цели и краткое описание. Slug должен быть латиницей через дефис."
-            : "Fill in the title, slug, target amount and summary. The slug must use latin letters with hyphens."
+            ? "Заполните название, адрес проекта, сумму цели и краткое описание. Адрес проекта пишется латиницей через дефис, например qidra-new-project."
+            : "Fill in the title, project URL address, target amount and summary. The project address must use latin letters with hyphens, for example qidra-new-project."
       },
       { status: 400 }
     );
@@ -81,8 +117,8 @@ export async function POST(request: NextRequest) {
   if (existing) {
     return NextResponse.json(
       {
-        title: localeRu ? "Slug уже занят" : "Slug already exists",
-        message: localeRu ? "Выберите другой slug для проекта." : "Choose another project slug."
+        title: localeRu ? "Адрес проекта уже занят" : "Project address already exists",
+        message: localeRu ? "Выберите другой адрес проекта латиницей." : "Choose another latin project address."
       },
       { status: 409 }
     );
@@ -114,6 +150,18 @@ export async function POST(request: NextRequest) {
       expectedReturnEn: parsed.data.expectedReturnEn,
       expectedYieldRu: parsed.data.expectedYieldRu,
       expectedYieldEn: parsed.data.expectedYieldEn,
+      stageRu: parsed.data.stageRu,
+      stageEn: parsed.data.stageEn,
+      currentProgressRu: parsed.data.currentProgressRu,
+      currentProgressEn: parsed.data.currentProgressEn,
+      fundraisingStartAt: parsed.data.fundraisingStartAt,
+      fundraisingEndAt: parsed.data.fundraisingEndAt,
+      plannedLaunchAt: parsed.data.plannedLaunchAt,
+      plannedDividendAt: parsed.data.plannedDividendAt,
+      participationTermRu: parsed.data.participationTermRu,
+      participationTermEn: parsed.data.participationTermEn,
+      raisePlanRu: parsed.data.raisePlanRu,
+      raisePlanEn: parsed.data.raisePlanEn,
       status: parsed.data.status,
       targetUsdt: parsed.data.targetUsdt,
       fundedUsdt: 0,

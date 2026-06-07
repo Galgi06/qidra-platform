@@ -153,6 +153,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     await tx.supportThread.update({
       where: { id: threadId },
       data: {
+        closedAt: thread.status === SupportThreadStatus.CLOSED ? null : thread.closedAt,
         lastManagerMessageAt: now,
         status: thread.status === SupportThreadStatus.CLOSED ? SupportThreadStatus.OPEN : thread.status
       }

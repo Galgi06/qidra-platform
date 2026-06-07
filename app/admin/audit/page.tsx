@@ -284,11 +284,11 @@ function payloadKeyLabel(key: string, locale: Locale) {
     projectId: { ru: "ID проекта", en: "Project ID" },
     reservedDeltaUsdt: { ru: "Изменение резерва", en: "Reserve change" },
     reason: { ru: "Причина", en: "Reason" },
-    slug: { ru: "Slug", en: "Slug" },
+    slug: { ru: "Адрес проекта", en: "Project address" },
     status: { ru: "Статус", en: "Status" },
     to: { ru: "Стало", en: "To" },
     toAddress: { ru: "Адрес зачисления", en: "Recipient address" },
-    txHash: { ru: "Transaction hash", en: "Transaction hash" },
+    txHash: { ru: "Хэш транзакции", en: "Transaction hash" },
     type: { ru: "Тип операции", en: "Operation type" },
     userId: { ru: "ID клиента", en: "Client ID" }
   };

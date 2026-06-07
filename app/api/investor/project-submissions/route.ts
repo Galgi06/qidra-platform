@@ -16,6 +16,14 @@ const optionalText = z.preprocess((value) => {
   return trimmed ? trimmed : undefined;
 }, z.string().max(180).optional());
 
+const requiredText = (min = 2, max = 5000) => z.string().trim().min(min).max(max);
+
+const dateSchema = z.preprocess((value) => {
+  if (typeof value !== "string" || !value.trim()) return value;
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return Number.isNaN(date.getTime()) ? value : date;
+}, z.date());
+
 const projectSubmissionSchema = z.object({
   title: z.string().trim().min(3).max(180),
   sector: optionalText,
@@ -29,7 +37,25 @@ const projectSubmissionSchema = z.object({
   structure: optionalText,
   expectedReturn: z.string().trim().min(5).max(180),
   expectedYield: z.string().trim().min(2).max(180),
+  stage: requiredText(3, 180),
+  currentProgress: requiredText(20, 2500),
+  fundraisingStartAt: dateSchema,
+  fundraisingEndAt: dateSchema,
+  plannedLaunchAt: dateSchema,
+  plannedDividendAt: dateSchema,
+  participationTerm: requiredText(3, 180),
+  raisePlan: z.string().trim().max(2500).optional(),
   summary: z.string().trim().min(120).max(5000)
+}).superRefine((data, context) => {
+  const fundraisingDays = Math.ceil((data.fundraisingEndAt.getTime() - data.fundraisingStartAt.getTime()) / 86_400_000);
+
+  if (fundraisingDays < 1 || fundraisingDays > 93) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "fundraising_period",
+      path: ["fundraisingEndAt"]
+    });
+  }
 });
 
 type SessionUser = {
@@ -167,6 +193,14 @@ export async function POST(request: NextRequest) {
     structure: readText(formData, "structure"),
     expectedReturn: readText(formData, "expectedReturn"),
     expectedYield: readText(formData, "expectedYield"),
+    stage: readText(formData, "stage"),
+    currentProgress: readText(formData, "currentProgress"),
+    fundraisingStartAt: readText(formData, "fundraisingStartAt"),
+    fundraisingEndAt: readText(formData, "fundraisingEndAt"),
+    plannedLaunchAt: readText(formData, "plannedLaunchAt"),
+    plannedDividendAt: readText(formData, "plannedDividendAt"),
+    participationTerm: readText(formData, "participationTerm"),
+    raisePlan: readText(formData, "raisePlan"),
     summary: readText(formData, "summary")
   });
   const documents = readFiles(formData, "documents");
@@ -266,6 +300,14 @@ export async function POST(request: NextRequest) {
         structure: data.structure,
         expectedReturn: data.expectedReturn,
         expectedYield: data.expectedYield,
+        stage: data.stage,
+        currentProgress: data.currentProgress,
+        fundraisingStartAt: data.fundraisingStartAt,
+        fundraisingEndAt: data.fundraisingEndAt,
+        plannedLaunchAt: data.plannedLaunchAt,
+        plannedDividendAt: data.plannedDividendAt,
+        participationTerm: data.participationTerm,
+        raisePlan: data.raisePlan,
         summary: data.summary,
         documents: {
           files: savedDocuments,
@@ -285,6 +327,12 @@ export async function POST(request: NextRequest) {
           title: data.title,
           expectedReturn: data.expectedReturn,
           expectedYield: data.expectedYield,
+          stage: data.stage,
+          fundraisingStartAt: data.fundraisingStartAt.toISOString(),
+          fundraisingEndAt: data.fundraisingEndAt.toISOString(),
+          plannedLaunchAt: data.plannedLaunchAt.toISOString(),
+          plannedDividendAt: data.plannedDividendAt.toISOString(),
+          participationTerm: data.participationTerm,
           documents: savedDocuments.map((document) => document.name)
         }
       }

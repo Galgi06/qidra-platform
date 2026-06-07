@@ -336,7 +336,7 @@ export default async function AdminSupportPage({ searchParams }: { searchParams:
                       </FeedbackForm>
 
                       <FeedbackForm
-                        className="grid gap-4 border-t border-qidra-grayLight pt-5 lg:grid-cols-[1fr_auto] lg:items-end"
+                        className="grid gap-5 border-t border-qidra-grayLight pt-6"
                         endpoint={`/api/admin/support/${thread.id}/messages?lang=${locale}`}
                         feedback={{
                           title: isRu ? "Ответ отправлен" : "Reply sent",
@@ -345,7 +345,7 @@ export default async function AdminSupportPage({ searchParams }: { searchParams:
                           dismissLabel: isRu ? "Закрыть уведомление" : "Close notification",
                           tone: "success"
                         }}
-                        refreshOnSuccess
+                        reloadOnSuccess
                         resetOnSubmit
                       >
                         <input name="action" type="hidden" value="reply" />
@@ -354,14 +354,18 @@ export default async function AdminSupportPage({ searchParams }: { searchParams:
                           {isRu ? "Ответ участнику" : "Reply to participant"}
                           <textarea
                             id={`support-reply-${thread.id}`}
-                            className="min-h-28 rounded-qidra border border-transparent bg-qidra-grayLight px-4 py-3 text-16 outline-none transition-colors placeholder:text-qidra-grayMedium focus:border-qidra-accent"
+                            className="min-h-56 w-full resize-y rounded-qidra border border-transparent bg-qidra-grayLight px-5 py-4 text-16 leading-relaxed outline-none transition-colors placeholder:text-qidra-grayMedium focus:border-qidra-accent"
                             maxLength={3000}
                             name="body"
-                            placeholder={isRu ? "Напишите ответ" : "Write a reply"}
+                            placeholder={isRu ? "Напишите полный ответ участнику. Можно использовать шаблон выше или ввести текст вручную." : "Write a full reply to the participant. You can use a template above or type a custom answer."}
                             required
                           />
                         </label>
-                        <Button type="submit">{isRu ? "Ответить" : "Reply"}</Button>
+                        <div className="flex justify-end">
+                          <Button type="submit" className="w-full sm:w-fit">
+                            {isRu ? "Отправить ответ участнику" : "Send reply to participant"}
+                          </Button>
+                        </div>
                       </FeedbackForm>
                     </article>
                   );

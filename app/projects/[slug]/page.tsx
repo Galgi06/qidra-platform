@@ -54,6 +54,11 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                   <ProjectFact label={isRu ? "Структура" : "Structure"} value={project.structure} />
                   <ProjectFact label={isRu ? "Локация" : "Location"} value={project.location} />
                   <ProjectFact label={isRu ? "Риск" : "Risk"} value={riskLabel} />
+                  <ProjectFact label={isRu ? "Стадия" : "Stage"} value={project.lifecycle.stage[locale]} />
+                  <ProjectFact label={isRu ? "Период сбора" : "Raise period"} value={formatDateRange(project.lifecycle.fundraisingStartAt, project.lifecycle.fundraisingEndAt, locale)} />
+                  <ProjectFact label={isRu ? "План запуска" : "Planned launch"} value={formatDate(project.lifecycle.plannedLaunchAt, locale)} />
+                  <ProjectFact label={isRu ? "Первые выплаты" : "First distributions"} value={formatDate(project.lifecycle.plannedDividendAt, locale)} />
+                  <ProjectFact label={isRu ? "Срок участия" : "Participation term"} value={project.lifecycle.participationTerm[locale]} />
                   <ProjectFact label={isRu ? "Ожидаемый результат" : "Expected result"} value={project.expectedReturn[locale]} />
                   <ProjectFact label={isRu ? "Ориентир доходности" : "Return guidance"} value={project.expectedYield[locale]} />
                 </dl>
@@ -81,6 +86,10 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
         <section className="px-5 py-12 sm:px-8 lg:px-11 lg:py-16">
           <div className="mx-auto grid max-w-[1840px] gap-12">
             <ProjectGallery title={project.title[locale]} locale={locale} />
+            <div className="grid gap-6 lg:grid-cols-2">
+              <InfoPanel title={isRu ? "Что сделано сейчас" : "Current progress"} text={project.lifecycle.currentProgress[locale]} />
+              <InfoPanel title={isRu ? "План сбора" : "Raise plan"} text={project.lifecycle.raisePlan[locale]} />
+            </div>
             <div className="grid gap-6 lg:grid-cols-3">
               <InfoPanel
                 title={isRu ? "Формат участия" : "Participation format"}
@@ -148,4 +157,15 @@ function InfoPanel({ title, text }: { title: string; text: string }) {
       <p className="mt-5 text-18 text-qidra-grayBlue">{text}</p>
     </article>
   );
+}
+
+function formatDate(value: string | null, locale: "ru" | "en") {
+  if (!value) return locale === "ru" ? "Уточняется" : "To be confirmed";
+  return new Intl.DateTimeFormat(locale === "ru" ? "ru-RU" : "en-US", { dateStyle: "medium" }).format(new Date(value));
+}
+
+function formatDateRange(start: string | null, end: string | null, locale: "ru" | "en") {
+  if (!start && !end) return locale === "ru" ? "Уточняется" : "To be confirmed";
+  if (start && end) return `${formatDate(start, locale)} - ${formatDate(end, locale)}`;
+  return formatDate(start ?? end, locale);
 }

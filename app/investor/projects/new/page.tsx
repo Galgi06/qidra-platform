@@ -98,7 +98,41 @@ export default async function NewProjectSubmissionPage({ searchParams }: { searc
                     placeholder={isRu ? "Например: ориентировочно 30-40% по итогам проекта, не гарантия" : "Example: approximately 30-40% by project outcome, not guaranteed"}
                     required
                   />
+                  <Input label={isRu ? "Стадия проекта" : "Project stage"} name="stage" placeholder={isRu ? "Стартап, действующий бизнес, расширение" : "Startup, operating business, expansion"} required />
+                  <Input label={isRu ? "Срок участия" : "Participation term"} name="participationTerm" placeholder={isRu ? "Например: 12 месяцев после запуска" : "Example: 12 months after launch"} required />
+                  <Input label={isRu ? "Начало сбора" : "Fundraising start"} name="fundraisingStartAt" type="date" required />
+                  <Input label={isRu ? "Окончание сбора" : "Fundraising end"} name="fundraisingEndAt" type="date" required />
+                  <Input label={isRu ? "План запуска проекта" : "Planned launch"} name="plannedLaunchAt" type="date" required />
+                  <Input label={isRu ? "План первых выплат" : "Planned first distributions"} name="plannedDividendAt" type="date" required />
                 </div>
+                <label className="grid gap-2 text-14 font-medium text-qidra-dark">
+                  {isRu ? "Что уже сделано" : "Current progress"}
+                  <textarea
+                    className="min-h-[140px] rounded-qidra border border-transparent bg-qidra-grayLight px-4 py-3 text-16 outline-none transition-colors placeholder:text-qidra-grayMedium focus:border-qidra-accent"
+                    maxLength={2500}
+                    minLength={20}
+                    name="currentProgress"
+                    placeholder={
+                      isRu
+                        ? "Опишите текущую стадию: что уже создано, какие активы/договоры есть, что готово к запуску."
+                        : "Describe current stage: what is already built, assets/contracts available and launch readiness."
+                    }
+                    required
+                  />
+                </label>
+                <label className="grid gap-2 text-14 font-medium text-qidra-dark">
+                  {isRu ? "План и этапы сбора" : "Raise plan and phases"}
+                  <textarea
+                    className="min-h-[120px] rounded-qidra border border-transparent bg-qidra-grayLight px-4 py-3 text-16 outline-none transition-colors placeholder:text-qidra-grayMedium focus:border-qidra-accent"
+                    maxLength={2500}
+                    name="raisePlan"
+                    placeholder={
+                      isRu
+                        ? "Если сбор идёт этапами, опишите этапы. Срок сбора должен быть в пределах 1-3 месяцев."
+                        : "If the raise is phased, describe phases. Fundraising period must be within 1-3 months."
+                    }
+                  />
+                </label>
                 <label className="grid gap-2 text-14 font-medium text-qidra-dark">
                   {isRu ? "Подробное описание проекта" : "Detailed project description"}
                   <textarea

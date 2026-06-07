@@ -77,7 +77,12 @@ export default async function AdminProjectsPage({ searchParams }: { searchParams
               <div className="grid gap-4 lg:grid-cols-3">
                 <Input label={locale === "ru" ? "Название RU" : "Title RU"} name="titleRu" required />
                 <Input label={locale === "ru" ? "Название EN" : "Title EN"} name="titleEn" required />
-                <Input label="Slug" name="slug" placeholder="qidra-new-project" required />
+                <Input
+                  label={locale === "ru" ? "Адрес проекта (латиницей)" : "Project URL address"}
+                  name="slug"
+                  placeholder={locale === "ru" ? "Например: qidra-new-project" : "Example: qidra-new-project"}
+                  required
+                />
                 <Input label={locale === "ru" ? "Цель USDT" : "Target USDT"} name="targetUsdt" inputMode="decimal" placeholder="100000" required />
                 <Select
                   label={locale === "ru" ? "Структура" : "Structure"}
@@ -97,14 +102,36 @@ export default async function AdminProjectsPage({ searchParams }: { searchParams
                     { value: "REVIEW", label: locale === "ru" ? "Проверка" : "Review" }
                   ]}
                 />
-                <Input label={locale === "ru" ? "Локация" : "Location"} name="location" placeholder="UAE" />
-                <Input label={locale === "ru" ? "Риск" : "Risk"} name="riskLevel" placeholder="Moderate" />
+                <Input label={locale === "ru" ? "Локация" : "Location"} name="location" placeholder={locale === "ru" ? "Например: ОАЭ, Дубай" : "Example: UAE, Dubai"} />
+                <Input label={locale === "ru" ? "Риск" : "Risk"} name="riskLevel" placeholder={locale === "ru" ? "Например: средний" : "Example: moderate"} />
                 <Input label={locale === "ru" ? "Кратко RU" : "Summary RU"} name="summaryRu" required />
                 <Input label={locale === "ru" ? "Кратко EN" : "Summary EN"} name="summaryEn" required />
                 <Input label={locale === "ru" ? "Ожидаемый результат RU" : "Expected result RU"} name="expectedReturnRu" placeholder={locale === "ru" ? "Зависит от фактических итогов проекта" : "Depends on actual project results"} required />
-                <Input label={locale === "ru" ? "Ожидаемый результат EN" : "Expected result EN"} name="expectedReturnEn" placeholder="Depends on actual project results" required />
+                <Input label={locale === "ru" ? "Ожидаемый результат EN" : "Expected result EN"} name="expectedReturnEn" placeholder={locale === "ru" ? "Напишите английскую версию ожидаемого результата" : "Depends on actual project results"} required />
                 <Input label={locale === "ru" ? "Ориентир доходности RU" : "Return guidance RU"} name="expectedYieldRu" placeholder={locale === "ru" ? "Например: ориентировочно 30-40%, не гарантия" : "Example: approximately 30-40%, not guaranteed"} required />
-                <Input label={locale === "ru" ? "Ориентир доходности EN" : "Return guidance EN"} name="expectedYieldEn" placeholder="Example: approximately 30-40%, not guaranteed" required />
+                <Input label={locale === "ru" ? "Ориентир доходности EN" : "Return guidance EN"} name="expectedYieldEn" placeholder={locale === "ru" ? "Напишите английскую версию ориентира доходности" : "Example: approximately 30-40%, not guaranteed"} required />
+                <Input label={locale === "ru" ? "Стадия проекта RU" : "Project stage RU"} name="stageRu" placeholder={locale === "ru" ? "Подготовка к запуску" : "Preparing for launch"} />
+                <Input label={locale === "ru" ? "Стадия проекта EN" : "Project stage EN"} name="stageEn" placeholder={locale === "ru" ? "Напишите английскую версию стадии проекта" : "Preparing for launch"} />
+                <Input label={locale === "ru" ? "Начало сбора" : "Fundraising start"} name="fundraisingStartAt" type="date" />
+                <Input label={locale === "ru" ? "Окончание сбора" : "Fundraising end"} name="fundraisingEndAt" type="date" />
+                <Input label={locale === "ru" ? "План запуска" : "Planned launch"} name="plannedLaunchAt" type="date" />
+                <Input label={locale === "ru" ? "Первые выплаты" : "First distributions"} name="plannedDividendAt" type="date" />
+                <Input label={locale === "ru" ? "Срок участия RU" : "Participation term RU"} name="participationTermRu" placeholder={locale === "ru" ? "12 месяцев после запуска" : "12 months after launch"} />
+                <Input label={locale === "ru" ? "Срок участия EN" : "Participation term EN"} name="participationTermEn" placeholder={locale === "ru" ? "Напишите английскую версию срока участия" : "12 months after launch"} />
+              </div>
+              <div className="grid gap-4 lg:grid-cols-2">
+                <TextArea label={locale === "ru" ? "Что сделано сейчас RU" : "Current progress RU"} name="currentProgressRu" placeholder={locale === "ru" ? "Опишите текущую стадию, активы, документы и готовность команды." : "Describe current stage, assets, documents and team readiness."} />
+                <TextArea
+                  label={locale === "ru" ? "Что сделано сейчас EN" : "Current progress EN"}
+                  name="currentProgressEn"
+                  placeholder={locale === "ru" ? "Напишите английскую версию текущей стадии проекта" : "Describe current stage, assets, documents and team readiness."}
+                />
+                <TextArea label={locale === "ru" ? "План сбора RU" : "Raise plan RU"} name="raisePlanRu" placeholder={locale === "ru" ? "Опишите срок сбора, этапы и условия остановки сбора." : "Describe raise period, phases and closing conditions."} />
+                <TextArea
+                  label={locale === "ru" ? "План сбора EN" : "Raise plan EN"}
+                  name="raisePlanEn"
+                  placeholder={locale === "ru" ? "Напишите английскую версию плана сбора" : "Describe raise period, phases and closing conditions."}
+                />
               </div>
               <Button type="submit" className="w-full sm:w-fit">
                 {locale === "ru" ? "Создать черновик" : "Create draft"}
@@ -241,7 +268,24 @@ function AdminProjectPanel({ project, locale }: { project: CatalogProject; local
           <ProjectFact label={isRu ? "Структура" : "Structure"} value={project.structure} />
           <ProjectFact label={isRu ? "Локация" : "Location"} value={project.location} />
           <ProjectFact label={isRu ? "Риск" : "Risk"} value={project.riskLevel} />
+          <ProjectFact label={isRu ? "Стадия" : "Stage"} value={project.lifecycle.stage[locale]} />
+          <ProjectFact label={isRu ? "Период сбора" : "Raise period"} value={formatDateRange(project.lifecycle.fundraisingStartAt, project.lifecycle.fundraisingEndAt, locale)} />
+          <ProjectFact label={isRu ? "План запуска" : "Planned launch"} value={formatDate(project.lifecycle.plannedLaunchAt, locale)} />
+          <ProjectFact label={isRu ? "Первые выплаты" : "First distributions"} value={formatDate(project.lifecycle.plannedDividendAt, locale)} />
+          <ProjectFact label={isRu ? "Срок участия" : "Participation term"} value={project.lifecycle.participationTerm[locale]} />
+          <ProjectFact label={isRu ? "Ориентир доходности" : "Return guidance"} value={project.expectedYield[locale]} />
         </dl>
+      </div>
+
+      <div className="grid gap-4 rounded-[14px] bg-qidra-grayLight p-4 lg:grid-cols-2">
+        <div>
+          <h3 className="text-16 font-medium text-qidra-dark">{isRu ? "Что сделано сейчас" : "Current progress"}</h3>
+          <p className="mt-2 text-14 text-qidra-grayBlue">{project.lifecycle.currentProgress[locale]}</p>
+        </div>
+        <div>
+          <h3 className="text-16 font-medium text-qidra-dark">{isRu ? "План сбора" : "Raise plan"}</h3>
+          <p className="mt-2 text-14 text-qidra-grayBlue">{project.lifecycle.raisePlan[locale]}</p>
+        </div>
       </div>
 
       <div className="grid gap-6 border-t border-qidra-grayLight pt-6 lg:grid-cols-[0.7fr_1.3fr]">
@@ -359,8 +403,33 @@ function ProjectFact({ label, value }: { label: string; value: string }) {
   );
 }
 
+function TextArea({ label, name, placeholder }: { label: string; name: string; placeholder: string }) {
+  return (
+    <label className="grid gap-2 text-14 font-medium text-qidra-dark">
+      {label}
+      <textarea
+        className="min-h-28 rounded-qidra border border-transparent bg-qidra-grayLight px-4 py-3 text-16 outline-none transition-colors placeholder:text-qidra-grayMedium focus:border-qidra-accent"
+        maxLength={5000}
+        name={name}
+        placeholder={placeholder}
+      />
+    </label>
+  );
+}
+
 function formatUsdt(value: number) {
   return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(value)} USDT`;
+}
+
+function formatDate(value: string | null, locale: Locale) {
+  if (!value) return locale === "ru" ? "Уточняется" : "To be confirmed";
+  return new Intl.DateTimeFormat(locale === "ru" ? "ru-RU" : "en-US", { dateStyle: "medium" }).format(new Date(value));
+}
+
+function formatDateRange(start: string | null, end: string | null, locale: Locale) {
+  if (!start && !end) return locale === "ru" ? "Уточняется" : "To be confirmed";
+  if (start && end) return `${formatDate(start, locale)} - ${formatDate(end, locale)}`;
+  return formatDate(start ?? end, locale);
 }
 
 function buildProjectStats(projects: CatalogProject[]): ProjectStats {

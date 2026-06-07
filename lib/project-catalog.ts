@@ -10,6 +10,16 @@ export type CatalogProject = {
   expectedYield: Record<Locale, string>;
   fundedUsdt: number;
   id: string;
+  lifecycle: {
+    currentProgress: Record<Locale, string>;
+    fundraisingEndAt: string | null;
+    fundraisingStartAt: string | null;
+    participationTerm: Record<Locale, string>;
+    plannedDividendAt: string | null;
+    plannedLaunchAt: string | null;
+    raisePlan: Record<Locale, string>;
+    stage: Record<Locale, string>;
+  };
   location: string;
   riskLevel: string;
   slug: string;
@@ -125,6 +135,28 @@ export function mapProject(project: DbProject & { documents?: ProjectDocument[] 
       ru: project.expectedYieldRu || defaultExpectedYield("ru"),
       en: project.expectedYieldEn || defaultExpectedYield("en")
     },
+    lifecycle: {
+      stage: {
+        ru: project.stageRu || defaultStage("ru"),
+        en: project.stageEn || defaultStage("en")
+      },
+      currentProgress: {
+        ru: project.currentProgressRu || defaultCurrentProgress("ru"),
+        en: project.currentProgressEn || defaultCurrentProgress("en")
+      },
+      fundraisingStartAt: project.fundraisingStartAt ? project.fundraisingStartAt.toISOString() : null,
+      fundraisingEndAt: project.fundraisingEndAt ? project.fundraisingEndAt.toISOString() : null,
+      plannedLaunchAt: project.plannedLaunchAt ? project.plannedLaunchAt.toISOString() : null,
+      plannedDividendAt: project.plannedDividendAt ? project.plannedDividendAt.toISOString() : null,
+      participationTerm: {
+        ru: project.participationTermRu || defaultParticipationTerm("ru"),
+        en: project.participationTermEn || defaultParticipationTerm("en")
+      },
+      raisePlan: {
+        ru: project.raisePlanRu || defaultRaisePlan("ru"),
+        en: project.raisePlanEn || defaultRaisePlan("en")
+      }
+    },
     status: dbStatusToBadge(effectiveStatus),
     targetUsdt,
     fundedUsdt,
@@ -159,6 +191,28 @@ function mapContentProject(project: ContentProject): CatalogProject {
       ru: defaultExpectedYield("ru"),
       en: defaultExpectedYield("en")
     },
+    lifecycle: {
+      stage: {
+        ru: defaultStage("ru"),
+        en: defaultStage("en")
+      },
+      currentProgress: {
+        ru: defaultCurrentProgress("ru"),
+        en: defaultCurrentProgress("en")
+      },
+      fundraisingStartAt: null,
+      fundraisingEndAt: null,
+      plannedLaunchAt: null,
+      plannedDividendAt: null,
+      participationTerm: {
+        ru: defaultParticipationTerm("ru"),
+        en: defaultParticipationTerm("en")
+      },
+      raisePlan: {
+        ru: defaultRaisePlan("ru"),
+        en: defaultRaisePlan("en")
+      }
+    },
     status: project.status,
     targetUsdt: project.targetUsdt,
     fundedUsdt: project.fundedUsdt,
@@ -175,6 +229,22 @@ function defaultExpectedReturn(locale: Locale) {
 
 function defaultExpectedYield(locale: Locale) {
   return locale === "ru" ? "Ориентир не указан; фиксированная доходность не обещается" : "Not specified; fixed returns are not promised";
+}
+
+function defaultStage(locale: Locale) {
+  return locale === "ru" ? "Стадия уточняется после проверки проекта" : "Stage will be clarified after project review";
+}
+
+function defaultCurrentProgress(locale: Locale) {
+  return locale === "ru" ? "Текущий прогресс раскрывается в документах проекта и обновлениях команды." : "Current progress is disclosed in project documents and team updates.";
+}
+
+function defaultParticipationTerm(locale: Locale) {
+  return locale === "ru" ? "По условиям проекта" : "Per project terms";
+}
+
+function defaultRaisePlan(locale: Locale) {
+  return locale === "ru" ? "Сбор открыт в пределах цели проекта; при достижении цели новые заявки автоматически закрываются." : "The raise is open within the project target; once the target is reached, new applications close automatically.";
 }
 
 function fallbackProjectBySlug(slug: string) {

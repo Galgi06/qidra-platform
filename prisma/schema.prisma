@@ -172,31 +172,43 @@ model WalletTransaction {
 }
 
 model Project {
-  id                 String                  @id @default(cuid())
-  slug               String                  @unique
-  titleRu            String
-  titleEn            String
-  summaryRu          String
-  summaryEn          String
-  descriptionRu      String
-  descriptionEn      String
-  expectedReturnRu   String?
-  expectedReturnEn   String?
-  expectedYieldRu    String?
-  expectedYieldEn    String?
-  status             ProjectStatus           @default(DRAFT)
-  targetUsdt         Decimal                 @db.Decimal(18, 6)
-  fundedUsdt         Decimal                 @default(0) @db.Decimal(18, 6)
-  location           String?
-  structure          String                  @default("Mudaraba")
-  riskLevel          String?
-  coverImage         String?
-  createdAt          DateTime                @default(now())
-  updatedAt          DateTime                @updatedAt
-  documents          ProjectDocument[]
-  reports            ProjectReport[]
-  investments        InvestmentApplication[]
-  projectSubmissions ProjectSubmission[]
+  id                  String                  @id @default(cuid())
+  slug                String                  @unique
+  titleRu             String
+  titleEn             String
+  summaryRu           String
+  summaryEn           String
+  descriptionRu       String
+  descriptionEn       String
+  expectedReturnRu    String?
+  expectedReturnEn    String?
+  expectedYieldRu     String?
+  expectedYieldEn     String?
+  stageRu             String?
+  stageEn             String?
+  currentProgressRu   String?                 @db.Text
+  currentProgressEn   String?                 @db.Text
+  fundraisingStartAt  DateTime?
+  fundraisingEndAt    DateTime?
+  plannedLaunchAt     DateTime?
+  plannedDividendAt   DateTime?
+  participationTermRu String?
+  participationTermEn String?
+  raisePlanRu         String?                 @db.Text
+  raisePlanEn         String?                 @db.Text
+  status              ProjectStatus           @default(DRAFT)
+  targetUsdt          Decimal                 @db.Decimal(18, 6)
+  fundedUsdt          Decimal                 @default(0) @db.Decimal(18, 6)
+  location            String?
+  structure           String                  @default("Mudaraba")
+  riskLevel           String?
+  coverImage          String?
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+  documents           ProjectDocument[]
+  reports             ProjectReport[]
+  investments         InvestmentApplication[]
+  projectSubmissions  ProjectSubmission[]
 }
 
 model ProjectDocument {
@@ -223,24 +235,32 @@ model ProjectReport {
 }
 
 model ProjectSubmission {
-  id             String                  @id @default(cuid())
-  userId         String
-  title          String
-  sector         String?
-  location       String?
-  targetUsdt     Decimal?                @db.Decimal(18, 6)
-  projectId      String?
-  structure      String?
-  expectedReturn String?
-  expectedYield  String?
-  summary        String                  @db.Text
-  documents      Json?
-  status         ProjectSubmissionStatus @default(SUBMITTED)
-  adminNote      String?
-  createdAt      DateTime                @default(now())
-  updatedAt      DateTime                @updatedAt
-  project        Project?                @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  user           User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                 String                  @id @default(cuid())
+  userId             String
+  title              String
+  sector             String?
+  location           String?
+  targetUsdt         Decimal?                @db.Decimal(18, 6)
+  projectId          String?
+  structure          String?
+  expectedReturn     String?
+  expectedYield      String?
+  stage              String?
+  currentProgress    String?                 @db.Text
+  fundraisingStartAt DateTime?
+  fundraisingEndAt   DateTime?
+  plannedLaunchAt    DateTime?
+  plannedDividendAt  DateTime?
+  participationTerm  String?
+  raisePlan          String?                 @db.Text
+  summary            String                  @db.Text
+  documents          Json?
+  status             ProjectSubmissionStatus @default(SUBMITTED)
+  adminNote          String?
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+  project            Project?                @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  user               User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
   @@index([status])
