@@ -46,6 +46,50 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   allowedDevOrigins: ["127.0.0.1", "localhost"],
+  async redirects() {
+    return [
+      {
+        source: "/auth/login",
+        destination: "/auth/sign-in",
+        permanent: false
+      },
+      {
+        source: "/auth/registration",
+        destination: "/auth/sign-up",
+        permanent: false
+      },
+      {
+        source: "/wallet",
+        destination: "/investor/wallet",
+        permanent: false
+      },
+      {
+        source: "/messages",
+        destination: "/investor/support",
+        permanent: false
+      },
+      {
+        source: "/profile",
+        destination: "/investor",
+        permanent: false
+      },
+      {
+        source: "/profile/:path*",
+        destination: "/investor",
+        permanent: false
+      },
+      {
+        source: "/cabinet",
+        destination: "/investor",
+        permanent: false
+      },
+      {
+        source: "/cabinet/:path*",
+        destination: "/investor",
+        permanent: false
+      }
+    ];
+  },
   async headers() {
     return [
       {
