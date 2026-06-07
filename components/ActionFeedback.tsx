@@ -155,10 +155,17 @@ export function FeedbackForm({
                 body: JSON.stringify(Object.fromEntries(formData.entries()))
               });
         const data = (await response.json().catch(() => ({}))) as { title?: string; message?: string; tone?: FeedbackTone };
+        const english = feedback.buttonLabel === "Got it" || feedback.dismissLabel === "Close notification";
         const nextFeedback = {
           ...feedback,
-          title: data.title ?? feedback.title,
-          text: data.message ?? feedback.text,
+          title: data.title ?? (response.ok ? feedback.title : english ? "Action failed" : "Действие не выполнено"),
+          text:
+            data.message ??
+            (response.ok
+              ? feedback.text
+              : english
+                ? "The server did not confirm the action. Refresh the page and try again."
+                : "Сервер не подтвердил действие. Обновите страницу и попробуйте ещё раз."),
           tone: response.ok ? data.tone ?? feedback.tone : "error"
         };
 

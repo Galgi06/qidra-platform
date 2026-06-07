@@ -226,8 +226,6 @@ export default async function AdminSupportPage({ searchParams }: { searchParams:
                   const accessRecoveryDocumentLinks = approvedKycApplication
                     ? kycDocumentLinkItems(approvedKycApplication.id, readKycDocuments(approvedKycApplication.documents), locale)
                     : [];
-                  const replyFormId = `support-reply-form-${thread.id}`;
-
                   return (
                     <article key={thread.id} className="grid gap-5 rounded-[20px] bg-white p-6 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] sm:p-8">
                       <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-start">
@@ -346,8 +344,7 @@ export default async function AdminSupportPage({ searchParams }: { searchParams:
                           dismissLabel: isRu ? "Закрыть уведомление" : "Close notification",
                           tone: "success"
                         }}
-                        formId={replyFormId}
-                        reloadOnSuccess
+                        refreshOnSuccess
                         resetOnSubmit
                       >
                         <input name="action" type="hidden" value="reply" />
@@ -357,7 +354,6 @@ export default async function AdminSupportPage({ searchParams }: { searchParams:
                           <textarea
                             id={`support-reply-${thread.id}`}
                             className="min-h-56 w-full resize-y rounded-qidra border border-transparent bg-qidra-grayLight px-5 py-4 text-16 leading-relaxed outline-none transition-colors placeholder:text-qidra-grayMedium focus:border-qidra-accent"
-                            form={replyFormId}
                             maxLength={3000}
                             name="body"
                             placeholder={isRu ? "Напишите полный ответ участнику. Можно использовать шаблон выше или ввести текст вручную." : "Write a full reply to the participant. You can use a template above or type a custom answer."}
@@ -365,7 +361,7 @@ export default async function AdminSupportPage({ searchParams }: { searchParams:
                           />
                         </label>
                         <div className="flex justify-end">
-                          <Button className="w-full sm:w-fit" form={replyFormId} name="action" type="submit" value="reply">
+                          <Button className="w-full sm:w-fit" type="submit">
                             {isRu ? "Отправить ответ участнику" : "Send reply to participant"}
                           </Button>
                         </div>
