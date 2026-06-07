@@ -13,6 +13,7 @@
 - [x] В личном кабинете авторизованный пользователь видит `Выход`, а не `Вход`.
 - [x] Автовыход по бездействию настроен на 10 минут на клиентской стороне.
 - [x] Серверная JWT-сессия ограничена 8 часами с обновлением не чаще 15 минут.
+- [x] Старые ссылки основного сайта перенаправляются на новые разделы без 404: `/auth/login`, `/auth/registration`, `/wallet`, `/messages`, `/profile`, `/cabinet`.
 - [x] Чувствительные API защищены базовым rate limit на уровне приложения.
 - [x] Mutating `/api/*` запросы блокируют чужой browser Origin/Referer.
 - [x] KYC требует документы и сохраняет предыдущее значение, если участник обновляет только часть анкеты.
@@ -112,7 +113,7 @@
 - [ ] SMTP настроен на домене Qidra и проходит SPF/DKIM/DMARC.
 - [ ] `CRON_SECRET` и `QIDRA_WALLET_SYNC_SECRET` заданы в secrets.
 - [ ] `FILE_STORAGE_DRIVER=s3` подключен к приватному bucket с выключенным публичным доступом.
-- [ ] Dependency audit разобран без `npm audit fix --force`; опасные транзитивные зависимости обновлены отдельным тестируемым планом.
+- [x] Dependency audit разобран без `npm audit fix --force`; опасные транзитивные зависимости обновлены точечно, `npm audit --omit=dev` возвращает `0 vulnerabilities`.
 - [x] Security headers включены в Next config: CSP без `unsafe-eval` в production, HSTS, frame protection, referrer policy, MIME sniffing protection, permissions policy.
 - [x] Админ видит production-блокеры по secrets, SMTP, OAuth, S3 и TRC20 на странице `/admin/security`.
 - [ ] Настроить внешний WAF/rate limit на уровне Cloudflare/Vercel/nginx для `/api/auth/*`, `/api/wallet/*`, `/api/investments`, `/api/support/*`.
