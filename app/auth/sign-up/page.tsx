@@ -6,6 +6,7 @@ import { Checkbox } from "@/components/ui/Checkbox";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { getLocale, type SearchParams } from "@/lib/i18n";
+import { passwordPolicyDescription } from "@/lib/password-policy";
 import { getSocialAuthConfig } from "@/lib/social-auth";
 
 export default async function SignUpPage({ searchParams }: { searchParams?: SearchParams }) {
@@ -47,6 +48,7 @@ export default async function SignUpPage({ searchParams }: { searchParams?: Sear
           <Input label={locale === "ru" ? "Имя" : "Name"} name="name" placeholder={locale === "ru" ? "Ваше имя" : "Your name"} required />
           <Input label="Email" name="email" type="email" placeholder="name@example.com" required />
           <Input label={locale === "ru" ? "Пароль" : "Password"} name="password" type="password" placeholder="********" required />
+          <p className="text-14 text-qidra-grayBlue">{locale === "ru" ? passwordPolicyDescription.ru : passwordPolicyDescription.en}</p>
           <Checkbox required>
             {locale === "ru"
               ? "Я принимаю условия Qidra, предупреждение о рисках и понимаю, что доходность не гарантируется."

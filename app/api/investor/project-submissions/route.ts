@@ -39,6 +39,8 @@ type SessionUser = {
 };
 
 const maxProjectFileSize = 20 * 1024 * 1024;
+const maxProjectFiles = 20;
+const maxProjectTotalSize = 100 * 1024 * 1024;
 const allowedMimeTypes = new Set([
   "application/msword",
   "application/pdf",
@@ -190,6 +192,28 @@ export async function POST(request: NextRequest) {
           localeRu
             ? "Для первичной проверки нужен минимум один файл: презентация, регистрационный документ или финансовая модель."
             : "Initial review requires at least one file: presentation, registration document or financial model."
+      },
+      { status: 400 }
+    );
+  }
+
+  if (documents.length > maxProjectFiles) {
+    return NextResponse.json(
+      {
+        title: localeRu ? "Слишком много файлов" : "Too many files",
+        message: localeRu ? "За один раз можно загрузить до 20 файлов проекта." : "You can upload up to 20 project files at a time."
+      },
+      { status: 400 }
+    );
+  }
+
+  const totalUploadSize = documents.reduce((sum, file) => sum + file.size, 0);
+
+  if (totalUploadSize > maxProjectTotalSize) {
+    return NextResponse.json(
+      {
+        title: localeRu ? "Файлы слишком большие" : "Files are too large",
+        message: localeRu ? "Общий размер документов проекта должен быть не больше 100 МБ." : "The total project document size must be no larger than 100 MB."
       },
       { status: 400 }
     );

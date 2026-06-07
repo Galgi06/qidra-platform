@@ -124,6 +124,7 @@ DNS:
 
 - security headers через Next config;
 - CSP с запретом iframe-встраивания и object/embed-контента;
+- production CSP не включает `unsafe-eval`;
 - HSTS для HTTPS production-домена;
 - `Referrer-Policy: strict-origin-when-cross-origin`;
 - `X-Content-Type-Options: nosniff`;
@@ -131,6 +132,8 @@ DNS:
 - middleware-защита mutating `/api/*` от чужого browser Origin/Referer;
 - server-side JWT session max age 8 часов;
 - базовый rate limit для регистрации, восстановления пароля, KYC, project submissions, депозитов, выводов, заявок участия и сообщений поддержки.
+- усиленная password policy для новых паролей: минимум 10 символов, верхний и нижний регистр, цифра и специальный символ.
+- лимиты документов project submission: до 20 файлов и до 100 МБ суммарно за одну отправку.
 
 Перед production обязательно добавить внешний rate limit/WAF на инфраструктурном уровне. Встроенный rate limit является дополнительным защитным слоем и не заменяет Cloudflare/Vercel/nginx rules.
 

@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { sendEmail, getAppBaseUrl } from "@/lib/email";
+import { isStrongPassword, passwordPolicyDescription } from "@/lib/password-policy";
 import { prisma } from "@/lib/prisma";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { createRawToken, expiresIn, hashToken } from "@/lib/tokens";
@@ -9,7 +10,7 @@ import { createRawToken, expiresIn, hashToken } from "@/lib/tokens";
 const registerSchema = z.object({
   name: z.string().trim().min(2).max(120),
   email: z.string().trim().email().max(255),
-  password: z.string().min(8).max(128)
+  password: z.string().max(128).refine(isStrongPassword)
 });
 
 function isRu(request: NextRequest) {
@@ -24,7 +25,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         title: localeRu ? "Проверьте данные" : "Check the details",
-        message: localeRu ? "Заполните имя, корректный email и пароль не короче 8 символов." : "Enter a name, valid email, and a password of at least 8 characters."
+        message: localeRu
+          ? `Заполните имя, корректный email и пароль. ${passwordPolicyDescription.ru}`
+          : `Enter a name, valid email, and password. ${passwordPolicyDescription.en}`
       },
       { status: 400 }
     );

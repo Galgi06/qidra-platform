@@ -5,6 +5,7 @@ import { NotificationCard } from "@/components/NotificationCard";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { getLocale, type SearchParams } from "@/lib/i18n";
+import { passwordPolicyDescription } from "@/lib/password-policy";
 import { readParam } from "@/lib/tokens";
 
 type ResetPasswordSearchParams = SearchParams & {
@@ -40,6 +41,7 @@ export default async function ResetPasswordPage({ searchParams }: { searchParams
             <input name="email" type="hidden" value={email} />
             <input name="token" type="hidden" value={token} />
             <Input label={locale === "ru" ? "Пароль" : "Password"} name="password" type="password" placeholder="********" required />
+            <p className="text-14 text-qidra-grayBlue">{locale === "ru" ? passwordPolicyDescription.ru : passwordPolicyDescription.en}</p>
             <Button type="submit">{locale === "ru" ? "Сохранить пароль" : "Save password"}</Button>
           </FeedbackForm>
         ) : (

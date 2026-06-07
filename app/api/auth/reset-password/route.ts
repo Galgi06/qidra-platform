@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
+import { isStrongPassword, passwordPolicyDescription } from "@/lib/password-policy";
 import { prisma } from "@/lib/prisma";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { hashToken } from "@/lib/tokens";
@@ -8,7 +9,7 @@ import { hashToken } from "@/lib/tokens";
 const resetPasswordSchema = z.object({
   email: z.string().trim().email().max(255),
   token: z.string().min(20),
-  password: z.string().min(8).max(128)
+  password: z.string().max(128).refine(isStrongPassword)
 });
 
 function isRu(request: NextRequest) {
@@ -23,7 +24,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         title: localeRu ? "Проверьте данные" : "Check the details",
-        message: localeRu ? "Пароль должен быть не короче 8 символов." : "The password must be at least 8 characters."
+        message: localeRu ? passwordPolicyDescription.ru : passwordPolicyDescription.en
       },
       { status: 400 }
     );

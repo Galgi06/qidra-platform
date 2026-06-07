@@ -7,6 +7,7 @@
 ## 1. Клиентские сценарии
 
 - [x] Регистрация и вход имеют уведомления после ключевых действий.
+- [x] Новые пароли и сброс пароля требуют усиленную password policy.
 - [x] Google OAuth и Telegram OAuth добавлены как способы входа.
 - [x] Заблокированный пользователь не должен получать активную сессию.
 - [x] В личном кабинете авторизованный пользователь видит `Выход`, а не `Вход`.
@@ -18,6 +19,7 @@
 - [x] Заявка на размещение проекта требует одобренный KYC.
 - [x] Заявка на размещение проекта требует минимум один документ.
 - [x] Проектная заявка принимает несколько документов.
+- [x] Проектная заявка ограничивает массовую загрузку: до 20 файлов и до 100 МБ суммарно.
 
 Критично перед продом:
 
@@ -110,7 +112,7 @@
 - [ ] `CRON_SECRET` и `QIDRA_WALLET_SYNC_SECRET` заданы в secrets.
 - [ ] `FILE_STORAGE_DRIVER=s3` подключен к приватному bucket с выключенным публичным доступом.
 - [ ] Dependency audit разобран без `npm audit fix --force`; опасные транзитивные зависимости обновлены отдельным тестируемым планом.
-- [x] Security headers включены в Next config: CSP, HSTS, frame protection, referrer policy, MIME sniffing protection, permissions policy.
+- [x] Security headers включены в Next config: CSP без `unsafe-eval` в production, HSTS, frame protection, referrer policy, MIME sniffing protection, permissions policy.
 - [ ] Настроить внешний WAF/rate limit на уровне Cloudflare/Vercel/nginx для `/api/auth/*`, `/api/wallet/*`, `/api/investments`, `/api/support/*`.
 - [ ] Логи ошибок и бизнес-аудит доступны администратору.
 - [ ] Настроен rollback-план деплоя.
