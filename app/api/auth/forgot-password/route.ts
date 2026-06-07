@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { sendEmail, getAppBaseUrl } from "@/lib/email";
 import { prisma } from "@/lib/prisma";
+import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { createRawToken, expiresIn, hashToken } from "@/lib/tokens";
 
 const forgotPasswordSchema = z.object({
@@ -27,6 +28,17 @@ export async function POST(request: NextRequest) {
   }
 
   const email = parsed.data.email.toLowerCase();
+  const rateLimit = checkRateLimit({
+    key: `auth:forgot-password:${email}`,
+    limit: 4,
+    request,
+    windowMs: 60 * 60 * 1000
+  });
+
+  if (!rateLimit.allowed) {
+    return rateLimitResponse(localeRu, rateLimit.retryAfterSeconds);
+  }
+
   const user = await prisma.user.findUnique({ where: { email } });
 
   if (user) {

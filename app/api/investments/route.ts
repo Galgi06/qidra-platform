@@ -5,6 +5,7 @@ import { z } from "zod";
 import { authOptions } from "@/lib/next-auth";
 import { ensureBaseProjects } from "@/lib/project-catalog";
 import { prisma } from "@/lib/prisma";
+import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
 const amountSchema = z
   .string()
@@ -47,6 +48,17 @@ export async function POST(request: NextRequest) {
       },
       { status: 401 }
     );
+  }
+
+  const rateLimit = checkRateLimit({
+    key: `investment:application:${userId}`,
+    limit: 20,
+    request,
+    windowMs: 60 * 60 * 1000
+  });
+
+  if (!rateLimit.allowed) {
+    return rateLimitResponse(localeRu, rateLimit.retryAfterSeconds);
   }
 
   const parsed = applicationSchema.safeParse(await request.json().catch(() => null));

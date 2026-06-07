@@ -118,7 +118,20 @@ DNS:
 - сотрудники не должны знать пароли клиентов;
 - восстановление доступа клиента только через одноразовую ссылку после сверки KYC.
 
-## 8. Перед деплоем
+## 8. Защита приложения
+
+В коде включены:
+
+- security headers через Next config;
+- CSP с запретом iframe-встраивания и object/embed-контента;
+- `Referrer-Policy: strict-origin-when-cross-origin`;
+- `X-Content-Type-Options: nosniff`;
+- `Permissions-Policy` без камеры, микрофона, геолокации и payment API;
+- базовый rate limit для регистрации, восстановления пароля, KYC, project submissions, депозитов, выводов, заявок участия и сообщений поддержки.
+
+Перед production обязательно добавить внешний rate limit/WAF на инфраструктурном уровне. Встроенный rate limit является дополнительным защитным слоем и не заменяет Cloudflare/Vercel/nginx rules.
+
+## 9. Перед деплоем
 
 Команды проверки:
 
@@ -145,7 +158,7 @@ npm run check:production
 - проверить вывод маленькой суммой
 - проверить журнал действий
 
-## 9. Dependency audit
+## 10. Dependency audit
 
 `npm audit --omit=dev` должен запускаться перед каждым production-релизом.
 

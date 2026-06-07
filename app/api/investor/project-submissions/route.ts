@@ -6,6 +6,7 @@ import { z } from "zod";
 import { authOptions } from "@/lib/next-auth";
 import { saveUploadedFile } from "@/lib/file-storage";
 import { prisma } from "@/lib/prisma";
+import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -122,6 +123,17 @@ export async function POST(request: NextRequest) {
       },
       { status: 401 }
     );
+  }
+
+  const rateLimit = checkRateLimit({
+    key: `project-submission:create:${userId}`,
+    limit: 6,
+    request,
+    windowMs: 60 * 60 * 1000
+  });
+
+  if (!rateLimit.allowed) {
+    return rateLimitResponse(localeRu, rateLimit.retryAfterSeconds);
   }
 
   const latestKyc = await prisma.kycApplication.findFirst({

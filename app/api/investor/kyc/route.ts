@@ -8,6 +8,7 @@ import { saveUploadedFile } from "@/lib/file-storage";
 import { readKycDocuments, type KycDocumentKind, type KycDocuments, type KycFileMeta } from "@/lib/kyc-documents";
 import { authOptions } from "@/lib/next-auth";
 import { prisma } from "@/lib/prisma";
+import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -126,6 +127,17 @@ export async function POST(request: NextRequest) {
       },
       { status: 401 }
     );
+  }
+
+  const rateLimit = checkRateLimit({
+    key: `kyc:submit:${userId}`,
+    limit: 8,
+    request,
+    windowMs: 60 * 60 * 1000
+  });
+
+  if (!rateLimit.allowed) {
+    return rateLimitResponse(localeRu, rateLimit.retryAfterSeconds);
   }
 
   const formData = await request.formData();

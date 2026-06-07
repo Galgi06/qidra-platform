@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { hashToken } from "@/lib/tokens";
 
 const resetPasswordSchema = z.object({
@@ -29,6 +30,17 @@ export async function POST(request: NextRequest) {
   }
 
   const email = parsed.data.email.toLowerCase();
+  const rateLimit = checkRateLimit({
+    key: `auth:reset-password:${email}`,
+    limit: 8,
+    request,
+    windowMs: 60 * 60 * 1000
+  });
+
+  if (!rateLimit.allowed) {
+    return rateLimitResponse(localeRu, rateLimit.retryAfterSeconds);
+  }
+
   const tokenHash = hashToken(parsed.data.token);
   const identifier = `password-reset:${email}`;
   const verificationToken = await prisma.verificationToken.findUnique({

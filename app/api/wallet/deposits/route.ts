@@ -4,6 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { authOptions } from "@/lib/next-auth";
 import { prisma } from "@/lib/prisma";
+import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { verifyTrc20Deposit } from "@/lib/trongrid";
 import { ensureUserDepositWallet } from "@/lib/wallet-addresses";
 
@@ -40,6 +41,17 @@ export async function POST(request: NextRequest) {
       },
       { status: 401 }
     );
+  }
+
+  const rateLimit = checkRateLimit({
+    key: `wallet:deposit:${userId}`,
+    limit: 12,
+    request,
+    windowMs: 60 * 60 * 1000
+  });
+
+  if (!rateLimit.allowed) {
+    return rateLimitResponse(localeRu, rateLimit.retryAfterSeconds);
   }
 
   const parsed = depositSchema.safeParse(await request.json().catch(() => null));

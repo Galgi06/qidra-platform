@@ -4,6 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { authOptions } from "@/lib/next-auth";
 import { prisma } from "@/lib/prisma";
+import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
 const messageSchema = z.object({
   body: z.string().trim().min(2).max(3000),
@@ -34,6 +35,17 @@ export async function POST(request: NextRequest) {
       },
       { status: 401 }
     );
+  }
+
+  const rateLimit = checkRateLimit({
+    key: `support:message:${userId}`,
+    limit: 30,
+    request,
+    windowMs: 60 * 60 * 1000
+  });
+
+  if (!rateLimit.allowed) {
+    return rateLimitResponse(localeRu, rateLimit.retryAfterSeconds);
   }
 
   const parsed = messageSchema.safeParse(await request.json().catch(() => null));

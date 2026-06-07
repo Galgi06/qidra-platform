@@ -4,6 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { authOptions } from "@/lib/next-auth";
 import { prisma } from "@/lib/prisma";
+import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
 const tronAddressPattern = /^T[1-9A-HJ-NP-Za-km-z]{33}$/;
 
@@ -44,6 +45,17 @@ export async function POST(request: NextRequest) {
       },
       { status: 401 }
     );
+  }
+
+  const rateLimit = checkRateLimit({
+    key: `wallet:withdrawal:${userId}`,
+    limit: 8,
+    request,
+    windowMs: 60 * 60 * 1000
+  });
+
+  if (!rateLimit.allowed) {
+    return rateLimitResponse(localeRu, rateLimit.retryAfterSeconds);
   }
 
   const parsed = withdrawalSchema.safeParse(await request.json().catch(() => null));
