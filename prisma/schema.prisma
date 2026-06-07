@@ -102,6 +102,8 @@ model User {
   supportThreads         SupportThread[]         @relation("SupportThreadUser")
   assignedSupportThreads SupportThread[]         @relation("SupportThreadAssignee")
   supportMessages        SupportMessage[]        @relation("SupportMessageSender")
+  notifications          Notification[]          @relation("NotificationRecipient")
+  authoredNotifications  Notification[]          @relation("NotificationActor")
   accounts               Account[]
   sessions               Session[]
 
@@ -310,6 +312,27 @@ model SupportMessage {
 
   @@index([senderId])
   @@index([threadId])
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  actorId   String?
+  titleRu   String
+  titleEn   String
+  bodyRu    String    @db.Text
+  bodyEn    String    @db.Text
+  type      String    @default("system")
+  href      String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation("NotificationRecipient", fields: [userId], references: [id], onDelete: Cascade)
+  actor     User?     @relation("NotificationActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([readAt])
+  @@index([type])
+  @@index([userId, readAt, createdAt])
 }
 
 model AdminAuditLog {

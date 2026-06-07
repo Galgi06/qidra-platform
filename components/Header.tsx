@@ -5,6 +5,7 @@ import type { Locale } from "@/lib/i18n";
 import { dictionary, withLocale } from "@/lib/i18n";
 import { ButtonLink } from "@/components/ui/Button";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { NotificationBell } from "@/components/NotificationBell";
 import { authOptions } from "@/lib/next-auth";
 import { SignOutButton } from "@/components/auth/SignOutButton";
 import { canAccessAdmin, canAccessSupportDesk } from "@/lib/auth";
@@ -45,7 +46,10 @@ export async function Header({ locale, path = "/" }: { locale: Locale; path?: st
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
           <LanguageSwitcher locale={locale} path={path} />
           {signedIn ? (
-            <SignOutButton callbackUrl={withLocale("/", locale)} label={locale === "ru" ? "Выход" : "Sign out"} />
+            <>
+              <NotificationBell locale={locale} />
+              <SignOutButton callbackUrl={withLocale("/", locale)} label={locale === "ru" ? "Выход" : "Sign out"} />
+            </>
           ) : (
             <>
               <div className="hidden sm:block">

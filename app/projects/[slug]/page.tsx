@@ -8,7 +8,7 @@ import { ButtonLink } from "@/components/ui/Button";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { ProjectStatusBadge } from "@/components/ui/ProjectStatusBadge";
 import { dictionary, getLocale, type SearchParams, withLocale } from "@/lib/i18n";
-import { getProjectBySlug } from "@/lib/project-catalog";
+import { acceptsApplications, getProjectBySlug } from "@/lib/project-catalog";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +19,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
   const progress = Math.round((project.fundedUsdt / project.targetUsdt) * 100);
   const riskLabel = locale === "ru" ? { Moderate: "Средний", High: "Высокий" }[project.riskLevel] ?? project.riskLevel : project.riskLevel;
   const isRu = locale === "ru";
+  const canApply = acceptsApplications(project);
 
   return (
     <>
@@ -56,9 +57,21 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                   <ProjectFact label={isRu ? "Ожидаемый результат" : "Expected result"} value={project.expectedReturn[locale]} />
                   <ProjectFact label={isRu ? "Ориентир доходности" : "Return guidance"} value={project.expectedYield[locale]} />
                 </dl>
-                <ButtonLink href={withLocale(`/invest/${project.slug}`, locale)} className="h-14">
-                  {isRu ? "Подать заявку" : "Create application"}
-                </ButtonLink>
+                {canApply ? (
+                  <ButtonLink href={withLocale(`/invest/${project.slug}`, locale)} className="h-14">
+                    {isRu ? "Подать заявку" : "Create application"}
+                  </ButtonLink>
+                ) : (
+                  <div className="rounded-qidra border border-qidra-grayMedium/40 bg-qidra-grayLight p-4 text-15 font-medium text-qidra-grayBlue">
+                    {project.status === "funded"
+                      ? isRu
+                        ? "Сбор по проекту завершён. Новые заявки не принимаются."
+                        : "The raise is complete. New applications are not accepted."
+                      : isRu
+                        ? "Проект сейчас недоступен для новых заявок."
+                        : "The project is currently unavailable for new applications."}
+                  </div>
+                )}
                 <p className="text-12 text-qidra-grayBlue">{dictionary[locale].common.noFixedYield}</p>
               </aside>
             </div>

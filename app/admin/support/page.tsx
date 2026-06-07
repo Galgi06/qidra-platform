@@ -7,6 +7,7 @@ import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { NotificationCard } from "@/components/NotificationCard";
 import { AccessRecoveryForm } from "@/components/admin/AccessRecoveryForm";
+import { QuickReplyTemplates } from "@/components/support/QuickReplyTemplates";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
 import { requireSupportDesk } from "@/lib/access";
@@ -184,6 +185,7 @@ export default async function AdminSupportPage({ searchParams }: { searchParams:
                 />
               </div>
             </section>
+            {session.user?.role === Role.ADMIN || session.user?.role === Role.SUPER_ADMIN ? <BroadcastNotificationPanel locale={locale} /> : null}
             <div className="flex flex-wrap gap-2 rounded-qidra border border-qidra-grayLight bg-white p-4">
               <FilterPill active={!statusFilter} href={supportFilterHref(locale, undefined, queueFilter, ownerFilter, query)}>
                 {isRu ? "Все" : "All"} ({stats.totalCount})
@@ -347,9 +349,11 @@ export default async function AdminSupportPage({ searchParams }: { searchParams:
                         resetOnSubmit
                       >
                         <input name="action" type="hidden" value="reply" />
+                        <QuickReplyTemplates locale={locale} textareaId={`support-reply-${thread.id}`} />
                         <label className="grid gap-2 text-14 font-medium text-qidra-dark">
                           {isRu ? "Ответ участнику" : "Reply to participant"}
                           <textarea
+                            id={`support-reply-${thread.id}`}
                             className="min-h-28 rounded-qidra border border-transparent bg-qidra-grayLight px-4 py-3 text-16 outline-none transition-colors placeholder:text-qidra-grayMedium focus:border-qidra-accent"
                             maxLength={3000}
                             name="body"
@@ -374,6 +378,106 @@ export default async function AdminSupportPage({ searchParams }: { searchParams:
       </main>
       <Footer locale={locale} />
     </>
+  );
+}
+
+function BroadcastNotificationPanel({ locale }: { locale: "ru" | "en" }) {
+  const isRu = locale === "ru";
+
+  return (
+    <section className="rounded-[20px] bg-white p-6 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] sm:p-8">
+      <div>
+        <h2 className="text-[28px] font-medium leading-tight tracking-[0] text-qidra-dark">{isRu ? "Рассылка в личные кабинеты" : "Participant account broadcast"}</h2>
+        <p className="mt-2 max-w-3xl text-16 text-qidra-grayBlue">
+          {isRu
+            ? "Администратор может отправить уведомление всем участникам или одному участнику по email. Сообщение появится в колокольчике и сохранится в журнале действий."
+            : "An administrator can send a notification to all participants or to one participant by email. The message appears in the bell and is recorded in the audit log."}
+        </p>
+      </div>
+      <FeedbackForm
+        className="mt-6 grid gap-4 lg:grid-cols-2"
+        endpoint={`/api/admin/notifications?lang=${locale}`}
+        feedback={{
+          title: isRu ? "Рассылка отправлена" : "Broadcast sent",
+          text: isRu ? "Сообщение добавлено в личные кабинеты участников." : "The message was added to participant accounts.",
+          buttonLabel: isRu ? "Понятно" : "Got it",
+          dismissLabel: isRu ? "Закрыть уведомление" : "Close notification",
+          tone: "success"
+        }}
+        refreshOnSuccess
+        resetOnSubmit
+      >
+        <label className="grid gap-2 text-14 font-medium text-qidra-dark">
+          {isRu ? "Получатели" : "Recipients"}
+          <select
+            className="h-12 rounded-qidra border border-transparent bg-qidra-grayLight px-4 text-16 outline-none transition-colors focus:border-qidra-accent"
+            defaultValue="all_participants"
+            name="scope"
+          >
+            <option value="all_participants">{isRu ? "Все участники" : "All participants"}</option>
+            <option value="single_user">{isRu ? "Один участник по email" : "Single participant by email"}</option>
+          </select>
+        </label>
+        <label className="grid gap-2 text-14 font-medium text-qidra-dark">
+          Email
+          <input
+            className="h-12 rounded-qidra border border-transparent bg-qidra-grayLight px-4 text-16 outline-none transition-colors placeholder:text-qidra-grayMedium focus:border-qidra-accent"
+            name="recipientEmail"
+            placeholder={isRu ? "Заполните только для одного участника" : "Fill only for a single participant"}
+            type="email"
+          />
+        </label>
+        <label className="grid gap-2 text-14 font-medium text-qidra-dark">
+          {isRu ? "Заголовок RU" : "Title RU"}
+          <input
+            className="h-12 rounded-qidra border border-transparent bg-qidra-grayLight px-4 text-16 outline-none transition-colors placeholder:text-qidra-grayMedium focus:border-qidra-accent"
+            maxLength={140}
+            name="titleRu"
+            placeholder={isRu ? "Например: обновление по платформе" : "For example: platform update"}
+            required
+          />
+        </label>
+        <label className="grid gap-2 text-14 font-medium text-qidra-dark">
+          {isRu ? "Заголовок EN" : "Title EN"}
+          <input
+            className="h-12 rounded-qidra border border-transparent bg-qidra-grayLight px-4 text-16 outline-none transition-colors placeholder:text-qidra-grayMedium focus:border-qidra-accent"
+            maxLength={140}
+            name="titleEn"
+            placeholder={isRu ? "Можно оставить пустым" : "Optional"}
+          />
+        </label>
+        <label className="grid gap-2 text-14 font-medium text-qidra-dark lg:col-span-2">
+          {isRu ? "Текст RU" : "Message RU"}
+          <textarea
+            className="min-h-28 rounded-qidra border border-transparent bg-qidra-grayLight px-4 py-3 text-16 outline-none transition-colors placeholder:text-qidra-grayMedium focus:border-qidra-accent"
+            maxLength={3000}
+            name="bodyRu"
+            placeholder={isRu ? "Текст уведомления для личного кабинета" : "Notification text for the account"}
+            required
+          />
+        </label>
+        <label className="grid gap-2 text-14 font-medium text-qidra-dark lg:col-span-2">
+          {isRu ? "Текст EN" : "Message EN"}
+          <textarea
+            className="min-h-24 rounded-qidra border border-transparent bg-qidra-grayLight px-4 py-3 text-16 outline-none transition-colors placeholder:text-qidra-grayMedium focus:border-qidra-accent"
+            maxLength={3000}
+            name="bodyEn"
+            placeholder={isRu ? "Можно оставить пустым" : "Optional"}
+          />
+        </label>
+        <label className="grid gap-2 text-14 font-medium text-qidra-dark">
+          {isRu ? "Ссылка внутри кабинета" : "Account link"}
+          <input
+            className="h-12 rounded-qidra border border-transparent bg-qidra-grayLight px-4 text-16 outline-none transition-colors placeholder:text-qidra-grayMedium focus:border-qidra-accent"
+            name="href"
+            placeholder="/investor/support"
+          />
+        </label>
+        <div className="flex items-end">
+          <Button type="submit">{isRu ? "Отправить уведомление" : "Send notification"}</Button>
+        </div>
+      </FeedbackForm>
+    </section>
   );
 }
 

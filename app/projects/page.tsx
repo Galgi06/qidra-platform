@@ -12,6 +12,8 @@ export default async function ProjectsPage({ searchParams }: { searchParams?: Se
   const locale = await getLocale(searchParams);
   const isRu = locale === "ru";
   const projects = await getPublicProjects();
+  const activeProjects = projects.filter((project) => project.status === "active");
+  const completedProjects = projects.filter((project) => project.status !== "active");
 
   return (
     <>
@@ -64,10 +66,29 @@ export default async function ProjectsPage({ searchParams }: { searchParams?: Se
         <section className="px-5 py-12 sm:px-8 lg:px-11 lg:py-16">
           <div className="mx-auto grid max-w-[1840px] gap-6">
             <div className="grid gap-5 lg:grid-cols-2">
-              {projects.map((project) => (
+              {activeProjects.map((project) => (
                 <ProjectCard key={project.slug} project={project} locale={locale} />
               ))}
             </div>
+            {completedProjects.length ? (
+              <div className="mt-12 grid gap-5">
+                <div>
+                  <h2 className="text-[36px] font-medium leading-tight tracking-[0] text-qidra-dark sm:text-[44px]">
+                    {isRu ? "Проекты с привлечёнными средствами" : "Funded through Qidra"}
+                  </h2>
+                  <p className="mt-3 max-w-4xl text-18 text-qidra-grayBlue">
+                    {isRu
+                      ? "Эти проекты уже завершили сбор или временно недоступны для новых заявок. Документы и описание остаются открытыми для ознакомления."
+                      : "These projects have completed their raise or are temporarily unavailable for new applications. Documents and descriptions remain available for review."}
+                  </p>
+                </div>
+                <div className="grid gap-5 lg:grid-cols-2">
+                  {completedProjects.map((project) => (
+                    <ProjectCard key={project.slug} project={project} locale={locale} />
+                  ))}
+                </div>
+              </div>
+            ) : null}
             <p className="max-w-4xl text-14 text-qidra-grayBlue">
               {isRu
                 ? "Qidra не обещает фиксированную доходность. Любое участие требует самостоятельного изучения документов, условий и рисков проекта."

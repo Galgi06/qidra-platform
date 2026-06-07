@@ -4,6 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { canAccessSupportDesk } from "@/lib/auth";
 import { authOptions } from "@/lib/next-auth";
+import { createUserNotification } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 
 const optionalAssigneeSchema = z.preprocess((value) => {
@@ -167,6 +168,17 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           status: thread.status === SupportThreadStatus.CLOSED ? SupportThreadStatus.OPEN : thread.status
         }
       }
+    });
+
+    await createUserNotification(tx, {
+      actorId: session?.user?.id,
+      bodyEn: "The Qidra team replied to your support request.",
+      bodyRu: "Команда Qidra ответила на ваше обращение в поддержку.",
+      href: "/investor/support",
+      titleEn: "Support reply",
+      titleRu: "Ответ поддержки",
+      type: "support_reply",
+      userId: thread.userId
     });
   });
 

@@ -2,10 +2,12 @@ import { notFound } from "next/navigation";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { InvestmentApplicationForm } from "@/components/InvestmentApplicationForm";
+import { NotificationCard } from "@/components/NotificationCard";
+import { ButtonLink } from "@/components/ui/Button";
 import { requireAuth } from "@/lib/access";
-import { dictionary, getLocale, type SearchParams } from "@/lib/i18n";
+import { dictionary, getLocale, type SearchParams, withLocale } from "@/lib/i18n";
 import { prisma } from "@/lib/prisma";
-import { getProjectBySlug } from "@/lib/project-catalog";
+import { acceptsApplications, getProjectBySlug } from "@/lib/project-catalog";
 
 export const dynamic = "force-dynamic";
 
@@ -45,17 +47,39 @@ export default async function InvestPage({ params, searchParams }: { params: Pro
     <>
       <Header locale={locale} path={`/invest/${project.slug}`} />
       <main className="section">
-        <InvestmentApplicationForm
-          endpoint={`/api/investments?lang=${locale}`}
-          activeApplicationAmountUsdt={activeApplicationAmountUsdt}
-          activeReservedUsdt={activeReservedUsdt}
-          freeUsdt={freeUsdt}
-          kycApproved={kycApproved}
-          locale={locale}
-          noFixedYieldText={dictionary[locale].common.noFixedYield}
-          projectSlug={project.slug}
-          projectTitle={project.title[locale]}
-        />
+        {acceptsApplications(project) ? (
+          <InvestmentApplicationForm
+            endpoint={`/api/investments?lang=${locale}`}
+            activeApplicationAmountUsdt={activeApplicationAmountUsdt}
+            activeReservedUsdt={activeReservedUsdt}
+            freeUsdt={freeUsdt}
+            kycApproved={kycApproved}
+            locale={locale}
+            noFixedYieldText={dictionary[locale].common.noFixedYield}
+            projectSlug={project.slug}
+            projectTitle={project.title[locale]}
+          />
+        ) : (
+          <div className="container-qidra grid max-w-2xl gap-5">
+            <h1 className="subtitle-28">{locale === "ru" ? "Заявки закрыты" : "Applications closed"}</h1>
+            <NotificationCard
+              title={locale === "ru" ? "Проект недоступен для участия" : "Project is not available"}
+              text={
+                project.status === "funded"
+                  ? locale === "ru"
+                    ? "Сбор по проекту завершён, новые заявки на участие не принимаются."
+                    : "The raise for this project is complete, and new participation applications are not accepted."
+                  : locale === "ru"
+                    ? "Новые заявки принимаются только по активным проектам с открытым сбором."
+                    : "New applications are accepted only for active projects with an open raise."
+              }
+              tone="warning"
+            />
+            <ButtonLink href={withLocale(`/projects/${project.slug}`, locale)} variant="outline">
+              {locale === "ru" ? "Вернуться к проекту" : "Back to project"}
+            </ButtonLink>
+          </div>
+        )}
       </main>
       <Footer locale={locale} />
     </>

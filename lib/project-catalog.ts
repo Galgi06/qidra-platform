@@ -107,6 +107,10 @@ async function createBaseDocuments(projectId: string, project: ContentProject) {
 }
 
 export function mapProject(project: DbProject & { documents?: ProjectDocument[] }): CatalogProject {
+  const fundedUsdt = Number(project.fundedUsdt.toString());
+  const targetUsdt = Number(project.targetUsdt.toString());
+  const effectiveStatus = project.status === ProjectStatus.ACTIVE && fundedUsdt >= targetUsdt ? ProjectStatus.FUNDED : project.status;
+
   return {
     id: project.id,
     slug: project.slug,
@@ -121,9 +125,9 @@ export function mapProject(project: DbProject & { documents?: ProjectDocument[] 
       ru: project.expectedYieldRu || defaultExpectedYield("ru"),
       en: project.expectedYieldEn || defaultExpectedYield("en")
     },
-    status: dbStatusToBadge(project.status),
-    targetUsdt: Number(project.targetUsdt.toString()),
-    fundedUsdt: Number(project.fundedUsdt.toString()),
+    status: dbStatusToBadge(effectiveStatus),
+    targetUsdt,
+    fundedUsdt,
     location: project.location ?? "UAE",
     structure: project.structure,
     riskLevel: project.riskLevel ?? "Moderate",
@@ -134,6 +138,10 @@ export function mapProject(project: DbProject & { documents?: ProjectDocument[] 
         kind: document.kind.toLowerCase()
       })) ?? []
   };
+}
+
+export function acceptsApplications(project: CatalogProject) {
+  return project.status === "active" && project.fundedUsdt < project.targetUsdt;
 }
 
 function mapContentProject(project: ContentProject): CatalogProject {

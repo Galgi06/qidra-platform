@@ -7,6 +7,7 @@ import { NotificationCard } from "@/components/NotificationCard";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
+import { SupportAutoRefresh } from "@/components/support/SupportAutoRefresh";
 import { requireAuth } from "@/lib/access";
 import { getLocale, type SearchParams } from "@/lib/i18n";
 import { prisma } from "@/lib/prisma";
@@ -16,7 +17,7 @@ export default async function InvestorSupportPage({ searchParams }: { searchPara
   const session = await requireAuth(locale, "/investor/support");
   const isRu = locale === "ru";
   const userId = session.user?.id ?? "";
-  const thread = await prisma.supportThread.findFirst({
+  const latestThread = await prisma.supportThread.findFirst({
     where: { userId },
     include: {
       assignedTo: {
@@ -41,10 +42,13 @@ export default async function InvestorSupportPage({ searchParams }: { searchPara
     },
     orderBy: { updatedAt: "desc" }
   });
+  const thread = latestThread?.status === SupportThreadStatus.CLOSED ? null : latestThread;
+  const closedThread = latestThread?.status === SupportThreadStatus.CLOSED ? latestThread : null;
   const messages = [...(thread?.messages ?? [])].reverse();
 
   return (
     <>
+      <SupportAutoRefresh />
       <Header locale={locale} path="/investor/support" />
       <main>
         <section className="bg-qidra-grayLight px-5 py-10 sm:px-8 lg:px-11 lg:py-14">
@@ -99,21 +103,21 @@ export default async function InvestorSupportPage({ searchParams }: { searchPara
                 />
               )}
 
-              {thread?.status === SupportThreadStatus.CLOSED ? (
-                thread.rating ? (
+              {closedThread ? (
+                closedThread.rating ? (
                   <NotificationCard
                     title={isRu ? "Оценка поддержки сохранена" : "Support rating saved"}
                     text={
                       isRu
-                        ? `Вы оценили работу поддержки на ${thread.rating} из 5. Спасибо за обратную связь.`
-                        : `You rated support ${thread.rating} out of 5. Thank you for the feedback.`
+                        ? `Вы оценили работу поддержки на ${closedThread.rating} из 5. Спасибо за обратную связь.`
+                        : `You rated support ${closedThread.rating} out of 5. Thank you for the feedback.`
                     }
                     tone="success"
                   />
                 ) : (
                   <FeedbackForm
                     className="grid gap-4 rounded-[18px] bg-qidra-grayLight p-5"
-                    endpoint={`/api/support/threads/${thread.id}/rating?lang=${locale}`}
+                    endpoint={`/api/support/threads/${closedThread.id}/rating?lang=${locale}`}
                     feedback={{
                       title: isRu ? "Спасибо за оценку" : "Thanks for the rating",
                       text: isRu ? "Оценка сохранена и попадёт в статистику качества поддержки." : "The rating was saved and will appear in support quality statistics.",
@@ -148,6 +152,18 @@ export default async function InvestorSupportPage({ searchParams }: { searchPara
                     <Button type="submit">{isRu ? "Сохранить оценку" : "Save rating"}</Button>
                   </FeedbackForm>
                 )
+              ) : null}
+
+              {closedThread ? (
+                <NotificationCard
+                  title={isRu ? "Последний диалог закрыт" : "Last thread closed"}
+                  text={
+                    isRu
+                      ? "Предыдущее обращение завершено. Для нового вопроса выберите направление и отправьте новое сообщение."
+                      : "The previous request is resolved. Choose a department and send a new message for a new question."
+                  }
+                  tone="success"
+                />
               ) : null}
 
               <FeedbackForm
