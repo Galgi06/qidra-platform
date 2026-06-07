@@ -5,7 +5,7 @@ import { sendEmail, getAppBaseUrl } from "@/lib/email";
 import { isStrongPassword, passwordPolicyDescription } from "@/lib/password-policy";
 import { prisma } from "@/lib/prisma";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
-import { createRawToken, expiresIn, hashToken } from "@/lib/tokens";
+import { createRawToken, expiresInMinutes, hashToken } from "@/lib/tokens";
 
 const registerSchema = z.object({
   name: z.string().trim().min(2).max(120),
@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
       data: {
         identifier,
         token: tokenHash,
-        expires: expiresIn(24)
+        expires: expiresInMinutes(15)
       }
     });
   });
@@ -101,15 +101,15 @@ export async function POST(request: NextRequest) {
     to: email,
     subject: localeRu ? "Подтвердите email в Qidra" : "Confirm your Qidra email",
     text: localeRu
-      ? `Регистрация в Qidra почти завершена. Подтвердите электронную почту по ссылке: ${verifyUrl.toString()}`
-      : `Your Qidra registration is almost complete. Confirm your email using this link: ${verifyUrl.toString()}`,
+      ? `Регистрация в Qidra почти завершена. Подтвердите электронную почту в течение 15 минут по ссылке: ${verifyUrl.toString()}`
+      : `Your Qidra registration is almost complete. Confirm your email within 15 minutes using this link: ${verifyUrl.toString()}`,
     html: localeRu
-      ? `<p>Регистрация в Qidra почти завершена.</p><p><a href="${verifyUrl.toString()}">Подтвердить электронную почту</a></p>`
-      : `<p>Your Qidra registration is almost complete.</p><p><a href="${verifyUrl.toString()}">Confirm email</a></p>`
+      ? `<p>Регистрация в Qidra почти завершена.</p><p>Ссылка действует 15 минут.</p><p><a href="${verifyUrl.toString()}">Подтвердить электронную почту</a></p>`
+      : `<p>Your Qidra registration is almost complete.</p><p>The link is valid for 15 minutes.</p><p><a href="${verifyUrl.toString()}">Confirm email</a></p>`
   });
 
   return NextResponse.json({
     title: localeRu ? "Регистрация прошла успешно" : "Registration successful",
-    message: localeRu ? "Проверьте свой электронный адрес и подтвердите электронную почту по ссылке из письма." : "Check your email address and confirm your account using the link in the message."
+    message: localeRu ? "Проверьте свой электронный адрес и подтвердите электронную почту. Ссылка действует 15 минут." : "Check your email address and confirm your account. The link is valid for 15 minutes."
   });
 }

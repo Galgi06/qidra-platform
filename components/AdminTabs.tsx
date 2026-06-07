@@ -1,18 +1,18 @@
-import { Tabs } from "@/components/Tabs";
+import Link from "next/link";
 import type { Locale } from "@/lib/i18n";
 import { withLocale } from "@/lib/i18n";
 
 const adminSections = [
-  { path: "/admin", label: { ru: "Обзор", en: "Overview" } },
-  { path: "/admin/users", label: { ru: "Пользователи", en: "Users" } },
-  { path: "/admin/kyc", label: { ru: "KYC", en: "KYC" } },
-  { path: "/admin/projects", label: { ru: "Проекты", en: "Projects" } },
-  { path: "/admin/project-submissions", label: { ru: "Размещение", en: "Listings" } },
-  { path: "/admin/investments", label: { ru: "Заявки", en: "Applications" } },
-  { path: "/admin/payments", label: { ru: "Платежи", en: "Payments" } },
-  { path: "/admin/support", label: { ru: "Коммуникации", en: "Communications" } },
-  { path: "/admin/security", label: { ru: "Безопасность", en: "Security" } },
-  { path: "/admin/audit", label: { ru: "Журнал", en: "Audit" } }
+  { path: "/admin", label: { ru: "Обзор", en: "Overview" }, description: { ru: "Сводка платформы", en: "Platform summary" } },
+  { path: "/admin/users", label: { ru: "Пользователи", en: "Users" }, description: { ru: "Клиенты, роли, доступы", en: "Clients, roles, access" } },
+  { path: "/admin/kyc", label: { ru: "KYC", en: "KYC" }, description: { ru: "Анкеты и документы", en: "Profiles and documents" } },
+  { path: "/admin/projects", label: { ru: "Проекты", en: "Projects" }, description: { ru: "Карточки и статусы", en: "Cards and statuses" } },
+  { path: "/admin/project-submissions", label: { ru: "Размещение", en: "Listings" }, description: { ru: "Инициативы клиентов", en: "Client initiatives" } },
+  { path: "/admin/investments", label: { ru: "Заявки", en: "Applications" }, description: { ru: "Участие и резервы", en: "Participation and reserves" } },
+  { path: "/admin/payments", label: { ru: "Платежи", en: "Payments" }, description: { ru: "Пополнения и выводы", en: "Deposits and withdrawals" } },
+  { path: "/admin/support", label: { ru: "Коммуникации", en: "Communications" }, description: { ru: "Чаты и рассылки", en: "Chats and broadcasts" } },
+  { path: "/admin/security", label: { ru: "Безопасность", en: "Security" }, description: { ru: "Блокировки и 2FA", en: "Blocks and 2FA" } },
+  { path: "/admin/audit", label: { ru: "Журнал", en: "Audit" }, description: { ru: "История действий", en: "Action history" } }
 ];
 
 export function AdminTabs({ activePath, locale, role }: { activePath: string; locale: Locale; role?: string }) {
@@ -22,12 +22,31 @@ export function AdminTabs({ activePath, locale, role }: { activePath: string; lo
       : adminSections;
 
   return (
-    <Tabs
-      items={visibleSections.map((section) => ({
-        label: section.label[locale],
-        href: withLocale(section.path, locale)
-      }))}
-      activeHref={withLocale(activePath, locale)}
-    />
+    <nav className="grid gap-3 rounded-[20px] bg-white p-4 shadow-[0_0_0_1px_rgba(18,20,23,0.08)]">
+      <div className="px-1">
+        <p className="text-12 font-medium uppercase text-qidra-accent">{locale === "ru" ? "Операционный центр" : "Operations center"}</p>
+        <p className="mt-1 text-14 text-qidra-grayBlue">
+          {locale === "ru" ? "Разделы администрирования, поддержки, платежей и аудита." : "Administration, support, payments and audit sections."}
+        </p>
+      </div>
+      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
+        {visibleSections.map((section) => {
+          const active = section.path === activePath;
+
+          return (
+            <Link
+              key={section.path}
+              className={`grid min-h-[92px] content-start gap-1 rounded-[14px] px-4 py-3 transition-colors ${
+                active ? "bg-qidra-dark text-white" : "bg-qidra-grayLight text-qidra-dark hover:bg-white hover:shadow-[0_0_0_1px_rgba(18,20,23,0.08)]"
+              }`}
+              href={withLocale(section.path, locale)}
+            >
+              <span className="text-15 font-medium">{section.label[locale]}</span>
+              <span className={`text-12 ${active ? "text-white/70" : "text-qidra-grayBlue"}`}>{section.description[locale]}</span>
+            </Link>
+          );
+        })}
+      </div>
+    </nav>
   );
 }

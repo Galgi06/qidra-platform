@@ -191,6 +191,28 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
                 </ButtonLink>
               </div>
             </div>
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <HomeSectorCard
+                title={isRu ? "Недвижимость" : "Real estate"}
+                text={isRu ? "Девелопмент, доходные объекты и партнёрские сделки с недвижимостью." : "Development, income assets and real-estate partnership deals."}
+                href={withLocale("/projects?sector=real-estate", locale)}
+              />
+              <HomeSectorCard
+                title={isRu ? "Торговля" : "Trade"}
+                text={isRu ? "Закупки, поставки, международная торговля и оборотные контракты." : "Procurement, supply, international trade and working-capital contracts."}
+                href={withLocale("/projects?sector=trade", locale)}
+              />
+              <HomeSectorCard
+                title={isRu ? "Металлургия и сырьё" : "Metallurgy and resources"}
+                text={isRu ? "Проекты добычи, переработки, производства и поставок сырья." : "Mining, processing, production and resource supply projects."}
+                href={withLocale("/projects?sector=metallurgy", locale)}
+              />
+              <HomeSectorCard
+                title={isRu ? "Медицина и технологии" : "Healthcare and technology"}
+                text={isRu ? "Медицинские, цифровые и технологические инициативы." : "Healthcare, digital and technology initiatives."}
+                href={withLocale("/projects?sector=healthcare", locale)}
+              />
+            </div>
             <div className="grid gap-5 lg:grid-cols-2">
               {projects.slice(0, 2).map((project) => (
                 <ProjectCard key={project.slug} project={project} locale={locale} />
@@ -266,6 +288,18 @@ function FeaturePanel({ title, text, tone = "light" }: { title: string; text: st
       <h3 className="max-w-3xl text-[30px] font-medium leading-[1.15] tracking-[0] sm:text-[38px]">{title}</h3>
       <p className={`mt-7 max-w-3xl text-20 sm:text-[24px] ${isBlue ? "text-white/84" : "text-qidra-grayBlue"}`}>{text}</p>
     </article>
+  );
+}
+
+function HomeSectorCard({ href, text, title }: { href: string; text: string; title: string }) {
+  return (
+    <Link className="grid min-h-[190px] content-between rounded-[20px] bg-qidra-grayLight p-6 transition-colors hover:bg-white hover:shadow-[0_0_0_1px_rgba(18,20,23,0.08)]" href={href}>
+      <div>
+        <h3 className="text-[26px] font-medium leading-tight text-qidra-dark">{title}</h3>
+        <p className="mt-3 text-16 text-qidra-grayBlue">{text}</p>
+      </div>
+      <span className="mt-6 text-15 font-medium text-qidra-accent">Qidra →</span>
+    </Link>
   );
 }
 

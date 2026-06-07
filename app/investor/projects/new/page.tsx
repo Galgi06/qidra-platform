@@ -2,7 +2,7 @@ import { FileUpload } from "@/components/FileUpload";
 import { FeedbackForm } from "@/components/ActionFeedback";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
-import { InvestorTabs } from "@/components/InvestorTabs";
+import { InvestorWorkspace } from "@/components/InvestorTabs";
 import { NotificationCard } from "@/components/NotificationCard";
 import { ProjectSectorFields } from "@/components/ProjectSectorFields";
 import { Button, ButtonLink } from "@/components/ui/Button";
@@ -40,12 +40,12 @@ export default async function NewProjectSubmissionPage({ searchParams }: { searc
                   : "Describe the initiative, attach documents and send the project for Qidra's initial review."}
               </p>
             </div>
-            <InvestorTabs activePath="/investor/projects/new" locale={locale} />
           </div>
         </section>
 
         <section className="px-5 py-12 sm:px-8 lg:px-11 lg:py-16">
-          <div className="mx-auto grid max-w-[1840px] gap-8 lg:grid-cols-[1fr_0.48fr]">
+          <InvestorWorkspace activePath="/investor/projects/new" locale={locale}>
+          <div className="grid gap-8 xl:grid-cols-[1fr_0.48fr]">
             <FeedbackForm
               className="grid gap-6 rounded-[20px] bg-white p-6 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] sm:p-8"
               endpoint={`/api/investor/project-submissions?lang=${locale}`}
@@ -207,6 +207,7 @@ export default async function NewProjectSubmissionPage({ searchParams }: { searc
               </ButtonLink>
             </aside>
           </div>
+          </InvestorWorkspace>
         </section>
       </main>
       <Footer locale={locale} />

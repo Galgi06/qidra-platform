@@ -1,7 +1,7 @@
 import { InvestmentStatus, PaymentStatus, TransactionType } from "@prisma/client";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
-import { InvestorTabs } from "@/components/InvestorTabs";
+import { InvestorWorkspace } from "@/components/InvestorTabs";
 import { NotificationCard } from "@/components/NotificationCard";
 import { UserAvatar } from "@/components/UserAvatar";
 import { ButtonLink } from "@/components/ui/Button";
@@ -95,12 +95,12 @@ export default async function InvestorPage({ searchParams }: { searchParams?: Se
                 </ButtonLink>
               </div>
             </div>
-            <InvestorTabs activePath="/investor" locale={locale} />
           </div>
         </section>
 
         <section className="px-5 py-12 sm:px-8 lg:px-11 lg:py-16">
-          <div className="mx-auto grid max-w-[1840px] gap-8">
+          <InvestorWorkspace activePath="/investor" locale={locale}>
+            <div className="grid gap-8">
             <div className="grid gap-5 md:grid-cols-3">
               <MetricCard label={isRu ? "Статус профиля" : "Profile status"} value={profileStatusText} tone={profileStatus === "APPROVED" ? "neutral" : "warning"} />
               <MetricCard label={isRu ? "Свободный баланс" : "Available balance"} value={formatUsdt(availableUsdt)} />
@@ -219,7 +219,8 @@ export default async function InvestorPage({ searchParams }: { searchParams?: Se
                 </section>
               </aside>
             </div>
-          </div>
+            </div>
+          </InvestorWorkspace>
         </section>
       </main>
       <Footer locale={locale} />

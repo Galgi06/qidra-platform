@@ -4,7 +4,7 @@ import { InvestmentStatus } from "@prisma/client";
 import { FeedbackForm } from "@/components/ActionFeedback";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
-import { InvestorTabs } from "@/components/InvestorTabs";
+import { InvestorWorkspace } from "@/components/InvestorTabs";
 import { NotificationCard } from "@/components/NotificationCard";
 import { ButtonLink } from "@/components/ui/Button";
 import { ProjectStatusBadge, type BadgeStatus } from "@/components/ui/ProjectStatusBadge";
@@ -55,12 +55,12 @@ export default async function InvestmentsPage({ searchParams }: { searchParams?:
                   : "This page shows participation applications submitted from project pages."}
               </p>
             </div>
-            <InvestorTabs activePath="/investor/investments" locale={locale} />
           </div>
         </section>
 
         <section className="px-5 py-12 sm:px-8 lg:px-11 lg:py-16">
-          <div className="mx-auto grid max-w-[1840px] gap-5">
+          <InvestorWorkspace activePath="/investor/investments" locale={locale}>
+          <div className="grid gap-5">
             <div className="grid gap-4 md:grid-cols-3">
               <SummaryCard label={isRu ? "Доступно для новых заявок" : "Available for new applications"} value={formatUsdt(freeUsdt)} />
               <SummaryCard label={isRu ? "Зарезервировано" : "Reserved"} value={formatUsdt(reservedUsdt)} />
@@ -154,6 +154,7 @@ export default async function InvestmentsPage({ searchParams }: { searchParams?:
               </section>
             )}
           </div>
+          </InvestorWorkspace>
         </section>
       </main>
       <Footer locale={locale} />

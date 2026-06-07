@@ -4,16 +4,31 @@ import { ProjectCard } from "@/components/ProjectCard";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { ButtonLink } from "@/components/ui/Button";
 import { getLocale, type SearchParams, withLocale } from "@/lib/i18n";
-import { getPublicProjects } from "@/lib/project-catalog";
+import { getPublicProjects, type CatalogProject } from "@/lib/project-catalog";
 
 export const dynamic = "force-dynamic";
 
 export default async function ProjectsPage({ searchParams }: { searchParams?: SearchParams }) {
-  const locale = await getLocale(searchParams);
+  const params = await searchParams;
+  const locale = await getLocale(params);
   const isRu = locale === "ru";
+  const query = searchParamString(params?.q).trim();
+  const sectorFilter = searchParamString(params?.sector);
+  const structureFilter = searchParamString(params?.structure);
   const projects = await getPublicProjects();
-  const activeProjects = projects.filter((project) => project.status === "active");
-  const completedProjects = projects.filter((project) => project.status !== "active");
+  const filteredProjects = projects.filter((project) => {
+    const sectorMatch = !sectorFilter || inferProjectSector(project, locale) === sectorFilter;
+    const structureMatch = !structureFilter || project.structure.toLowerCase() === structureFilter.toLowerCase();
+    const queryText = [project.title[locale], project.summary[locale], project.description[locale], project.location, project.structure, inferProjectSectorLabel(inferProjectSector(project, locale), locale)]
+      .join(" ")
+      .toLowerCase();
+    const queryMatch = !query || queryText.includes(query.toLowerCase());
+
+    return sectorMatch && structureMatch && queryMatch;
+  });
+  const activeProjects = filteredProjects.filter((project) => project.status === "active");
+  const completedProjects = filteredProjects.filter((project) => project.status !== "active");
+  const sectors = buildSectorStats(projects, locale);
 
   return (
     <>
@@ -48,16 +63,52 @@ export default async function ProjectsPage({ searchParams }: { searchParams?: Se
                 <CatalogStat value="UAE" label={isRu ? "юрисдикция" : "jurisdiction"} />
               </div>
             </div>
-            <div className="flex flex-wrap gap-3">
-              {[isRu ? "Все проекты" : "All projects", "Mudaraba", "Musharaka", isRu ? "С документами" : "With documents"].map((item, index) => (
-                <span
-                  key={item}
-                  className={`rounded-full border px-4 py-2 text-14 font-medium ${
-                    index === 0 ? "border-qidra-dark bg-qidra-dark text-white" : "border-qidra-grayMedium/40 bg-white text-qidra-grayBlue"
+            <form className="grid gap-3 rounded-[20px] bg-white p-4 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] lg:grid-cols-[1fr_220px_220px_auto]" action="/projects">
+              <input name="lang" type="hidden" value={locale} />
+              <label className="grid gap-2 text-13 font-medium text-qidra-dark">
+                {isRu ? "Поиск проекта" : "Project search"}
+                <input
+                  className="h-12 rounded-qidra border border-transparent bg-qidra-grayLight px-4 text-16 outline-none transition-colors placeholder:text-qidra-grayMedium focus:border-qidra-accent"
+                  defaultValue={query}
+                  name="q"
+                  placeholder={isRu ? "Название, отрасль, страна, модель" : "Name, sector, country, model"}
+                />
+              </label>
+              <label className="grid gap-2 text-13 font-medium text-qidra-dark">
+                {isRu ? "Направление" : "Sector"}
+                <select className="h-12 rounded-qidra border border-transparent bg-qidra-grayLight px-4 text-16 outline-none focus:border-qidra-accent" defaultValue={sectorFilter} name="sector">
+                  <option value="">{isRu ? "Все направления" : "All sectors"}</option>
+                  {sectorOptions(locale).map((sector) => (
+                    <option key={sector.value} value={sector.value}>{sector.label}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="grid gap-2 text-13 font-medium text-qidra-dark">
+                {isRu ? "Структура" : "Structure"}
+                <select className="h-12 rounded-qidra border border-transparent bg-qidra-grayLight px-4 text-16 outline-none focus:border-qidra-accent" defaultValue={structureFilter} name="structure">
+                  <option value="">{isRu ? "Все модели" : "All models"}</option>
+                  <option value="Mudaraba">Mudaraba</option>
+                  <option value="Musharaka">Musharaka</option>
+                </select>
+              </label>
+              <button className="h-12 self-end rounded-qidra bg-qidra-dark px-6 text-16 font-medium text-white transition-colors hover:bg-qidra-accent" type="submit">
+                {isRu ? "Найти" : "Search"}
+              </button>
+            </form>
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              {sectors.map((sector) => (
+                <a
+                  key={sector.value}
+                  className={`rounded-[18px] p-5 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] transition-colors ${
+                    sectorFilter === sector.value ? "bg-qidra-dark text-white" : "bg-white text-qidra-dark hover:bg-qidra-grayLight"
                   }`}
+                  href={projectFilterHref(locale, { sector: sector.value })}
                 >
-                  {item}
-                </span>
+                  <p className="text-18 font-medium">{sector.label}</p>
+                  <p className={`mt-2 text-14 ${sectorFilter === sector.value ? "text-white/70" : "text-qidra-grayBlue"}`}>
+                    {sector.count} {isRu ? "проектов" : "projects"}
+                  </p>
+                </a>
               ))}
             </div>
           </div>
@@ -65,11 +116,18 @@ export default async function ProjectsPage({ searchParams }: { searchParams?: Se
 
         <section className="px-5 py-12 sm:px-8 lg:px-11 lg:py-16">
           <div className="mx-auto grid max-w-[1840px] gap-6">
-            <div className="grid gap-5 lg:grid-cols-2">
-              {activeProjects.map((project) => (
-                <ProjectCard key={project.slug} project={project} locale={locale} />
-              ))}
-            </div>
+            {activeProjects.length ? (
+              <div className="grid gap-5 lg:grid-cols-2">
+                {activeProjects.map((project) => (
+                  <ProjectCard key={project.slug} project={project} locale={locale} />
+                ))}
+              </div>
+            ) : (
+              <NotificationPanel
+                title={isRu ? "Активные проекты не найдены" : "No active projects found"}
+                text={isRu ? "Измените поиск или выберите другое направление." : "Change the search or choose another sector."}
+              />
+            )}
             {completedProjects.length ? (
               <div className="mt-12 grid gap-5">
                 <div>
@@ -99,6 +157,65 @@ export default async function ProjectsPage({ searchParams }: { searchParams?: Se
       </main>
       <Footer locale={locale} />
     </>
+  );
+}
+
+type SectorValue = "healthcare" | "metallurgy" | "real-estate" | "trade" | "technology" | "other";
+
+function sectorOptions(locale: "ru" | "en") {
+  return [
+    { value: "real-estate", label: locale === "ru" ? "Недвижимость" : "Real estate" },
+    { value: "trade", label: locale === "ru" ? "Торговля" : "Trade" },
+    { value: "metallurgy", label: locale === "ru" ? "Металлургия и сырьё" : "Metallurgy and resources" },
+    { value: "healthcare", label: locale === "ru" ? "Медицина" : "Healthcare" },
+    { value: "technology", label: locale === "ru" ? "Технологии" : "Technology" },
+    { value: "other", label: locale === "ru" ? "Другие направления" : "Other sectors" }
+  ] satisfies { value: SectorValue; label: string }[];
+}
+
+function inferProjectSector(project: CatalogProject, locale: "ru" | "en"): SectorValue {
+  const text = [project.title.ru, project.title.en, project.summary.ru, project.summary.en, project.description.ru, project.description.en, project.location]
+    .join(" ")
+    .toLowerCase();
+
+  if (text.includes("estate") || text.includes("real estate") || text.includes("недвиж") || text.includes("квартир") || text.includes("дуба")) return "real-estate";
+  if (text.includes("trade") || text.includes("торгов") || text.includes("продаж")) return "trade";
+  if (text.includes("gold") || text.includes("золот") || text.includes("металл") || text.includes("добыч")) return "metallurgy";
+  if (text.includes("мед") || text.includes("health") || text.includes("clinic")) return "healthcare";
+  if (text.includes("tech") || text.includes("it") || text.includes("технолог")) return "technology";
+  return "other";
+}
+
+function inferProjectSectorLabel(sector: SectorValue, locale: "ru" | "en") {
+  return sectorOptions(locale).find((item) => item.value === sector)?.label ?? sector;
+}
+
+function buildSectorStats(projects: CatalogProject[], locale: "ru" | "en") {
+  return sectorOptions(locale).map((sector) => ({
+    ...sector,
+    count: projects.filter((project) => inferProjectSector(project, locale) === sector.value).length
+  }));
+}
+
+function projectFilterHref(locale: "ru" | "en", params: { sector?: string; structure?: string; q?: string }) {
+  const urlParams = new URLSearchParams({ lang: locale });
+  if (params.sector) urlParams.set("sector", params.sector);
+  if (params.structure) urlParams.set("structure", params.structure);
+  if (params.q) urlParams.set("q", params.q);
+  return `/projects?${urlParams.toString()}`;
+}
+
+function searchParamString(value: string | string[] | undefined) {
+  if (Array.isArray(value)) return value[0] ?? "";
+  return value ?? "";
+}
+
+function NotificationPanel({ text, title }: { text: string; title: string }) {
+  return (
+    <div className="rounded-[20px] border border-qidra-grayLight bg-white p-6 sm:p-8">
+      <h2 className="text-[28px] font-medium leading-tight text-qidra-dark">{title}</h2>
+      <p className="mt-2 text-16 text-qidra-grayBlue">{text}</p>
+    </div>
   );
 }
 

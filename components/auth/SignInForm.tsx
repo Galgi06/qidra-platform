@@ -77,17 +77,17 @@ export function SignInForm({
     <>
       <form aria-busy={loading} className="container-qidra grid max-w-md gap-5" onSubmit={handleSubmit}>
         <h1 className="subtitle-28">{locale === "ru" ? "Вход" : "Sign in"}</h1>
-        <SocialAuthButtons googleEnabled={googleEnabled} locale={locale} mode="signIn" nextPath={nextPath} telegramEnabled={telegramEnabled} />
-        <div className="flex items-center gap-3 text-12 font-medium uppercase text-qidra-grayBlue">
-          <span className="h-px flex-1 bg-qidra-grayLight" />
-          {locale === "ru" ? "или email" : "or email"}
-          <span className="h-px flex-1 bg-qidra-grayLight" />
-        </div>
         <Input label="Email" name="email" type="email" placeholder="name@example.com" required />
         <Input label={locale === "ru" ? "Пароль" : "Password"} name="password" type="password" placeholder="********" required />
         <Button loading={loading} loadingLabel={locale === "ru" ? "Входим..." : "Signing in..."} type="submit">
           {locale === "ru" ? "Войти" : "Sign in"}
         </Button>
+        <div className="flex items-center gap-3 text-12 font-medium uppercase text-qidra-grayBlue">
+          <span className="h-px flex-1 bg-qidra-grayLight" />
+          {locale === "ru" ? "или через Google / Telegram" : "or with Google / Telegram"}
+          <span className="h-px flex-1 bg-qidra-grayLight" />
+        </div>
+        <SocialAuthButtons googleEnabled={googleEnabled} locale={locale} mode="signIn" nextPath={nextPath} telegramEnabled={telegramEnabled} />
         <div className="flex justify-between gap-3 text-14 text-qidra-grayBlue">
           <Link href={withLocale("/auth/sign-up", locale)}>{locale === "ru" ? "Регистрация" : "Create account"}</Link>
           <Link href={withLocale("/auth/forgot-password", locale)}>{locale === "ru" ? "Забыли пароль" : "Forgot password"}</Link>

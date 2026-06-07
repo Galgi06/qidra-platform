@@ -2,7 +2,7 @@ import { SupportQueue, SupportThreadStatus } from "@prisma/client";
 import { FeedbackForm } from "@/components/ActionFeedback";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
-import { InvestorTabs } from "@/components/InvestorTabs";
+import { InvestorWorkspace } from "@/components/InvestorTabs";
 import { NotificationCard } from "@/components/NotificationCard";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -64,12 +64,12 @@ export default async function InvestorSupportPage({ searchParams }: { searchPara
                   : "Send questions about your profile, payments, projects and documents. Team replies will be stored in this thread."}
               </p>
             </div>
-            <InvestorTabs activePath="/investor/support" locale={locale} />
           </div>
         </section>
 
         <section className="px-5 py-12 sm:px-8 lg:px-11 lg:py-16">
-          <div className="mx-auto grid max-w-[1840px] gap-8 lg:grid-cols-[1fr_0.42fr]">
+          <InvestorWorkspace activePath="/investor/support" locale={locale}>
+          <div className="grid gap-8 xl:grid-cols-[1fr_0.42fr]">
             <section className="grid gap-5 rounded-[20px] bg-white p-6 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] sm:p-8">
               <div>
                 <h2 className="text-[32px] font-medium leading-tight tracking-[0] text-qidra-dark">{isRu ? "Личный диалог" : "Personal thread"}</h2>
@@ -228,6 +228,7 @@ export default async function InvestorSupportPage({ searchParams }: { searchPara
               />
             </aside>
           </div>
+          </InvestorWorkspace>
         </section>
       </main>
       <Footer locale={locale} />

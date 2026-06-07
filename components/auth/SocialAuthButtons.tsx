@@ -40,10 +40,28 @@ export function SocialAuthButtons({ googleEnabled, locale, mode, nextPath, teleg
     window.location.href = `/auth/telegram?${params.toString()}`;
   }
 
+  const googleLabel =
+    mode === "signUp"
+      ? isRu
+        ? "Регистрация через Google"
+        : "Sign up with Google"
+      : isRu
+        ? "Вход через Google"
+        : "Sign in with Google";
+  const telegramLabel =
+    mode === "signUp"
+      ? isRu
+        ? "Регистрация через Telegram"
+        : "Sign up with Telegram"
+      : isRu
+        ? "Вход через Telegram"
+        : "Sign in with Telegram";
+
   return (
     <>
-      <div className="grid gap-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         <Button
+          aria-label={googleLabel}
           className="h-12 gap-3 bg-white"
           onClick={() => {
             if (!googleEnabled) {
@@ -57,15 +75,10 @@ export function SocialAuthButtons({ googleEnabled, locale, mode, nextPath, teleg
           variant="outline"
         >
           <GoogleIcon />
-          {mode === "signUp"
-            ? isRu
-              ? "Зарегистрироваться через Google"
-              : "Sign up with Google"
-            : isRu
-              ? "Войти через Google"
-              : "Sign in with Google"}
+          Google
         </Button>
         <Button
+          aria-label={telegramLabel}
           className="h-12 gap-3 bg-white"
           onClick={() => {
             if (!telegramEnabled) {
@@ -79,13 +92,7 @@ export function SocialAuthButtons({ googleEnabled, locale, mode, nextPath, teleg
           variant="outline"
         >
           <TelegramIcon />
-          {mode === "signUp"
-            ? isRu
-              ? "Зарегистрироваться через Telegram"
-              : "Sign up with Telegram"
-            : isRu
-              ? "Войти через Telegram"
-              : "Sign in with Telegram"}
+          Telegram
         </Button>
       </div>
       {feedback ? <FeedbackPopup feedback={feedback} onClose={() => setFeedback(null)} /> : null}

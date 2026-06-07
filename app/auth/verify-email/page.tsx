@@ -44,7 +44,7 @@ export default async function VerifyEmailPage({ searchParams }: { searchParams?:
     idle: {
       tone: "info" as const,
       title: locale === "ru" ? "Подтверждение email" : "Email verification",
-      text: locale === "ru" ? "Откройте ссылку из письма, чтобы подтвердить электронную почту." : "Open the link from your email to confirm your address."
+      text: locale === "ru" ? "Откройте ссылку из письма, чтобы подтвердить электронную почту. Ссылка действует 15 минут." : "Open the link from your email to confirm your address. The link is valid for 15 minutes."
     },
     success: {
       tone: "success" as const,
@@ -54,7 +54,7 @@ export default async function VerifyEmailPage({ searchParams }: { searchParams?:
     invalid: {
       tone: "error" as const,
       title: locale === "ru" ? "Ссылка недействительна" : "Invalid link",
-      text: locale === "ru" ? "Ссылка подтверждения истекла или уже была использована. Зарегистрируйтесь заново или запросите новое письмо." : "This confirmation link expired or was already used. Register again or request a new message."
+      text: locale === "ru" ? "Ссылка подтверждения истекла, была использована или прошло больше 15 минут. Зарегистрируйтесь заново или запросите новое письмо." : "This confirmation link expired, was already used, or more than 15 minutes have passed. Register again or request a new message."
     }
   }[state];
 
