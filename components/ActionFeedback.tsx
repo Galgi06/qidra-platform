@@ -84,6 +84,7 @@ type FeedbackFormProps = {
   className?: string;
   endpoint?: string;
   feedback: FeedbackMessage;
+  formId?: string;
   payload?: "json" | "form-data";
   popupPlacement?: FeedbackPlacement;
   refreshOnSuccess?: boolean;
@@ -96,6 +97,7 @@ export function FeedbackForm({
   className = "",
   endpoint,
   feedback,
+  formId,
   payload = "json",
   popupPlacement = "top-right",
   refreshOnSuccess = false,
@@ -208,7 +210,7 @@ export function FeedbackForm({
 
   return (
     <>
-      <form aria-busy={submitting} className={className} onSubmit={handleSubmit}>
+      <form aria-busy={submitting} className={className} id={formId} onSubmit={handleSubmit}>
         {children}
       </form>
       {open ? <FeedbackPopup feedback={activeFeedback} onClose={() => setOpen(false)} placement={popupPlacement} /> : null}

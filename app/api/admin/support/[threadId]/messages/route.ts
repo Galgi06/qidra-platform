@@ -139,52 +139,79 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   const data = parsed.data;
 
-  await prisma.$transaction(async (tx) => {
-    const now = new Date();
+  try {
+    const createdMessage = await prisma.$transaction(async (tx) => {
+      const now = new Date();
 
-    await tx.supportMessage.create({
-      data: {
-        threadId,
-        senderId: session?.user?.id,
-        body: data.body
-      }
-    });
-
-    await tx.supportThread.update({
-      where: { id: threadId },
-      data: {
-        closedAt: thread.status === SupportThreadStatus.CLOSED ? null : thread.closedAt,
-        lastManagerMessageAt: now,
-        status: thread.status === SupportThreadStatus.CLOSED ? SupportThreadStatus.OPEN : thread.status
-      }
-    });
-
-    await tx.adminAuditLog.create({
-      data: {
-        actorId: session?.user?.id,
-        action: "support.message.manager",
-        entityType: "SupportThread",
-        entityId: threadId,
-        payload: {
+      const updatedThread = await tx.supportThread.update({
+        where: { id: threadId },
+        data: {
+          closedAt: thread.status === SupportThreadStatus.CLOSED ? null : thread.closedAt,
+          lastManagerMessageAt: now,
+          messages: {
+            create: {
+              body: data.body,
+              senderId: session?.user?.id
+            }
+          },
           status: thread.status === SupportThreadStatus.CLOSED ? SupportThreadStatus.OPEN : thread.status
+        },
+        include: {
+          messages: {
+            orderBy: { createdAt: "desc" },
+            take: 1
+          }
         }
+      });
+
+      const createdMessage = updatedThread.messages[0];
+
+      if (!createdMessage) {
+        throw new Error("Support reply message was not created.");
       }
+
+      await tx.adminAuditLog.create({
+        data: {
+          actorId: session?.user?.id,
+          action: "support.message.manager",
+          entityType: "SupportThread",
+          entityId: threadId,
+          payload: {
+            messageId: createdMessage.id,
+            status: thread.status === SupportThreadStatus.CLOSED ? SupportThreadStatus.OPEN : thread.status
+          }
+        }
+      });
+
+      await createUserNotification(tx, {
+        actorId: session?.user?.id,
+        bodyEn: "The Qidra team replied to your support request.",
+        bodyRu: "Команда Qidra ответила на ваше обращение в поддержку.",
+        href: "/investor/support",
+        titleEn: "Support reply",
+        titleRu: "Ответ поддержки",
+        type: "support_reply",
+        userId: thread.userId
+      });
+
+      return createdMessage;
     });
 
-    await createUserNotification(tx, {
-      actorId: session?.user?.id,
-      bodyEn: "The Qidra team replied to your support request.",
-      bodyRu: "Команда Qidra ответила на ваше обращение в поддержку.",
-      href: "/investor/support",
-      titleEn: "Support reply",
-      titleRu: "Ответ поддержки",
-      type: "support_reply",
-      userId: thread.userId
+    return NextResponse.json({
+      id: createdMessage.id,
+      title: localeRu ? "Ответ отправлен" : "Reply sent",
+      message: localeRu ? "Сообщение добавлено в диалог участника и сохранено в журнале действий." : "The message was added to the participant thread and recorded in the audit log."
     });
-  });
+  } catch (error) {
+    console.error("support_reply_failed", error);
 
-  return NextResponse.json({
-    title: localeRu ? "Ответ отправлен" : "Reply sent",
-    message: localeRu ? "Диалог обновлён и сохранён в журнале действий." : "The thread was updated and recorded in the audit log."
-  });
+    return NextResponse.json(
+      {
+        title: localeRu ? "Ответ не отправлен" : "Reply not sent",
+        message: localeRu ? "Сообщение не было записано в диалог. Обновите страницу и попробуйте ещё раз." : "The message was not saved to the thread. Refresh the page and try again.",
+        tone: "error"
+      },
+      { status: 500 }
+    );
+  }
 }
