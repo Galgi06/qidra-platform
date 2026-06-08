@@ -3,9 +3,10 @@ import type { InputHTMLAttributes } from "react";
 type InputProps = InputHTMLAttributes<HTMLInputElement> & {
   label: string;
   error?: string;
+  hint?: string;
 };
 
-export function Input({ label, error, className = "", ...props }: InputProps) {
+export function Input({ label, error, hint, className = "", ...props }: InputProps) {
   return (
     <label className="grid gap-2 text-14 font-medium text-qidra-dark">
       {label}
@@ -15,6 +16,7 @@ export function Input({ label, error, className = "", ...props }: InputProps) {
         } ${className}`}
         {...props}
       />
+      {hint ? <span className="text-12 leading-snug text-qidra-grayBlue">{hint}</span> : null}
       {error ? <span className="text-12 text-qidra-red">{error}</span> : null}
     </label>
   );

@@ -419,9 +419,16 @@ function SubmissionActions({
               <Input label={isRu ? "Название RU" : "Title RU"} name="titleRu" defaultValue={submission.title} required />
               <Input label={isRu ? "Название EN" : "Title EN"} name="titleEn" defaultValue={submission.title} required />
               <Input
-                label={isRu ? "Адрес проекта (латиницей)" : "Project URL address"}
+                label={isRu ? "Адрес проекта на сайте" : "Project page address"}
                 name="slug"
                 defaultValue={preparedSlug}
+                hint={
+                  isRu
+                    ? "Это часть ссылки после /projects/. Используйте только латинские буквы, цифры и дефисы, без пробелов."
+                    : "This is the part of the URL after /projects/. Use only latin letters, numbers and hyphens, without spaces."
+                }
+                inputMode="url"
+                pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
                 placeholder={isRu ? "Например: qidra-new-project" : "Example: qidra-new-project"}
                 required
               />
