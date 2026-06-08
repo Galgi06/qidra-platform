@@ -1,4 +1,4 @@
-import type { CatalogProject } from "@/lib/project-catalog";
+import { acceptsApplications, type CatalogProject } from "@/lib/project-catalog";
 import type { Locale } from "@/lib/i18n";
 import { withLocale } from "@/lib/i18n";
 import { ButtonLink } from "@/components/ui/Button";
@@ -6,9 +6,11 @@ import { ProgressBar } from "@/components/ui/ProgressBar";
 import { ProjectStatusBadge } from "@/components/ui/ProjectStatusBadge";
 
 export function ProjectCard({ project, locale }: { project: CatalogProject; locale: Locale }) {
-  const progress = Math.round((project.fundedUsdt / project.targetUsdt) * 100);
+  const progress = Math.min(100, Math.round((project.fundedUsdt / Math.max(project.targetUsdt, 1)) * 100));
+  const canApply = acceptsApplications(project);
   const isRu = locale === "ru";
   const riskLabel = isRu ? { Moderate: "Средний", High: "Высокий" }[project.riskLevel] ?? project.riskLevel : project.riskLevel;
+  const availability = projectAvailability(project, locale);
 
   return (
     <article className="grid min-h-[360px] gap-7 rounded-[20px] bg-qidra-grayLight p-7 shadow-[0_0_0_1px_rgba(18,20,23,0.06)] sm:p-9">
@@ -109,9 +111,13 @@ export function ProjectCard({ project, locale }: { project: CatalogProject; loca
           <span>{isRu ? "Цель" : "Target"}: {project.targetUsdt.toLocaleString()} USDT</span>
         </div>
       </div>
+      <div className={`rounded-[14px] px-4 py-3 text-14 shadow-[0_0_0_1px_rgba(18,20,23,0.06)] ${availability.className}`}>
+        <p className="font-medium">{availability.title}</p>
+        <p className="mt-1 opacity-80">{availability.text}</p>
+      </div>
       <div className="mt-auto flex flex-wrap gap-3">
         <ButtonLink href={withLocale(`/projects/${project.slug}`, locale)} variant="dark" className="w-full sm:w-fit sm:min-w-56">
-          {isRu ? "Открыть проект" : "Open project"}
+          {canApply ? (isRu ? "Изучить проект" : "Review project") : (isRu ? "Карточка проекта" : "Project profile")}
         </ButtonLink>
         <ButtonLink href={`${withLocale(`/projects/${project.slug}`, locale)}#documents`} variant="outline" className="w-full sm:w-fit sm:min-w-44">
           {isRu ? "Документы" : "Documents"}
@@ -119,6 +125,48 @@ export function ProjectCard({ project, locale }: { project: CatalogProject; loca
       </div>
     </article>
   );
+}
+
+function projectAvailability(project: CatalogProject, locale: Locale) {
+  const isRu = locale === "ru";
+
+  if (acceptsApplications(project)) {
+    return {
+      className: "bg-emerald-50 text-emerald-900",
+      title: isRu ? "Сбор открыт" : "Open for applications",
+      text: isRu
+        ? "Можно изучить документы и отправить заявку в пределах свободного баланса."
+        : "You can review the documents and apply within your available balance."
+    };
+  }
+
+  if (project.status === "funded") {
+    return {
+      className: "bg-white text-qidra-dark",
+      title: isRu ? "Сбор завершён" : "Raise completed",
+      text: isRu
+        ? "Новые заявки не принимаются. Карточка и документы доступны только для ознакомления."
+        : "New applications are closed. The profile and documents remain available for review."
+    };
+  }
+
+  if (project.status === "paused") {
+    return {
+      className: "bg-amber-50 text-amber-900",
+      title: isRu ? "Проект на паузе" : "Project paused",
+      text: isRu
+        ? "Новые заявки временно недоступны до решения команды Qidra."
+        : "New applications are temporarily unavailable until the Qidra team reopens the project."
+    };
+  }
+
+  return {
+    className: "bg-white text-qidra-dark",
+    title: isRu ? "Заявки недоступны" : "Applications unavailable",
+    text: isRu
+      ? "Проект можно просматривать, но участие откроется только после публикации активного статуса."
+      : "The project can be reviewed, but participation opens only after an active status is published."
+  };
 }
 
 function ProjectInfo({ label, value }: { label: string; value: string }) {

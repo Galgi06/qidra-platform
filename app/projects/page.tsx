@@ -4,7 +4,7 @@ import { ProjectCard } from "@/components/ProjectCard";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { ButtonLink } from "@/components/ui/Button";
 import { getLocale, type SearchParams, withLocale } from "@/lib/i18n";
-import { getPublicProjects, type CatalogProject } from "@/lib/project-catalog";
+import { acceptsApplications, getPublicProjects, type CatalogProject } from "@/lib/project-catalog";
 
 export const dynamic = "force-dynamic";
 
@@ -26,8 +26,8 @@ export default async function ProjectsPage({ searchParams }: { searchParams?: Se
 
     return sectorMatch && structureMatch && queryMatch;
   });
-  const activeProjects = filteredProjects.filter((project) => project.status === "active");
-  const completedProjects = filteredProjects.filter((project) => project.status !== "active");
+  const openProjects = filteredProjects.filter((project) => acceptsApplications(project));
+  const unavailableProjects = filteredProjects.filter((project) => !acceptsApplications(project));
   const sectors = buildSectorStats(projects, locale);
 
   return (
@@ -116,32 +116,44 @@ export default async function ProjectsPage({ searchParams }: { searchParams?: Se
 
         <section className="px-5 py-12 sm:px-8 lg:px-11 lg:py-16">
           <div className="mx-auto grid max-w-[1840px] gap-6">
-            {activeProjects.length ? (
-              <div className="grid gap-5 lg:grid-cols-2">
-                {activeProjects.map((project) => (
-                  <ProjectCard key={project.slug} project={project} locale={locale} />
-                ))}
-              </div>
-            ) : (
-              <NotificationPanel
-                title={isRu ? "Активные проекты не найдены" : "No active projects found"}
-                text={isRu ? "Измените поиск или выберите другое направление." : "Change the search or choose another sector."}
-              />
-            )}
-            {completedProjects.length ? (
-              <div className="mt-12 grid gap-5">
+            {openProjects.length ? (
+              <div className="grid gap-5">
                 <div>
                   <h2 className="text-[36px] font-medium leading-tight tracking-[0] text-qidra-dark sm:text-[44px]">
-                    {isRu ? "Проекты с привлечёнными средствами" : "Funded through Qidra"}
+                    {isRu ? "Открытые для участия" : "Open for participation"}
                   </h2>
                   <p className="mt-3 max-w-4xl text-18 text-qidra-grayBlue">
                     {isRu
-                      ? "Эти проекты уже завершили сбор или временно недоступны для новых заявок. Документы и описание остаются открытыми для ознакомления."
-                      : "These projects have completed their raise or are temporarily unavailable for new applications. Documents and descriptions remain available for review."}
+                      ? "По этим проектам сейчас принимаются заявки. Участие доступно только в пределах свободного баланса и после изучения документов."
+                      : "These projects currently accept applications. Participation is available only within the free balance and after reviewing the documents."}
                   </p>
                 </div>
                 <div className="grid gap-5 lg:grid-cols-2">
-                  {completedProjects.map((project) => (
+                  {openProjects.map((project) => (
+                    <ProjectCard key={project.slug} project={project} locale={locale} />
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <NotificationPanel
+                title={isRu ? "Открытые проекты не найдены" : "No open projects found"}
+                text={isRu ? "Измените поиск или выберите другое направление." : "Change the search or choose another sector."}
+              />
+            )}
+            {unavailableProjects.length ? (
+              <div className="mt-12 grid gap-5">
+                <div>
+                  <h2 className="text-[36px] font-medium leading-tight tracking-[0] text-qidra-dark sm:text-[44px]">
+                    {isRu ? "Завершённые и недоступные для новых заявок" : "Completed or unavailable for new applications"}
+                  </h2>
+                  <p className="mt-3 max-w-4xl text-18 text-qidra-grayBlue">
+                    {isRu
+                      ? "Эти проекты уже привлекли нужный объём средств или временно закрыты командой Qidra. Новые заявки по ним не принимаются, но карточки и документы остаются доступными для истории и ознакомления."
+                      : "These projects have reached their target or are temporarily closed by the Qidra team. New applications are not accepted, while profiles and documents remain available for records and review."}
+                  </p>
+                </div>
+                <div className="grid gap-5 lg:grid-cols-2">
+                  {unavailableProjects.map((project) => (
                     <ProjectCard key={project.slug} project={project} locale={locale} />
                   ))}
                 </div>
