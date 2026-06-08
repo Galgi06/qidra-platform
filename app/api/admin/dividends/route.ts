@@ -110,20 +110,7 @@ async function calculatePeriod(data: z.infer<typeof calculateSchema>, actorId: s
   const operatingExpenseUsdt = toMoney(data.operatingExpenseUsdt);
   const netProfitUsdt = grossRevenueUsdt.minus(directCostUsdt).minus(operatingExpenseUsdt).toDecimalPlaces(6);
   const investorSharePercent = new Prisma.Decimal(data.investorSharePercent).toDecimalPlaces(4);
-  const investorPoolUsdt = netProfitUsdt.times(investorSharePercent).div(100).toDecimalPlaces(6);
-
-  if (netProfitUsdt.lt(0) || investorPoolUsdt.lte(0)) {
-    return NextResponse.json(
-      {
-        title: localeRu ? "Нет суммы к распределению" : "No distributable amount",
-        message:
-          localeRu
-            ? "Чистый результат периода должен быть положительным, а доля участников больше нуля."
-            : "The net result must be positive and the participant share must be above zero."
-      },
-      { status: 400 }
-    );
-  }
+  const investorPoolUsdt = netProfitUsdt.gt(0) ? netProfitUsdt.times(investorSharePercent).div(100).toDecimalPlaces(6) : new Prisma.Decimal(0);
 
   const result = await prisma.$transaction(async (tx) => {
     const existingPeriod = await tx.projectDividendPeriod.findUnique({
@@ -166,7 +153,7 @@ async function calculatePeriod(data: z.infer<typeof calculateSchema>, actorId: s
       })
       .filter((investment) => investment.eligibleDays > 0 && investment.weight.gt(0));
 
-    if (!weightedInvestments.length) {
+    if (investorPoolUsdt.gt(0) && !weightedInvestments.length) {
       throw new DividendError("no_investments");
     }
 
@@ -205,25 +192,27 @@ async function calculatePeriod(data: z.infer<typeof calculateSchema>, actorId: s
       }
     });
 
-    await tx.dividendPayment.createMany({
-      data: weightedInvestments.map((investment, index) => {
-        const isLast = index === weightedInvestments.length - 1;
-        const allocatedBefore = weightedInvestments
-          .slice(0, index)
-          .reduce((total, previous) => total.plus(investorPoolUsdt.times(previous.weight).div(totalWeight).toDecimalPlaces(6)), new Prisma.Decimal(0));
-        const amountUsdt = isLast ? investorPoolUsdt.minus(allocatedBefore).toDecimalPlaces(6) : investorPoolUsdt.times(investment.weight).div(totalWeight).toDecimalPlaces(6);
+    if (investorPoolUsdt.gt(0)) {
+      await tx.dividendPayment.createMany({
+        data: weightedInvestments.map((investment, index) => {
+          const isLast = index === weightedInvestments.length - 1;
+          const allocatedBefore = weightedInvestments
+            .slice(0, index)
+            .reduce((total, previous) => total.plus(investorPoolUsdt.times(previous.weight).div(totalWeight).toDecimalPlaces(6)), new Prisma.Decimal(0));
+          const amountUsdt = isLast ? investorPoolUsdt.minus(allocatedBefore).toDecimalPlaces(6) : investorPoolUsdt.times(investment.weight).div(totalWeight).toDecimalPlaces(6);
 
-        return {
-          periodId: period.id,
-          investmentId: investment.id,
-          userId: investment.userId,
-          amountUsdt,
-          investmentAmountUsdt: investment.amountUsdt,
-          weight: investment.weight,
-          eligibleDays: investment.eligibleDays
-        };
-      })
-    });
+          return {
+            periodId: period.id,
+            investmentId: investment.id,
+            userId: investment.userId,
+            amountUsdt,
+            investmentAmountUsdt: investment.amountUsdt,
+            weight: investment.weight,
+            eligibleDays: investment.eligibleDays
+          };
+        })
+      });
+    }
 
     await tx.adminAuditLog.create({
       data: {
@@ -237,13 +226,13 @@ async function calculatePeriod(data: z.infer<typeof calculateSchema>, actorId: s
           netProfitUsdt: netProfitUsdt.toString(),
           investorPoolUsdt: investorPoolUsdt.toString(),
           investorSharePercent: investorSharePercent.toString(),
-          payments: weightedInvestments.length,
+          payments: investorPoolUsdt.gt(0) ? weightedInvestments.length : 0,
           note: data.adminNote
         }
       }
     });
 
-    return { payments: weightedInvestments.length };
+    return { noDistribution: investorPoolUsdt.lte(0), payments: investorPoolUsdt.gt(0) ? weightedInvestments.length : 0 };
   }).catch((error) => {
     if (error instanceof DividendError) return error.code;
     throw error;
@@ -280,11 +269,15 @@ async function calculatePeriod(data: z.infer<typeof calculateSchema>, actorId: s
   }
 
   return NextResponse.json({
-    title: localeRu ? "Период рассчитан" : "Period calculated",
+    title: result.noDistribution ? (localeRu ? "Период сохранён" : "Period saved") : localeRu ? "Период рассчитан" : "Period calculated",
     message:
-      localeRu
-        ? `Начисления подготовлены для ${result.payments} участников. Перед выплатой утвердите расчёт.`
-        : `Accruals were prepared for ${result.payments} participants. Approve the calculation before payout.`
+      result.noDistribution
+        ? localeRu
+          ? "Чистая прибыль периода не положительная, поэтому дивиденды не начислены. Период сохранён для отчётности."
+          : "The period net result is not positive, so no dividends were accrued. The period was saved for reporting."
+        : localeRu
+          ? `Начисления подготовлены для ${result.payments} участников. Перед выплатой утвердите расчёт.`
+          : `Accruals were prepared for ${result.payments} participants. Approve the calculation before payout.`
   });
 }
 
@@ -295,11 +288,14 @@ async function approvePeriod(periodId: string, adminNote: string | undefined, ac
     return periodNotFound(localeRu);
   }
 
-  if (period.status !== DividendPeriodStatus.DRAFT || !period.payments.length) {
+  if (period.status !== DividendPeriodStatus.DRAFT || (!period.payments.length && period.investorPoolUsdt.gt(0))) {
     return NextResponse.json(
       {
         title: localeRu ? "Нельзя утвердить" : "Cannot approve",
-        message: localeRu ? "Утвердить можно только рассчитанный период со строками начислений." : "Only a calculated period with accrual rows can be approved."
+        message:
+          localeRu
+            ? "Утвердить можно только рассчитанный период. Если есть сумма к выплате, должны быть строки начислений."
+            : "Only a calculated period can be approved. If there is a payout pool, accrual rows are required."
       },
       { status: 409 }
     );
