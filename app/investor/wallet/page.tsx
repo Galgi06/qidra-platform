@@ -59,17 +59,17 @@ export default async function WalletPage({ searchParams }: { searchParams?: Sear
         <section className="px-5 py-12 sm:px-8 lg:px-11 lg:py-16">
           <InvestorWorkspace activePath="/investor/wallet" locale={locale}>
             <div className="grid gap-8">
-            <div className="grid gap-5 md:grid-cols-4">
-              <BalanceCard label={isRu ? "Доступный баланс" : "Available balance"} value={formatUsdt(availableUsdt)} tone="dark" />
-              <BalanceCard label={isRu ? "Зарезервировано" : "Reserved"} value={formatUsdt(reservedUsdt)} tone="accent" />
-              <BalanceCard label={isRu ? "На проверке" : "Under review"} value={formatUsdt(pendingUsdt)} tone="accent" />
-              <BalanceCard label={isRu ? "Сеть" : "Network"} value="USDT TRC20" tone="light" />
-            </div>
+              <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-4">
+                <BalanceCard label={isRu ? "Доступный баланс" : "Available balance"} value={formatUsdt(availableUsdt)} tone="dark" />
+                <BalanceCard label={isRu ? "Зарезервировано" : "Reserved"} value={formatUsdt(reservedUsdt)} tone="accent" />
+                <BalanceCard label={isRu ? "На проверке" : "Under review"} value={formatUsdt(pendingUsdt)} tone="accent" />
+                <BalanceCard label={isRu ? "Сеть" : "Network"} value="USDT TRC20" tone="light" />
+              </div>
 
-            <div className="grid gap-8 lg:grid-cols-[0.85fr_1.15fr]">
-              <div className="grid content-start gap-6">
-                <FeedbackForm
-                  className="grid content-start gap-5 rounded-[20px] bg-white p-6 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] sm:p-8"
+              <div className="grid gap-8 2xl:grid-cols-[minmax(0,0.95fr)_minmax(420px,1.05fr)] 2xl:items-start">
+                <div className="grid content-start gap-6">
+                  <FeedbackForm
+                    className="grid content-start gap-6 rounded-[20px] bg-white p-6 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] sm:p-8"
                   endpoint={`/api/wallet/deposits?lang=${locale}`}
                   feedback={{
                     title: isRu ? "Заявка на пополнение создана" : "Deposit request created",
@@ -84,7 +84,15 @@ export default async function WalletPage({ searchParams }: { searchParams?: Sear
                   popupPlacement="center"
                   reloadOnSuccess
                 >
-                  <h2 className="text-[32px] font-medium leading-tight tracking-[0] text-qidra-dark">{isRu ? "Создать пополнение" : "Create deposit"}</h2>
+                  <div>
+                    <p className="text-12 font-semibold uppercase text-qidra-accent">{isRu ? "Пополнение баланса" : "Balance deposit"}</p>
+                    <h2 className="mt-2 text-[32px] font-medium leading-tight tracking-[0] text-qidra-dark">{isRu ? "Создать пополнение" : "Create deposit"}</h2>
+                    <p className="mt-2 max-w-2xl text-15 leading-relaxed text-qidra-grayBlue">
+                      {isRu
+                        ? "Перевод принимается только на ваш личный адрес. После отправки укажите hash, и система сверит сеть, адрес и сумму."
+                        : "Transfers are accepted only to your personal address. After sending, add the hash so the system can match the network, address and amount."}
+                    </p>
+                  </div>
                   {depositAddress ? (
                     <WalletDepositAddress address={depositAddress} locale={locale} />
                   ) : (
@@ -112,7 +120,7 @@ export default async function WalletPage({ searchParams }: { searchParams?: Sear
                     required
                   />
                   <Input label={isRu ? "Сумма USDT" : "Amount USDT"} name="amount" inputMode="decimal" placeholder="1000" required defaultValue={prefilledAmount} />
-                  <Button disabled={!depositAddress || !tronPayment.verificationConfigured} type="submit">
+                  <Button className="w-full" disabled={!depositAddress || !tronPayment.verificationConfigured} type="submit">
                     {isRu ? "Проверить и пополнить" : "Verify and deposit"}
                   </Button>
                 </FeedbackForm>
@@ -133,7 +141,10 @@ export default async function WalletPage({ searchParams }: { searchParams?: Sear
                   popupPlacement="center"
                   reloadOnSuccess
                 >
-                  <h2 className="text-[32px] font-medium leading-tight tracking-[0] text-qidra-dark">{isRu ? "Создать вывод" : "Create withdrawal"}</h2>
+                  <div>
+                    <p className="text-12 font-semibold uppercase text-qidra-accent">{isRu ? "Вывод средств" : "Withdrawal"}</p>
+                    <h2 className="mt-2 text-[32px] font-medium leading-tight tracking-[0] text-qidra-dark">{isRu ? "Создать вывод" : "Create withdrawal"}</h2>
+                  </div>
                   <NotificationCard
                     title={isRu ? "Перед выводом" : "Before withdrawal"}
                     text={
@@ -144,16 +155,19 @@ export default async function WalletPage({ searchParams }: { searchParams?: Sear
                   />
                   <Input label={isRu ? "Адрес получателя USDT TRC20" : "Recipient USDT TRC20 address"} name="destinationAddress" placeholder="T..." required />
                   <Input label={isRu ? "Сумма USDT" : "Amount USDT"} name="amount" inputMode="decimal" placeholder="100" required />
-                  <Button disabled={decimalToNumber(availableUsdt) <= 0} type="submit">
+                  <Button className="w-full" disabled={decimalToNumber(availableUsdt) <= 0} type="submit">
                     {isRu ? "Отправить заявку на вывод" : "Submit withdrawal request"}
                   </Button>
                 </FeedbackForm>
               </div>
 
-              <section className="grid content-start gap-4">
-                <div>
-                  <h2 className="text-[32px] font-medium leading-tight tracking-[0] text-qidra-dark">{isRu ? "История операций" : "Transaction history"}</h2>
-                  <p className="mt-2 text-16 text-qidra-grayBlue">{isRu ? "Последние заявки и статусы платежей." : "Recent requests and payment statuses."}</p>
+              <section className="grid content-start gap-5 rounded-[20px] bg-white p-6 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] sm:p-8">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div>
+                    <p className="text-12 font-semibold uppercase text-qidra-accent">{isRu ? "Операционный журнал" : "Operation log"}</p>
+                    <h2 className="mt-2 text-[32px] font-medium leading-tight tracking-[0] text-qidra-dark">{isRu ? "История операций" : "Transaction history"}</h2>
+                    <p className="mt-2 text-16 text-qidra-grayBlue">{isRu ? "Последние заявки и статусы платежей." : "Recent requests and payment statuses."}</p>
+                  </div>
                 </div>
                 {wallet?.transactions.length ? (
                   <div className="grid gap-3">
@@ -188,9 +202,9 @@ function BalanceCard({ label, value, tone }: { label: string; value: string; ton
   const color = tone === "dark" ? "bg-qidra-dark text-white" : tone === "accent" ? "bg-[#2418f2] text-white" : "bg-white text-qidra-dark";
 
   return (
-    <article className={`rounded-[20px] p-6 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] ${color}`}>
+    <article className={`min-h-[132px] rounded-[20px] p-6 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] ${color}`}>
       <p className={`text-14 font-medium ${tone === "light" ? "text-qidra-grayBlue" : "text-white/72"}`}>{label}</p>
-      <p className="mt-4 text-[30px] font-medium leading-tight tracking-[0]">{value}</p>
+      <p className="mt-4 break-words text-[30px] font-medium leading-tight tracking-[0]">{value}</p>
     </article>
   );
 }

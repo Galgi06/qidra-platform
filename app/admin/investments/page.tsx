@@ -127,6 +127,7 @@ export default async function AdminInvestmentsPage({ searchParams }: { searchPar
                   latestKycStatus,
                   locale
                 });
+                const userDossierHref = withLocale(`/admin/users/${request.userId}`, locale);
 
                 return (
                   <div key={request.id} className="surface grid gap-5 p-6">
@@ -137,8 +138,13 @@ export default async function AdminInvestmentsPage({ searchParams }: { searchPar
                       </div>
                       <div>
                         <p className="text-14 text-qidra-grayBlue">{locale === "ru" ? "Участник" : "Participant"}</p>
-                        <p className="mt-1 text-16 font-medium text-qidra-dark">{request.user.name || request.user.email}</p>
+                        <Link className="mt-1 block text-16 font-medium text-qidra-dark transition-colors hover:text-qidra-accent" href={userDossierHref}>
+                          {request.user.name || request.user.email}
+                        </Link>
                         <p className="mt-1 break-words text-14 text-qidra-grayBlue">{request.user.email}</p>
+                        <Link className="mt-2 inline-flex text-13 font-medium text-qidra-accent hover:text-qidra-dark" href={userDossierHref}>
+                          {locale === "ru" ? "Открыть карточку клиента" : "Open client card"}
+                        </Link>
                       </div>
                       <div>
                         <p className="text-14 text-qidra-grayBlue">{locale === "ru" ? "Проект" : "Project"}</p>

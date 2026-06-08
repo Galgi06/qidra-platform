@@ -46,8 +46,8 @@ export function WalletDepositAddress({ address, locale }: { address: string; loc
   }
 
   return (
-    <div className="grid gap-5 rounded-qidra border border-qidra-grayLight bg-qidra-grayLight p-4 md:grid-cols-[auto_1fr] md:items-center">
-      <div className="grid size-[220px] place-items-center rounded-qidra bg-white p-3 shadow-[0_0_0_1px_rgba(18,20,23,0.08)]">
+    <div className="grid gap-5 rounded-[16px] border border-qidra-grayLight bg-qidra-grayLight p-4 xl:grid-cols-[240px_minmax(0,1fr)] xl:items-center">
+      <div className="mx-auto grid size-[220px] place-items-center rounded-[14px] bg-white p-3 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] xl:mx-0">
         {qrCode ? (
           <Image alt={isRu ? "QR-код адреса USDT TRC20" : "USDT TRC20 address QR code"} src={qrCode} width={196} height={196} unoptimized />
         ) : (
@@ -55,13 +55,13 @@ export function WalletDepositAddress({ address, locale }: { address: string; loc
         )}
       </div>
       <div className="min-w-0">
-        <p className="text-14 font-medium text-qidra-dark">{isRu ? "Ваш личный адрес Qidra для USDT TRC20" : "Your personal Qidra USDT TRC20 address"}</p>
-        <code className="mt-3 block break-all rounded-qidra bg-white px-3 py-3 text-14 text-qidra-dark">{address}</code>
-        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
-          <Button onClick={handleCopy} size="sm" type="button" variant="dark">
+        <p className="text-14 font-semibold text-qidra-dark">{isRu ? "Личный адрес для USDT TRC20" : "Personal USDT TRC20 address"}</p>
+        <code className="mt-3 block max-w-full overflow-hidden break-all rounded-[12px] bg-white px-4 py-4 font-mono text-14 leading-relaxed text-qidra-dark">{address}</code>
+        <div className="mt-4 grid gap-3 sm:grid-cols-[auto_1fr] sm:items-center">
+          <Button className="w-full sm:w-auto" onClick={handleCopy} size="sm" type="button" variant="dark">
             {copied ? (isRu ? "Скопировано" : "Copied") : isRu ? "Скопировать" : "Copy"}
           </Button>
-          <p className="text-12 text-qidra-grayBlue">{isRu ? "Отправляйте только USDT в сети TRC20." : "Send only USDT on the TRC20 network."}</p>
+          <p className="text-12 leading-relaxed text-qidra-grayBlue">{isRu ? "Отправляйте только USDT в сети TRC20. Адрес закреплён за вашим кабинетом." : "Send only USDT on the TRC20 network. This address is assigned to your account."}</p>
         </div>
       </div>
     </div>

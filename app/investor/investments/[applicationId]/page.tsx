@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { InvestmentStatus, PaymentStatus, TransactionType } from "@prisma/client";
+import { DividendPaymentStatus, DividendPeriodStatus, InvestmentStatus, PaymentStatus, TransactionType } from "@prisma/client";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { DocumentItem } from "@/components/DocumentItem";
 import { Footer } from "@/components/Footer";
@@ -32,8 +32,19 @@ export default async function InvestorContractPage({
       project: {
         include: {
           documents: true,
-          reports: true
+          reports: true,
+          dividendPeriods: {
+            where: {
+              status: { in: [DividendPeriodStatus.APPROVED, DividendPeriodStatus.PAID] }
+            },
+            orderBy: { periodEnd: "desc" },
+            take: 12
+          }
         }
+      },
+      dividendPayments: {
+        include: { period: true },
+        orderBy: { createdAt: "desc" }
       }
     }
   });
@@ -58,8 +69,12 @@ export default async function InvestorContractPage({
   const expectedReturn = localizedText(application.project.expectedReturnRu, application.project.expectedReturnEn, locale);
   const expectedYield = localizedText(application.project.expectedYieldRu, application.project.expectedYieldEn, locale);
   const linkedTransactions = wallet?.transactions ?? [];
-  const accrualsUsdt = sumUsdt(linkedTransactions.filter((transaction) => transaction.type === TransactionType.RETURN && transaction.status === PaymentStatus.CONFIRMED).map((transaction) => transaction.amountUsdt));
+  const dividendPayments = application.dividendPayments;
+  const dividendPaymentsByPeriodId = new Map(dividendPayments.map((payment) => [payment.periodId, payment]));
+  const dividendAccruedUsdt = sumUsdt(dividendPayments.filter((payment) => payment.status !== DividendPaymentStatus.CANCELLED).map((payment) => payment.amountUsdt));
+  const dividendPaidUsdt = sumUsdt(dividendPayments.filter((payment) => payment.status === DividendPaymentStatus.PAID).map((payment) => payment.amountUsdt));
   const withdrawnUsdt = sumUsdt(linkedTransactions.filter((transaction) => transaction.type === TransactionType.WITHDRAWAL && transaction.status === PaymentStatus.CONFIRMED).map((transaction) => transaction.amountUsdt));
+  const reportingPeriods = application.project.dividendPeriods;
 
   return (
     <>
@@ -100,11 +115,12 @@ export default async function InvestorContractPage({
 
         <section className="px-5 py-12 sm:px-8 lg:px-11 lg:py-16">
           <div className="mx-auto grid max-w-[1840px] gap-8">
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
               <MetricCard label={isRu ? "Статус" : "Status"} value={investmentStatusLabel(application.status, locale)} tone={investmentTone(application.status)} />
               <MetricCard label={isRu ? "Сумма контракта" : "Contract amount"} value={formatUsdt(application.amountUsdt)} />
               <MetricCard label={isRu ? "Резерв" : "Reserve"} value={formatUsdt(application.reservedUsdt)} />
-              <MetricCard label={isRu ? "Начислено" : "Accrued"} value={formatUsdt(accrualsUsdt)} tone="success" />
+              <MetricCard label={isRu ? "Начислено" : "Accrued"} value={formatUsdt(dividendAccruedUsdt)} tone="success" />
+              <MetricCard label={isRu ? "Выплачено" : "Paid"} value={formatUsdt(dividendPaidUsdt)} tone="success" />
               <MetricCard label={isRu ? "Выведено" : "Withdrawn"} value={formatUsdt(withdrawnUsdt)} />
             </div>
 
@@ -184,6 +200,77 @@ export default async function InvestorContractPage({
                     <NotificationCard
                       title={isRu ? "Отчётов пока нет" : "No reports yet"}
                       text={isRu ? "Когда проект начнёт публиковать отчётность, материалы появятся в этом разделе." : "When the project starts publishing reports, materials will appear here."}
+                    />
+                  )}
+                </Panel>
+
+                <Panel title={isRu ? "Дивиденды и отчётные периоды" : "Dividends and reporting periods"}>
+                  {reportingPeriods.length || dividendPayments.length ? (
+                    <div className="grid gap-3">
+                      {reportingPeriods.map((period) => {
+                        const payment = dividendPaymentsByPeriodId.get(period.id);
+                        const zeroDistribution = Number(period.investorPoolUsdt.toString()) <= 0;
+                        const amount = payment?.amountUsdt ?? 0;
+                        const statusLabel = payment
+                          ? dividendPaymentStatusLabel(payment.status, locale)
+                          : dividendPeriodParticipantStatusLabel(period.status, locale, zeroDistribution);
+
+                        return (
+                          <article key={period.id} className="grid gap-4 rounded-qidra border border-qidra-grayLight bg-qidra-grayLight p-4 lg:grid-cols-[1fr_auto] lg:items-start">
+                            <div>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <p className="text-18 font-medium text-qidra-dark">{period.periodLabel}</p>
+                                <span className="rounded-full bg-white px-3 py-1 text-12 font-medium text-qidra-grayBlue">{statusLabel}</span>
+                              </div>
+                              <p className="mt-2 text-14 text-qidra-grayBlue">
+                                {formatDate(period.periodStart, locale)} - {formatDate(period.periodEnd, locale)}
+                              </p>
+                              <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                                <InfoBlock label={isRu ? "Чистый результат" : "Net result"} value={formatUsdt(period.netProfitUsdt)} />
+                                <InfoBlock label={isRu ? "Пул участников" : "Participant pool"} value={formatUsdt(period.investorPoolUsdt)} />
+                                <InfoBlock label={isRu ? "Доля участников" : "Participant share"} value={`${formatPercent(period.investorSharePercent)}%`} />
+                                <InfoBlock label={isRu ? "Ваше начисление" : "Your accrual"} value={formatUsdt(amount)} />
+                              </div>
+                              {zeroDistribution ? (
+                                <p className="mt-3 rounded-qidra border border-qidra-gold bg-yellow-50 px-4 py-3 text-14 text-qidra-grayBlue">
+                                  {isRu
+                                    ? "За этот отчётный период положительный распределяемый результат не сформирован, поэтому начисление участникам равно 0 USDT."
+                                    : "This reporting period did not generate a positive distributable result, so participant accrual is 0 USDT."}
+                                </p>
+                              ) : null}
+                              {period.adminNote ? <p className="mt-3 whitespace-pre-wrap text-14 text-qidra-grayBlue">{period.adminNote}</p> : null}
+                            </div>
+                            <div className="rounded-qidra bg-white p-4 text-right">
+                              <p className="text-12 font-medium uppercase text-qidra-grayBlue">{isRu ? "Начислено вам" : "Accrued to you"}</p>
+                              <p className="mt-2 text-[26px] font-medium leading-tight tracking-[0] text-qidra-dark">{formatUsdt(amount)}</p>
+                              {payment ? <p className="mt-2 text-13 text-qidra-grayBlue">{payment.eligibleDays} {isRu ? "дн. участия" : "eligible days"}</p> : null}
+                            </div>
+                          </article>
+                        );
+                      })}
+                      {!reportingPeriods.length
+                        ? dividendPayments.map((payment) => (
+                            <article key={payment.id} className="grid gap-3 rounded-qidra border border-qidra-grayLight bg-qidra-grayLight p-4 md:grid-cols-[1fr_auto_auto] md:items-center">
+                              <div>
+                                <p className="text-18 font-medium text-qidra-dark">{payment.period.periodLabel}</p>
+                                <p className="mt-1 text-14 text-qidra-grayBlue">
+                                  {formatDate(payment.period.periodStart, locale)} - {formatDate(payment.period.periodEnd, locale)}
+                                </p>
+                              </div>
+                              <p className="text-14 font-medium text-qidra-accent">{dividendPaymentStatusLabel(payment.status, locale)}</p>
+                              <p className="text-18 font-medium text-qidra-dark">{formatUsdt(payment.amountUsdt)}</p>
+                            </article>
+                          ))
+                        : null}
+                    </div>
+                  ) : (
+                    <NotificationCard
+                      title={isRu ? "Отчётных периодов пока нет" : "No reporting periods yet"}
+                      text={
+                        isRu
+                          ? "Когда Qidra утвердит квартальный, ежемесячный или годовой период по проекту, он появится здесь вместе с вашим начислением."
+                          : "When Qidra approves a quarterly, monthly or annual project period, it will appear here with your accrual."
+                      }
                     />
                   )}
                 </Panel>
@@ -304,6 +391,41 @@ function transactionTitle(type: TransactionType, locale: "ru" | "en") {
 function transactionAmount(type: TransactionType, amount: { toString(): string }) {
   const sign = type === TransactionType.INVESTMENT || type === TransactionType.WITHDRAWAL ? "-" : "+";
   return `${sign}${formatUsdt(amount)}`;
+}
+
+function dividendPaymentStatusLabel(status: DividendPaymentStatus, locale: "ru" | "en") {
+  const labels: Record<DividendPaymentStatus, { ru: string; en: string }> = {
+    [DividendPaymentStatus.CALCULATED]: { ru: "Рассчитано", en: "Calculated" },
+    [DividendPaymentStatus.APPROVED]: { ru: "Утверждено", en: "Approved" },
+    [DividendPaymentStatus.PAID]: { ru: "Выплачено", en: "Paid" },
+    [DividendPaymentStatus.CANCELLED]: { ru: "Отменено", en: "Cancelled" }
+  };
+
+  return labels[status][locale];
+}
+
+function dividendPeriodParticipantStatusLabel(status: DividendPeriodStatus, locale: "ru" | "en", zeroDistribution: boolean) {
+  if (zeroDistribution && status === DividendPeriodStatus.PAID) {
+    return locale === "ru" ? "Закрыт без выплаты" : "Closed without payout";
+  }
+
+  if (zeroDistribution && status === DividendPeriodStatus.APPROVED) {
+    return locale === "ru" ? "Утверждён без начислений" : "Approved without accruals";
+  }
+
+  const labels: Record<DividendPeriodStatus, { ru: string; en: string }> = {
+    [DividendPeriodStatus.DRAFT]: { ru: "Рассчитано", en: "Calculated" },
+    [DividendPeriodStatus.APPROVED]: { ru: "Утверждено", en: "Approved" },
+    [DividendPeriodStatus.PAID]: { ru: "Выплачено", en: "Paid" },
+    [DividendPeriodStatus.CANCELLED]: { ru: "Отменено", en: "Cancelled" }
+  };
+
+  return labels[status][locale];
+}
+
+function formatPercent(value: { toString(): string } | number) {
+  const amount = typeof value === "number" ? value : Number(value.toString());
+  return new Intl.NumberFormat("en-US", { maximumFractionDigits: 4 }).format(amount);
 }
 
 function formatUsdt(value: { toString(): string } | number) {

@@ -673,7 +673,47 @@ function SafeAdjustmentsPanel({
               <Button type="submit">{isRu ? "Обновить KYC" : "Update KYC"}</Button>
             </FeedbackForm>
           ) : (
-            <NotificationCard title={isRu ? "Анкет нет" : "No profiles"} text={isRu ? "У клиента пока нет KYC-анкет для корректировки." : "The client has no KYC profiles to adjust yet."} />
+            <FeedbackForm
+              className="grid gap-3"
+              endpoint={endpoint}
+              feedback={{
+                title: isRu ? "KYC-решение создано" : "KYC decision created",
+                text: isRu ? "Ручное решение сохранено и записано в журнал действий." : "The manual decision was saved and written to the audit log.",
+                buttonLabel: isRu ? "Понятно" : "Got it",
+                dismissLabel: isRu ? "Закрыть уведомление" : "Close notification",
+                tone: "success"
+              }}
+              popupPlacement="center"
+              reloadOnSuccess
+            >
+              <NotificationCard
+                title={isRu ? "Анкет нет" : "No profiles"}
+                text={
+                  isRu
+                    ? "Можно создать ручное KYC-решение только после внутренней сверки документов клиента. Причина попадёт в журнал действий."
+                    : "You can create a manual KYC decision only after internal document verification. The reason will be written to the audit log."
+                }
+                tone="warning"
+              />
+              <input name="kind" type="hidden" value="kyc_manual_create" />
+              <Select
+                label={isRu ? "Ручной статус" : "Manual status"}
+                name="status"
+                options={[
+                  { label: kycStatusLabel(KycStatus.APPROVED, locale), value: KycStatus.APPROVED },
+                  { label: kycStatusLabel(KycStatus.REJECTED, locale), value: KycStatus.REJECTED }
+                ]}
+                required
+              />
+              <ReasonField
+                label={isRu ? "Основание решения" : "Decision reason"}
+                locale={locale}
+                name="reason"
+                placeholder={isRu ? "Например: документы сверены с исходным dossier Al Amana Gold" : "For example: documents matched against the original Al Amana Gold dossier"}
+              />
+              <Input label={isRu ? "Подтверждение" : "Confirmation"} name="confirmation" pattern="CONFIRM" placeholder="CONFIRM" required />
+              <Button type="submit">{isRu ? "Создать KYC-решение" : "Create KYC decision"}</Button>
+            </FeedbackForm>
           )}
         </div>
 

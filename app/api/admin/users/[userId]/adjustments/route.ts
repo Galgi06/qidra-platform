@@ -25,6 +25,10 @@ const adjustmentSchema = z.discriminatedUnion("kind", [
     status: z.nativeEnum(KycStatus)
   }),
   baseAdjustmentSchema.extend({
+    kind: z.literal("kyc_manual_create"),
+    status: z.enum([KycStatus.APPROVED, KycStatus.REJECTED])
+  }),
+  baseAdjustmentSchema.extend({
     kind: z.literal("payment_reject"),
     transactionId: z.string().trim().min(1)
   })
@@ -119,12 +123,66 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     });
   }
 
+  if (parsed.data.kind === "kyc_manual_create") {
+    return createManualKycDecision({
+      actorId: session?.user?.id,
+      localeRu,
+      reason: parsed.data.reason,
+      status: parsed.data.status,
+      userId
+    });
+  }
+
   return rejectPendingPayment({
     actorId: session?.user?.id,
     localeRu,
     reason: parsed.data.reason,
     transactionId: parsed.data.transactionId,
     userId
+  });
+}
+
+async function createManualKycDecision({
+  actorId,
+  localeRu,
+  reason,
+  status,
+  userId
+}: {
+  actorId?: string;
+  localeRu: boolean;
+  reason: string;
+  status: KycStatus;
+  userId: string;
+}) {
+  const now = new Date();
+  const application = await prisma.kycApplication.create({
+    data: {
+      reviewedAt: now,
+      reviewerNote: reason,
+      status,
+      userId
+    }
+  });
+
+  await prisma.adminAuditLog.create({
+    data: {
+      actorId,
+      action: status === KycStatus.APPROVED ? "kyc.manual.approve" : "kyc.manual.reject",
+      entityId: application.id,
+      entityType: "KycApplication",
+      payload: {
+        reason,
+        status,
+        userId
+      }
+    }
+  });
+
+  return NextResponse.json({
+    title: localeRu ? "Ручное KYC-решение создано" : "Manual KYC decision created",
+    message: localeRu ? "Решение сохранено в карточке клиента и журнале действий." : "The decision was saved in the client card and audit log.",
+    tone: status === KycStatus.APPROVED ? "success" : "warning"
   });
 }
 
