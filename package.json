@@ -8,6 +8,7 @@
     "start": "next start --port 8091",
     "lint": "eslint .",
     "check:production": "node scripts/check-production-config.mjs",
+    "backup:database": "node scripts/backup-database.mjs",
     "import:al-amana-gold": "node scripts/import-al-amana-gold.mjs",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev"

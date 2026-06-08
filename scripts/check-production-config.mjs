@@ -24,7 +24,13 @@ const required = [
   "FILE_STORAGE_S3_BUCKET",
   "FILE_STORAGE_S3_REGION",
   "FILE_STORAGE_S3_ACCESS_KEY_ID",
-  "FILE_STORAGE_S3_SECRET_ACCESS_KEY"
+  "FILE_STORAGE_S3_SECRET_ACCESS_KEY",
+  "DATABASE_BACKUP_REQUIRE_S3",
+  "DATABASE_BACKUP_RETENTION_DAYS",
+  "DATABASE_BACKUP_S3_BUCKET",
+  "DATABASE_BACKUP_S3_REGION",
+  "DATABASE_BACKUP_S3_ACCESS_KEY_ID",
+  "DATABASE_BACKUP_S3_SECRET_ACCESS_KEY"
 ];
 
 const failures = [];
@@ -56,6 +62,15 @@ if ((process.env.QIDRA_WALLET_KEY_ENCRYPTION_SECRET || "").trim().length < 32) {
 
 if (process.env.FILE_STORAGE_DRIVER !== "s3") {
   failures.push("FILE_STORAGE_DRIVER: production must use s3");
+}
+
+if (process.env.DATABASE_BACKUP_REQUIRE_S3 !== "true") {
+  failures.push("DATABASE_BACKUP_REQUIRE_S3: production must require off-server S3/R2 backup upload");
+}
+
+const retentionDays = Number.parseInt(process.env.DATABASE_BACKUP_RETENTION_DAYS || "", 10);
+if (!Number.isFinite(retentionDays) || retentionDays < 7) {
+  failures.push("DATABASE_BACKUP_RETENTION_DAYS: use at least 7 days");
 }
 
 if (process.env.SMTP_FROM && !/^[^<]*<[^@\s]+@[^@\s]+\.[^@\s]+>$/.test(process.env.SMTP_FROM)) {

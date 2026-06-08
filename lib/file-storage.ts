@@ -104,7 +104,13 @@ export async function readStoredFile(storagePath: string, allowedDirectory: stri
 }
 
 export function fileStorageDriver() {
-  return process.env.FILE_STORAGE_DRIVER === "s3" ? "s3" : "local";
+  const driver = process.env.FILE_STORAGE_DRIVER === "s3" ? "s3" : "local";
+
+  if (process.env.NODE_ENV === "production" && driver !== "s3") {
+    throw new Error("production_file_storage_must_use_s3");
+  }
+
+  return driver;
 }
 
 function storageKey(directory: string, storedName: string) {

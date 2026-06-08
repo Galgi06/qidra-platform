@@ -105,7 +105,10 @@
 
 ## Инфраструктура перед реальным запуском
 
+- [x] Добавлен скрипт `npm run backup:database` для ежедневного `pg_dump`, gzip-архива, retention и выгрузки в S3/R2.
 - [ ] Production database с ежедневными backup и точкой восстановления.
+- [ ] Подключить production `DATABASE_BACKUP_*` secrets и приватный backup bucket.
+- [ ] Проверить восстановление backup на отдельной базе до запуска с реальными деньгами.
 - [ ] HTTPS production-домен.
 - [ ] `NEXTAUTH_URL` равен production-домену.
 - [ ] `NEXTAUTH_SECRET` сгенерирован заново и хранится только в secrets.

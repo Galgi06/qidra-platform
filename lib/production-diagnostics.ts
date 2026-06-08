@@ -172,6 +172,40 @@ export function productionDiagnostics(): DiagnosticGroup[] {
           ru: "Отдельный секрет шифрования приватных ключей кошельков."
         }, (value) => value.length >= 32)
       ]
+    },
+    {
+      key: "backups",
+      title: { en: "Database backups", ru: "Резервные копии базы" },
+      description: {
+        en: "Daily off-server database backups are required before handling real clients and payments.",
+        ru: "Ежедневные внешние резервные копии базы обязательны перед работой с реальными клиентами и платежами."
+      },
+      checks: [
+        fixedCheck("DATABASE_BACKUP_REQUIRE_S3", process.env.DATABASE_BACKUP_REQUIRE_S3 === "true", {
+          en: "Production backups must require upload to private S3/R2 storage.",
+          ru: "Production-бэкапы должны обязательно выгружаться в приватное S3/R2-хранилище."
+        }),
+        envCheck("DATABASE_BACKUP_RETENTION_DAYS", "DATABASE_BACKUP_RETENTION_DAYS", {
+          en: "Keep backups for at least 7 days.",
+          ru: "Хранить резервные копии минимум 7 дней."
+        }, (value) => Number.parseInt(value, 10) >= 7),
+        envCheck("DATABASE_BACKUP_S3_BUCKET", "DATABASE_BACKUP_S3_BUCKET", {
+          en: "Private backup bucket.",
+          ru: "Приватный bucket для бэкапов."
+        }),
+        envCheck("DATABASE_BACKUP_S3_REGION", "DATABASE_BACKUP_S3_REGION", {
+          en: "Backup bucket region.",
+          ru: "Регион backup bucket."
+        }),
+        envCheck("DATABASE_BACKUP_S3_ACCESS_KEY_ID", "DATABASE_BACKUP_S3_ACCESS_KEY_ID", {
+          en: "Backup storage access key ID.",
+          ru: "Access key ID для backup-хранилища."
+        }),
+        envCheck("DATABASE_BACKUP_S3_SECRET_ACCESS_KEY", "DATABASE_BACKUP_S3_SECRET_ACCESS_KEY", {
+          en: "Backup storage secret access key.",
+          ru: "Secret access key для backup-хранилища."
+        })
+      ]
     }
   ];
 }

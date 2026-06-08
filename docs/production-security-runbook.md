@@ -52,7 +52,44 @@ KYC и документы проектов не должны храниться 
 - lifecycle policy: настроить отдельно по юридическим требованиям
 - audit/logging: on, если провайдер поддерживает
 
-## 4. OAuth callbacks
+## 4. Ежедневные резервные копии базы
+
+База должна копироваться ежедневно во внешнее приватное S3/R2-хранилище. Локальная копия на сервере допустима только как временный буфер и не считается полноценным backup.
+
+Переменные:
+
+- `DATABASE_BACKUP_REQUIRE_S3=true`
+- `DATABASE_BACKUP_RETENTION_DAYS=14`
+- `DATABASE_BACKUP_LOCAL_DIR=.backups/database`
+- `DATABASE_BACKUP_S3_BUCKET`
+- `DATABASE_BACKUP_S3_REGION`
+- `DATABASE_BACKUP_S3_ENDPOINT`
+- `DATABASE_BACKUP_S3_ACCESS_KEY_ID`
+- `DATABASE_BACKUP_S3_SECRET_ACCESS_KEY`
+- `DATABASE_BACKUP_S3_FORCE_PATH_STYLE=true`
+- `DATABASE_BACKUP_S3_PREFIX=qidra/database`
+
+Команда ручной проверки:
+
+```bash
+npm run backup:database
+```
+
+Пример ежедневного cron на production-сервере:
+
+```bash
+15 2 * * * cd /var/www/qidra-platform && NODE_ENV=production npm run backup:database >> /var/log/qidra-db-backup.log 2>&1
+```
+
+Восстановление из архива:
+
+```bash
+gunzip -c qidra-db-YYYY-MM-DD.sql.gz | psql "$DATABASE_URL"
+```
+
+Перед запуском с реальными деньгами нужно сделать тест: создать backup, скачать его из bucket, поднять восстановленную базу на отдельном окружении и проверить клиентов, платежи, заявки, контракты, чаты, KYC и журнал действий.
+
+## 5. OAuth callbacks
 
 Google OAuth:
 
@@ -65,7 +102,7 @@ Telegram:
 - `TELEGRAM_BOT_TOKEN` хранить только в secrets.
 - `TELEGRAM_BOT_USERNAME` указывать без `@`.
 
-## 5. SMTP
+## 6. SMTP
 
 Нужно подключить доменную почту Qidra:
 
@@ -89,7 +126,7 @@ DNS:
 - восстановление пароля
 - восстановление доступа через поддержку
 
-## 6. TronGrid и USDT TRC20
+## 7. TronGrid и USDT TRC20
 
 Переменные:
 
@@ -106,7 +143,7 @@ DNS:
 - вывод подтверждается только после сверки outgoing hash, суммы, получателя и адреса отправителя Qidra;
 - перед production нужен dry-run маленькой суммой.
 
-## 7. Админ-безопасность
+## 8. Админ-безопасность
 
 Обязательно:
 
@@ -118,7 +155,7 @@ DNS:
 - сотрудники не должны знать пароли клиентов;
 - восстановление доступа клиента только через одноразовую ссылку после сверки KYC.
 
-## 8. Защита приложения
+## 9. Защита приложения
 
 В коде включены:
 
@@ -137,7 +174,7 @@ DNS:
 
 Перед production обязательно добавить внешний rate limit/WAF на инфраструктурном уровне. Встроенный rate limit является дополнительным защитным слоем и не заменяет Cloudflare/Vercel/nginx rules.
 
-## 9. Перед деплоем
+## 10. Перед деплоем
 
 Команды проверки:
 
@@ -147,6 +184,7 @@ npm run lint
 npm run build
 npm audit --omit=dev
 npm run check:production
+npm run backup:database
 ```
 
 После деплоя:
@@ -163,8 +201,9 @@ npm run check:production
 - проверить участие в проекте из подтвержденного баланса
 - проверить вывод маленькой суммой
 - проверить журнал действий
+- проверить создание backup и восстановление на отдельной базе
 
-## 10. Dependency audit
+## 11. Dependency audit
 
 `npm audit --omit=dev` должен запускаться перед каждым production-релизом.
 
