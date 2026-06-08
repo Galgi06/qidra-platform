@@ -297,7 +297,7 @@ export default async function AdminSupportPage({ searchParams }: { searchParams:
                           dismissLabel: isRu ? "Закрыть уведомление" : "Close notification",
                           tone: "success"
                         }}
-                        refreshOnSuccess
+                        reloadOnSuccess
                       >
                         <input name="action" type="hidden" value="update" />
                         <Select
@@ -344,7 +344,7 @@ export default async function AdminSupportPage({ searchParams }: { searchParams:
                           dismissLabel: isRu ? "Закрыть уведомление" : "Close notification",
                           tone: "success"
                         }}
-                        refreshOnSuccess
+                        reloadOnSuccess
                         resetOnSubmit
                       >
                         <input name="action" type="hidden" value="reply" />

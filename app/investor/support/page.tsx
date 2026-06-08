@@ -125,7 +125,7 @@ export default async function InvestorSupportPage({ searchParams }: { searchPara
                       dismissLabel: isRu ? "Закрыть уведомление" : "Close notification",
                       tone: "success"
                     }}
-                    refreshOnSuccess
+                    reloadOnSuccess
                     popupPlacement="center"
                   >
                     <fieldset className="grid gap-3">
@@ -176,7 +176,7 @@ export default async function InvestorSupportPage({ searchParams }: { searchPara
                   dismissLabel: isRu ? "Закрыть уведомление" : "Close notification",
                   tone: "success"
                 }}
-                refreshOnSuccess
+                reloadOnSuccess
                 resetOnSubmit
                 popupPlacement="center"
               >
