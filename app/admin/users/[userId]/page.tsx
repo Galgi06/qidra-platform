@@ -234,7 +234,7 @@ export default async function AdminUserDetailPage({
                 </ButtonLink>
               </div>
             </div>
-            <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-7">
+            <div className="mt-10 grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4">
               <MetricCard label={isRu ? "Роль" : "Role"} value={roleLabel(user.role, locale)} />
               <MetricCard label={isRu ? "Доступ" : "Access"} value={accessStatusLabel(user, locale)} tone={userBlockMode(user) === "active" ? "success" : "danger"} />
               <MetricCard label={isRu ? "Email" : "Email"} value={user.emailVerified ? (isRu ? "Подтверждён" : "Verified") : isRu ? "Не подтверждён" : "Not verified"} tone={user.emailVerified ? "success" : "warning"} />
@@ -252,110 +252,114 @@ export default async function AdminUserDetailPage({
             <DossierTabs activeView={view} locale={locale} userId={user.id} />
 
             {view === "overview" ? (
-            <div className="grid gap-8 xl:grid-cols-[0.82fr_1.18fr]">
-              <section className="grid content-start gap-6">
-                <Panel title={isRu ? "Профиль участника" : "Participant profile"} description={isRu ? "Основные данные, которые участник отправляет для проверки." : "Core data submitted by the participant for review."}>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <InfoBlock label={isRu ? "Телефон" : "Phone"} value={formatPhone(user.investorProfile?.phoneDialCode, user.investorProfile?.phone)} locale={locale} />
-                    <InfoBlock label={isRu ? "Дата рождения" : "Date of birth"} value={user.investorProfile?.dateOfBirth ? formatDate(user.investorProfile.dateOfBirth, locale) : null} locale={locale} />
-                    <InfoBlock label={isRu ? "Страна" : "Country"} value={countryName(user.investorProfile?.country, locale)} locale={locale} />
-                    <InfoBlock label={isRu ? "Город" : "City"} value={user.investorProfile?.city} locale={locale} />
-                    <InfoBlock label={isRu ? "Гражданство" : "Citizenship"} value={countryName(user.investorProfile?.citizenship, locale)} locale={locale} />
-                    <InfoBlock label={isRu ? "Адрес" : "Address"} value={user.investorProfile?.address} locale={locale} />
-                  </div>
-                </Panel>
-
-                <Panel title={isRu ? "Доступ и авторизация" : "Access and authentication"} description={isRu ? "Роль, провайдеры входа и активные сессии." : "Role, sign-in providers and active sessions."}>
-                  <div className="grid gap-4">
-                    <InfoBlock label={isRu ? "Роль доступа" : "Access role"} value={roleLabel(user.role, locale)} locale={locale} />
-                    <InfoBlock label={isRu ? "Статус доступа" : "Access status"} value={accessStatusLabel(user, locale)} locale={locale} />
-                    <InfoBlock label={isRu ? "Дата регистрации" : "Registration date"} value={formatDateTime(user.createdAt, locale)} locale={locale} />
-                    <InfoBlock label={isRu ? "Провайдеры входа" : "Sign-in providers"} value={authProviders(user.accounts, locale)} locale={locale} />
-                    <InfoBlock label={isRu ? "Активные сессии" : "Active sessions"} value={formatCount(user._count.sessions)} locale={locale} />
-                  </div>
-                  {canManageRoles && user.id !== session.user?.id ? (
-                    <div className="mt-5">
-                      <RoleManagementForm currentRole={user.role} endpoint={roleEndpoint} locale={locale} />
+              <div className="grid gap-6">
+                <div className="grid gap-6 xl:grid-cols-[minmax(0,0.96fr)_minmax(0,1.04fr)]">
+                  <Panel title={isRu ? "Профиль участника" : "Participant profile"} description={isRu ? "Основные данные, которые участник отправляет для проверки." : "Core data submitted by the participant for review."}>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <InfoBlock label={isRu ? "Телефон" : "Phone"} value={formatPhone(user.investorProfile?.phoneDialCode, user.investorProfile?.phone)} locale={locale} />
+                      <InfoBlock label={isRu ? "Дата рождения" : "Date of birth"} value={user.investorProfile?.dateOfBirth ? formatDate(user.investorProfile.dateOfBirth, locale) : null} locale={locale} />
+                      <InfoBlock label={isRu ? "Страна" : "Country"} value={countryName(user.investorProfile?.country, locale)} locale={locale} />
+                      <InfoBlock label={isRu ? "Город" : "City"} value={user.investorProfile?.city} locale={locale} />
+                      <InfoBlock label={isRu ? "Гражданство" : "Citizenship"} value={countryName(user.investorProfile?.citizenship, locale)} locale={locale} />
+                      <InfoBlock label={isRu ? "Адрес" : "Address"} value={user.investorProfile?.address} locale={locale} />
                     </div>
-                  ) : (
-                    <NotificationCard
-                      title={user.id === session.user?.id ? (isRu ? "Это ваш аккаунт" : "This is your account") : isRu ? "Роль только для просмотра" : "Role is view-only"}
-                      text={
-                        user.id === session.user?.id
-                          ? isRu
-                            ? "Изменение собственной роли заблокировано, чтобы не потерять административный доступ."
-                            : "Changing your own role is blocked to avoid losing administrator access."
-                          : isRu
-                            ? "Назначать роли менеджеров и администраторов может только главный администратор."
-                            : "Only a super administrator can assign manager and administrator roles."
-                      }
-                    />
-                  )}
-                  {canSendAccessRecovery ? (
-                    <AccessRecoveryForm endpoint={accessRecoveryEndpoint} hasApprovedKyc={hasApprovedKyc} kycDocumentLinks={accessRecoveryDocumentLinks} locale={locale} />
-                  ) : null}
-                  <UserBlockForm canManageBlock={canManageBlock} endpoint={blockEndpoint} isOwnAccount={user.id === session.user?.id} locale={locale} user={user} />
-                </Panel>
-              </section>
+                  </Panel>
 
-              <section className="grid content-start gap-6">
-                <Panel title={isRu ? "KYC и решения" : "KYC and decisions"} description={isRu ? "История анкет, статусов и комментариев проверяющих." : "History of profiles, statuses and reviewer notes."}>
-                  {user.kycApplications.length ? (
-                    <div className="grid gap-3">
-                      {user.kycApplications.map((item) => (
-                        <TimelineItem
-                          key={item.id}
-                          title={kycStatusLabel(item.status, locale)}
-                          meta={`${formatDateTime(item.createdAt, locale)} · ${item.occupation || (isRu ? "профессия не указана" : "occupation not provided")}`}
-                          tone={item.status === KycStatus.APPROVED ? "success" : item.status === KycStatus.REJECTED ? "danger" : "warning"}
-                        >
-                          <p className="text-14 text-qidra-grayBlue">
-                            {isRu ? "Источник средств" : "Source of funds"}: {sourceLabel(item.sourceOfFunds, locale)}
-                          </p>
-                          {item.reviewerNote ? <p className="mt-2 text-14 text-qidra-grayBlue">{item.reviewerNote}</p> : null}
-                          <KycDocumentLinks applicationId={item.id} documents={readKycDocuments(item.documents)} locale={locale} />
-                        </TimelineItem>
-                      ))}
-                    </div>
-                  ) : (
-                    <NotificationCard title={isRu ? "Анкета не отправлена" : "KYC not submitted"} text={isRu ? "Участник пока не отправил профиль на проверку." : "The participant has not submitted a profile for review yet."} />
-                  )}
-                </Panel>
-
-                <Panel title={isRu ? "Кошелёк и операции" : "Wallet and operations"} description={isRu ? "Баланс, личный адрес и последние операции." : "Balance, personal address and recent operations."}>
-                  <div className="grid gap-4 md:grid-cols-3">
-                    <InfoBlock label={isRu ? "Доступно" : "Available"} value={formatUsdt(wallet?.availableUsdt ?? 0)} locale={locale} />
-                    <InfoBlock label={isRu ? "Зарезервировано" : "Reserved"} value={formatUsdt(wallet?.reservedUsdt ?? 0)} locale={locale} />
-                    <InfoBlock label={isRu ? "На проверке" : "Pending"} value={formatUsdt(wallet?.pendingUsdt ?? 0)} locale={locale} />
-                  </div>
-                  <InfoBlock label={isRu ? "Личный USDT TRC20 адрес" : "Personal USDT TRC20 address"} value={wallet?.trc20Address} locale={locale} compact />
-                  {wallet?.transactions.length ? (
-                    <div className="grid gap-3">
-                      {wallet.transactions.map((transaction) => (
-                        <TimelineItem
-                          key={transaction.id}
-                          title={transactionTitle(transaction.type, locale)}
-                          meta={transactionMeta(transaction.createdAt, transaction.status, transaction.txHash ?? transaction.destinationAddress, locale)}
-                          tone={paymentTone(transaction.status, transaction.type)}
-                        >
-                          <div className="flex flex-wrap items-center justify-between gap-3">
-                            <p className="text-14 text-qidra-grayBlue">{transaction.note || (isRu ? "Без комментария" : "No note")}</p>
-                            <strong className="text-16 text-qidra-dark">{transactionAmount(transaction.type, transaction.amountUsdt)}</strong>
-                          </div>
-                          {transaction.paymentReview?.reviewer ? (
-                            <p className="mt-2 text-12 text-qidra-grayBlue">
-                              {isRu ? "Проверил" : "Reviewed by"}: {transaction.paymentReview.reviewer.name || transaction.paymentReview.reviewer.email}
+                  <Panel title={isRu ? "KYC и решения" : "KYC and decisions"} description={isRu ? "История анкет, статусов и комментариев проверяющих." : "History of profiles, statuses and reviewer notes."}>
+                    {user.kycApplications.length ? (
+                      <div className="grid gap-3">
+                        {user.kycApplications.map((item) => (
+                          <TimelineItem
+                            key={item.id}
+                            title={kycStatusLabel(item.status, locale)}
+                            meta={`${formatDateTime(item.createdAt, locale)} · ${item.occupation || (isRu ? "профессия не указана" : "occupation not provided")}`}
+                            tone={item.status === KycStatus.APPROVED ? "success" : item.status === KycStatus.REJECTED ? "danger" : "warning"}
+                          >
+                            <p className="text-14 text-qidra-grayBlue">
+                              {isRu ? "Источник средств" : "Source of funds"}: {sourceLabel(item.sourceOfFunds, locale)}
                             </p>
-                          ) : null}
-                        </TimelineItem>
-                      ))}
+                            {item.reviewerNote ? <p className="mt-2 text-14 text-qidra-grayBlue">{item.reviewerNote}</p> : null}
+                            <KycDocumentLinks applicationId={item.id} documents={readKycDocuments(item.documents)} locale={locale} />
+                          </TimelineItem>
+                        ))}
+                      </div>
+                    ) : (
+                      <NotificationCard title={isRu ? "Анкета не отправлена" : "KYC not submitted"} text={isRu ? "Участник пока не отправил профиль на проверку." : "The participant has not submitted a profile for review yet."} />
+                    )}
+                  </Panel>
+                </div>
+
+                <div className="grid gap-6 xl:grid-cols-[minmax(0,1.04fr)_minmax(0,0.96fr)]">
+                  <Panel title={isRu ? "Кошелёк и операции" : "Wallet and operations"} description={isRu ? "Баланс, личный адрес и последние операции." : "Balance, personal address and recent operations."}>
+                    <div className="grid gap-4 md:grid-cols-3">
+                      <InfoBlock label={isRu ? "Доступно" : "Available"} value={formatUsdt(wallet?.availableUsdt ?? 0)} locale={locale} />
+                      <InfoBlock label={isRu ? "Зарезервировано" : "Reserved"} value={formatUsdt(wallet?.reservedUsdt ?? 0)} locale={locale} />
+                      <InfoBlock label={isRu ? "На проверке" : "Pending"} value={formatUsdt(wallet?.pendingUsdt ?? 0)} locale={locale} />
                     </div>
-                  ) : (
-                    <NotificationCard title={isRu ? "Операций нет" : "No operations"} text={isRu ? "Пополнения, выводы и участия появятся здесь после действий участника." : "Deposits, withdrawals and participations will appear here after participant actions."} />
-                  )}
-                </Panel>
-              </section>
-            </div>
+                    <InfoBlock label={isRu ? "Личный USDT TRC20 адрес" : "Personal USDT TRC20 address"} value={wallet?.trc20Address} locale={locale} compact />
+                    {wallet?.transactions.length ? (
+                      <div className="grid gap-3">
+                        {wallet.transactions.slice(0, 8).map((transaction) => (
+                          <TimelineItem
+                            key={transaction.id}
+                            title={transactionTitle(transaction.type, locale)}
+                            meta={transactionMeta(transaction.createdAt, transaction.status, transaction.txHash ?? transaction.destinationAddress, locale)}
+                            tone={paymentTone(transaction.status, transaction.type)}
+                          >
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                              <p className="text-14 text-qidra-grayBlue">{transaction.note || (isRu ? "Без комментария" : "No note")}</p>
+                              <strong className="text-16 text-qidra-dark">{transactionAmount(transaction.type, transaction.amountUsdt)}</strong>
+                            </div>
+                            {transaction.paymentReview?.reviewer ? (
+                              <p className="mt-2 text-12 text-qidra-grayBlue">
+                                {isRu ? "Проверил" : "Reviewed by"}: {transaction.paymentReview.reviewer.name || transaction.paymentReview.reviewer.email}
+                              </p>
+                            ) : null}
+                          </TimelineItem>
+                        ))}
+                      </div>
+                    ) : (
+                      <NotificationCard title={isRu ? "Операций нет" : "No operations"} text={isRu ? "Пополнения, выводы и участия появятся здесь после действий участника." : "Deposits, withdrawals and participations will appear here after participant actions."} />
+                    )}
+                  </Panel>
+
+                  <Panel title={isRu ? "Доступ и авторизация" : "Access and authentication"} description={isRu ? "Роль, провайдеры входа, восстановление и блокировка." : "Role, sign-in providers, recovery and access blocking."}>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <InfoBlock label={isRu ? "Роль доступа" : "Access role"} value={roleLabel(user.role, locale)} locale={locale} />
+                      <InfoBlock label={isRu ? "Статус доступа" : "Access status"} value={accessStatusLabel(user, locale)} locale={locale} />
+                      <InfoBlock label={isRu ? "Дата регистрации" : "Registration date"} value={formatDateTime(user.createdAt, locale)} locale={locale} />
+                      <InfoBlock label={isRu ? "Провайдеры входа" : "Sign-in providers"} value={authProviders(user.accounts, locale)} locale={locale} />
+                      <InfoBlock label={isRu ? "Активные сессии" : "Active sessions"} value={formatCount(user._count.sessions)} locale={locale} />
+                    </div>
+                    {canManageRoles && user.id !== session.user?.id ? (
+                      <div className="rounded-[18px] bg-qidra-grayLight p-5">
+                        <RoleManagementForm currentRole={user.role} endpoint={roleEndpoint} locale={locale} />
+                      </div>
+                    ) : (
+                      <NotificationCard
+                        title={user.id === session.user?.id ? (isRu ? "Это ваш аккаунт" : "This is your account") : isRu ? "Роль только для просмотра" : "Role is view-only"}
+                        text={
+                          user.id === session.user?.id
+                            ? isRu
+                              ? "Изменение собственной роли заблокировано, чтобы не потерять административный доступ."
+                              : "Changing your own role is blocked to avoid losing administrator access."
+                            : isRu
+                              ? "Назначать роли менеджеров и администраторов может только главный администратор."
+                              : "Only a super administrator can assign manager and administrator roles."
+                        }
+                      />
+                    )}
+                    {canSendAccessRecovery ? (
+                      <div className="rounded-[18px] bg-qidra-grayLight p-5">
+                        <AccessRecoveryForm endpoint={accessRecoveryEndpoint} hasApprovedKyc={hasApprovedKyc} kycDocumentLinks={accessRecoveryDocumentLinks} locale={locale} />
+                      </div>
+                    ) : null}
+                    <div className="rounded-[18px] bg-qidra-grayLight p-5">
+                      <UserBlockForm canManageBlock={canManageBlock} endpoint={blockEndpoint} isOwnAccount={user.id === session.user?.id} locale={locale} user={user} />
+                    </div>
+                  </Panel>
+                </div>
+              </div>
             ) : null}
 
             {view === "kyc" ? (
@@ -572,8 +576,8 @@ function SafeAdjustmentsPanel({
           : "Balance, KYC and disputed payment changes require a reason, manual confirmation and an audit entry."
       }
     >
-      <div className="grid gap-6 xl:grid-cols-3">
-        <div className="grid gap-4 rounded-qidra border border-qidra-grayLight bg-qidra-grayLight p-4">
+      <div className="grid items-start gap-6 xl:grid-cols-3">
+        <div className="grid content-start gap-5 rounded-[18px] border border-qidra-grayLight bg-qidra-grayLight p-5">
           <div>
             <p className="text-18 font-semibold text-qidra-dark">{isRu ? "Корректировка баланса" : "Balance adjustment"}</p>
             <p className="mt-2 text-14 text-qidra-grayBlue">
@@ -626,7 +630,7 @@ function SafeAdjustmentsPanel({
           )}
         </div>
 
-        <div className="grid gap-4 rounded-qidra border border-qidra-grayLight bg-qidra-grayLight p-4">
+        <div className="grid content-start gap-5 rounded-[18px] border border-qidra-grayLight bg-qidra-grayLight p-5">
           <div>
             <p className="text-18 font-semibold text-qidra-dark">{isRu ? "Статус KYC" : "KYC status"}</p>
             <p className="mt-2 text-14 text-qidra-grayBlue">
@@ -717,7 +721,7 @@ function SafeAdjustmentsPanel({
           )}
         </div>
 
-        <div className="grid gap-4 rounded-qidra border border-qidra-grayLight bg-qidra-grayLight p-4">
+        <div className="grid content-start gap-5 rounded-[18px] border border-qidra-grayLight bg-qidra-grayLight p-5">
           <div>
             <p className="text-18 font-semibold text-qidra-dark">{isRu ? "Отклонение спорной операции" : "Reject disputed operation"}</p>
             <p className="mt-2 text-14 text-qidra-grayBlue">
@@ -1283,10 +1287,10 @@ function kycDocumentLinkItems(applicationId: string, documents: ReturnType<typeo
 
 function Panel({ children, description, title }: { children: React.ReactNode; description?: string; title: string }) {
   return (
-    <section className="grid gap-5 rounded-[20px] bg-white p-6 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] sm:p-8">
+    <section className="grid content-start gap-6 rounded-[24px] border border-qidra-grayLight bg-white p-6 shadow-[0_18px_48px_rgba(18,20,23,0.04)] sm:p-8">
       <div>
-        <h2 className="text-[30px] font-medium leading-tight tracking-[0] text-qidra-dark">{title}</h2>
-        {description ? <p className="mt-2 text-16 text-qidra-grayBlue">{description}</p> : null}
+        <h2 className="text-[28px] font-medium leading-tight tracking-[0] text-qidra-dark md:text-[32px]">{title}</h2>
+        {description ? <p className="mt-2 max-w-[760px] text-16 leading-relaxed text-qidra-grayBlue">{description}</p> : null}
       </div>
       {children}
     </section>
@@ -1297,25 +1301,27 @@ function MetricCard({ label, tone = "neutral", value }: { label: string; tone?: 
   const valueClass = toneClass(tone);
 
   return (
-    <article className="rounded-qidra bg-white p-5 shadow-[0_0_0_1px_rgba(18,20,23,0.08)]">
-      <p className="text-14 font-medium text-qidra-grayBlue">{label}</p>
-      <p className={`mt-3 break-words text-[26px] font-medium leading-tight tracking-[0] ${valueClass}`}>{value}</p>
+    <article className="min-h-[128px] rounded-[18px] border border-white/70 bg-white p-5 shadow-[0_12px_34px_rgba(18,20,23,0.05)]">
+      <p className="text-13 font-semibold uppercase tracking-[0.02em] text-qidra-grayBlue">{label}</p>
+      <p className={`mt-4 break-words text-[24px] font-medium leading-tight tracking-[0] md:text-[26px] ${valueClass}`}>{value}</p>
     </article>
   );
 }
 
 function InfoBlock({ compact = false, label, locale, value }: { compact?: boolean; label: string; locale: Locale; value: string | number | null | undefined }) {
   return (
-    <div className="rounded-qidra border border-qidra-grayLight bg-qidra-grayLight p-4">
-      <p className="text-14 text-qidra-grayBlue">{label}</p>
-      <p className={`mt-2 break-words font-medium text-qidra-dark ${compact ? "text-12" : "text-16"}`}>{value || (locale === "ru" ? "Не указано" : "Not provided")}</p>
+    <div className="min-h-[96px] rounded-[16px] border border-transparent bg-qidra-grayLight p-4">
+      <p className="text-13 font-medium text-qidra-grayBlue">{label}</p>
+      <p className={`mt-2 break-words font-medium leading-snug text-qidra-dark ${compact ? "text-13" : "text-15 md:text-16"}`}>
+        {value || (locale === "ru" ? "Не указано" : "Not provided")}
+      </p>
     </div>
   );
 }
 
 function TimelineItem({ children, meta, title, tone = "neutral" }: { children?: React.ReactNode; meta?: string; title: string; tone?: Tone }) {
   return (
-    <article className="rounded-qidra border border-qidra-grayLight bg-qidra-grayLight p-4">
+    <article className="rounded-[16px] border border-qidra-grayLight bg-qidra-grayLight p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className={`text-16 font-medium ${toneClass(tone)}`}>{title}</p>
