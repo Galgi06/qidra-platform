@@ -191,6 +191,7 @@ export default async function AdminUserDetailPage({
     : [];
   const confirmedContractUsdt = sumUsdt(user.investments.filter((item) => item.status === InvestmentStatus.CONFIRMED).map((item) => item.amountUsdt));
   const pendingContractUsdt = sumUsdt(user.investments.filter((item) => item.status === InvestmentStatus.PENDING).map((item) => item.amountUsdt));
+  const confirmedContractApplications = user.investments.filter((item) => item.status === InvestmentStatus.CONFIRMED);
   const dividendPayments = user.investments.flatMap((item) => item.dividendPayments);
   const dividendAccruedUsdt = sumUsdt(dividendPayments.filter((item) => item.status !== DividendPaymentStatus.CANCELLED).map((item) => item.amountUsdt));
   const dividendPaidUsdt = sumUsdt(dividendPayments.filter((item) => item.status === DividendPaymentStatus.PAID).map((item) => item.amountUsdt));
@@ -234,14 +235,53 @@ export default async function AdminUserDetailPage({
                 </ButtonLink>
               </div>
             </div>
-            <div className="mt-10 grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4">
+            <div className="mt-10 grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
+              <section className="rounded-[28px] border border-qidra-grayLight bg-white p-5 shadow-[0_18px_48px_rgba(18,20,23,0.04)] sm:p-6">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div>
+                    <p className="text-12 font-semibold uppercase tracking-[0.04em] text-qidra-accent">{isRu ? "Финансовая сводка" : "Financial summary"}</p>
+                    <h2 className="mt-2 text-[28px] font-medium leading-tight tracking-[0] text-qidra-dark">{isRu ? "Всего инвестировано" : "Total invested"}</h2>
+                  </div>
+                  <p className="rounded-[18px] bg-qidra-dark px-4 py-3 text-[24px] font-medium leading-none text-white">{formatUsdt(confirmedContractUsdt)}</p>
+                </div>
+                <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  <MetricCard label={isRu ? "Свободно" : "Available"} value={formatUsdt(wallet?.availableUsdt ?? 0)} tone="accent" />
+                  <MetricCard label={isRu ? "На проверке" : "Pending"} value={formatUsdt(wallet?.pendingUsdt ?? 0)} />
+                  <MetricCard label={isRu ? "Заявки на проверке" : "Pending applications"} value={formatUsdt(pendingContractUsdt)} tone="warning" />
+                  <MetricCard label={isRu ? "Начислено дивидендов" : "Dividends accrued"} value={formatUsdt(dividendAccruedUsdt)} tone="success" />
+                </div>
+              </section>
+
+              <section className="rounded-[28px] border border-qidra-grayLight bg-white p-5 shadow-[0_18px_48px_rgba(18,20,23,0.04)] sm:p-6">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-12 font-semibold uppercase tracking-[0.04em] text-qidra-accent">{isRu ? "Контракты" : "Contracts"}</p>
+                    <h2 className="mt-2 text-[24px] font-medium leading-tight tracking-[0] text-qidra-dark">{isRu ? "Где размещены средства" : "Where funds are placed"}</h2>
+                  </div>
+                  <span className="rounded-full bg-qidra-grayLight px-3 py-1 text-13 font-medium text-qidra-grayBlue">{formatCount(confirmedContractApplications.length)}</span>
+                </div>
+                {confirmedContractApplications.length ? (
+                  <div className="mt-5 grid gap-3">
+                    {confirmedContractApplications.slice(0, 4).map((application) => (
+                      <ContractPositionCard key={application.id} application={application} locale={locale} />
+                    ))}
+                    {confirmedContractApplications.length > 4 ? (
+                      <Link className="text-13 font-medium text-qidra-accent hover:text-qidra-dark" href={withLocale(`/admin/users/${user.id}?view=contracts`, locale)}>
+                        {isRu ? `Показать все: ${confirmedContractApplications.length}` : `Show all: ${confirmedContractApplications.length}`}
+                      </Link>
+                    ) : null}
+                  </div>
+                ) : (
+                  <NotificationCard title={isRu ? "Активных контрактов нет" : "No active contracts"} text={isRu ? "Подтверждённые суммы по проектам появятся здесь после активации." : "Confirmed project allocations will appear here after activation."} />
+                )}
+              </section>
+            </div>
+
+            <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
               <MetricCard label={isRu ? "Роль" : "Role"} value={roleLabel(user.role, locale)} />
               <MetricCard label={isRu ? "Доступ" : "Access"} value={accessStatusLabel(user, locale)} tone={userBlockMode(user) === "active" ? "success" : "danger"} />
               <MetricCard label={isRu ? "Email" : "Email"} value={user.emailVerified ? (isRu ? "Подтверждён" : "Verified") : isRu ? "Не подтверждён" : "Not verified"} tone={user.emailVerified ? "success" : "warning"} />
               <MetricCard label="KYC" value={kycStatusLabel(latestKyc?.status, locale)} tone={latestKyc?.status === KycStatus.APPROVED ? "success" : latestKyc?.status === KycStatus.REJECTED ? "danger" : "warning"} />
-              <MetricCard label={isRu ? "Активировано в проектах" : "Activated in projects"} value={formatUsdt(confirmedContractUsdt)} tone="accent" />
-              <MetricCard label={isRu ? "Начислено дивидендов" : "Dividends accrued"} value={formatUsdt(dividendAccruedUsdt)} />
-              <MetricCard label={isRu ? "Доступный баланс" : "Available balance"} value={formatUsdt(wallet?.availableUsdt ?? 0)} tone="accent" />
               <MetricCard label={isRu ? "Заявки участия" : "Applications"} value={formatCount(user._count.investments)} />
               <MetricCard label={isRu ? "Свои проекты" : "Own projects"} value={formatCount(user._count.projectSubmissions)} />
             </div>
@@ -1304,13 +1344,50 @@ function Panel({ children, description, title }: { children: React.ReactNode; de
   );
 }
 
+function ContractPositionCard({ application, locale }: { application: ContractApplication; locale: Locale }) {
+  const isRu = locale === "ru";
+  const projectTitle = isRu ? application.project.titleRu : application.project.titleEn;
+  const entryDate = application.contractAcceptedAt ?? application.termsAcceptedAt ?? application.createdAt;
+
+  return (
+    <article className="rounded-[18px] border border-qidra-grayLight bg-qidra-grayLight p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="break-words text-15 font-semibold leading-snug text-qidra-dark">{projectTitle}</p>
+          <p className="mt-1 text-12 font-medium text-qidra-grayBlue">
+            {isRu ? "Дата входа" : "Entry date"}: {formatDate(entryDate, locale)}
+          </p>
+        </div>
+        <strong className="shrink-0 rounded-full bg-white px-3 py-1 text-14 font-semibold text-qidra-accent">{formatUsdt(application.amountUsdt)}</strong>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2 text-12 font-medium text-qidra-grayBlue">
+        <span className="rounded-full bg-white px-3 py-1">{application.project.structure}</span>
+        <span className="rounded-full bg-white px-3 py-1">{projectStatusLabel(application.project.status, locale)}</span>
+      </div>
+    </article>
+  );
+}
+
+function projectStatusLabel(status: string, locale: Locale) {
+  const labels: Record<string, { en: string; ru: string }> = {
+    ACTIVE: { ru: "Активен", en: "Active" },
+    CLOSED: { ru: "Закрыт", en: "Closed" },
+    DRAFT: { ru: "Черновик", en: "Draft" },
+    FUNDED: { ru: "Собран", en: "Funded" },
+    PAUSED: { ru: "Пауза", en: "Paused" },
+    REVIEW: { ru: "На проверке", en: "Review" }
+  };
+
+  return labels[status]?.[locale] ?? status;
+}
+
 function MetricCard({ label, tone = "neutral", value }: { label: string; tone?: Tone; value: string }) {
   const valueClass = toneClass(tone);
 
   return (
-    <article className="min-h-[128px] rounded-[18px] border border-white/70 bg-white p-5 shadow-[0_12px_34px_rgba(18,20,23,0.05)]">
-      <p className="text-13 font-semibold uppercase tracking-[0.02em] text-qidra-grayBlue">{label}</p>
-      <p className={`mt-4 break-words text-[24px] font-medium leading-tight tracking-[0] md:text-[26px] ${valueClass}`}>{value}</p>
+    <article className="min-h-[104px] rounded-[18px] border border-qidra-grayLight bg-white p-4 shadow-[0_10px_26px_rgba(18,20,23,0.04)]">
+      <p className="text-12 font-semibold uppercase leading-tight tracking-[0.02em] text-qidra-grayBlue">{label}</p>
+      <p className={`mt-3 break-words text-[18px] font-semibold leading-tight tracking-[0] md:text-[20px] ${valueClass}`}>{value}</p>
     </article>
   );
 }
