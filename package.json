@@ -7,8 +7,11 @@
     "build": "next build",
     "start": "next start --port 8091",
     "lint": "eslint .",
+    "check:env": "node scripts/production-env-status.mjs",
     "check:production": "node scripts/check-production-config.mjs",
     "backup:database": "node scripts/backup-database.mjs",
+    "test:smtp": "node scripts/test-smtp.mjs",
+    "test:storage": "node scripts/test-s3-storage.mjs",
     "import:al-amana-gold": "node scripts/import-al-amana-gold.mjs",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev"

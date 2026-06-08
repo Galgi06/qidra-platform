@@ -185,7 +185,11 @@ npm run build
 npm audit --omit=dev
 npm run check:production
 npm run backup:database
+npm run test:smtp
+npm run test:storage
 ```
+
+`npm run check:env` можно запускать локально для быстрой проверки наличия переменных. Команда не выводит значения секретов, только статус `missing`, `placeholder` или длину установленного значения.
 
 После деплоя:
 
@@ -205,9 +209,7 @@ npm run backup:database
 
 ## 11. Dependency audit
 
-`npm audit --omit=dev` должен запускаться перед каждым production-релизом.
-
-Текущий аудит показывает уязвимости в транзитивных зависимостях `tronweb`, `next-auth`/`@auth/core`, `nodemailer` и связанных пакетах. `npm audit fix --force` применять нельзя без отдельного тестового плана: он предлагает ломающее обновление `tronweb` и некорректные major/downgrade-изменения для части пакетов.
+`npm audit --omit=dev` должен запускаться перед каждым production-релизом. Если аудит снова покажет уязвимость, `npm audit fix --force` применять нельзя без отдельного тестового плана, потому что он может ломать auth, TRON-платежи или серверную сборку.
 
 План закрытия:
 
