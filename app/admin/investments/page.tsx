@@ -214,7 +214,11 @@ type DividendProject = {
 };
 
 type DividendPeriod = {
+  adminNote: string | null;
+  directCostUsdt: Prisma.Decimal;
+  grossRevenueUsdt: Prisma.Decimal;
   id: string;
+  operatingExpenseUsdt: Prisma.Decimal;
   periodLabel: string;
   periodStart: Date;
   periodEnd: Date;
@@ -337,39 +341,67 @@ function DividendAccountingPanel({
         <h3 className="text-20 font-medium text-qidra-dark">{isRu ? "Последние периоды" : "Recent periods"}</h3>
         {periods.length ? (
           <div className="grid gap-3">
-            {periods.map((period) => (
-              <article key={period.id} className="grid gap-4 rounded-qidra border border-qidra-grayLight bg-white p-4 xl:grid-cols-[1.2fr_0.9fr_0.9fr_auto] xl:items-center">
-                <div>
-                  <p className="text-16 font-medium text-qidra-dark">{isRu ? period.project.titleRu : period.project.titleEn}</p>
-                  <p className="mt-1 text-14 text-qidra-grayBlue">
-                    {period.periodLabel} · {formatDateRange(period.periodStart, period.periodEnd, locale)}
-                  </p>
-                </div>
-                <div className="grid gap-1 text-14">
-                  <p className="text-qidra-grayBlue">{isRu ? "Чистый результат" : "Net result"}: <span className="font-medium text-qidra-dark">{formatUsdt(period.netProfitUsdt)}</span></p>
-                  <p className="text-qidra-grayBlue">{isRu ? "Пул участников" : "Participant pool"}: <span className="font-medium text-qidra-dark">{formatUsdt(period.investorPoolUsdt)}</span></p>
-                </div>
-                <div className="grid gap-1 text-14">
-                  <p className="text-qidra-grayBlue">{isRu ? "Доля" : "Share"}: <span className="font-medium text-qidra-dark">{period.investorSharePercent.toString()}%</span></p>
-                  <p className="text-qidra-grayBlue">{isRu ? "Начислений" : "Accruals"}: <span className="font-medium text-qidra-dark">{period._count.payments}</span></p>
-                  <p className="font-medium text-qidra-accent">{dividendStatusLabel(period.status, locale)}</p>
-                </div>
-                <div className="flex flex-wrap gap-2 xl:justify-end">
-                  {period.status === DividendPeriodStatus.DRAFT ? (
-                    <>
-                      <DividendPeriodActionForm action="approve" locale={locale} periodId={period.id} />
-                      <DividendPeriodActionForm action="cancel" locale={locale} periodId={period.id} />
-                    </>
+            {periods.map((period) => {
+              const zeroDistribution = Number(period.investorPoolUsdt.toString()) <= 0;
+              const negativeOrZeroResult = Number(period.netProfitUsdt.toString()) <= 0;
+
+              return (
+                <article key={period.id} className="grid gap-4 rounded-qidra border border-qidra-grayLight bg-white p-4">
+                  <div className="grid gap-4 xl:grid-cols-[1.2fr_1.1fr_1fr_auto] xl:items-start">
+                    <div>
+                      <p className="text-16 font-medium text-qidra-dark">{isRu ? period.project.titleRu : period.project.titleEn}</p>
+                      <p className="mt-1 text-14 text-qidra-grayBlue">
+                        {period.periodLabel} · {formatDateRange(period.periodStart, period.periodEnd, locale)}
+                      </p>
+                      <p className="mt-2 font-medium text-qidra-accent">{dividendStatusLabel(period.status, locale, zeroDistribution)}</p>
+                    </div>
+                    <div className="grid gap-1 text-14">
+                      <p className="text-qidra-grayBlue">{isRu ? "Выручка" : "Revenue"}: <span className="font-medium text-qidra-dark">{formatUsdt(period.grossRevenueUsdt)}</span></p>
+                      <p className="text-qidra-grayBlue">{isRu ? "Прямые расходы" : "Direct costs"}: <span className="font-medium text-qidra-dark">{formatUsdt(period.directCostUsdt)}</span></p>
+                      <p className="text-qidra-grayBlue">{isRu ? "Опер. расходы" : "Operating expenses"}: <span className="font-medium text-qidra-dark">{formatUsdt(period.operatingExpenseUsdt)}</span></p>
+                      <p className={negativeOrZeroResult ? "text-qidra-red" : "text-qidra-green"}>
+                        {isRu ? "Чистый результат" : "Net result"}: <span className="font-medium">{formatUsdt(period.netProfitUsdt)}</span>
+                      </p>
+                    </div>
+                    <div className="grid gap-1 text-14">
+                      <p className="text-qidra-grayBlue">{isRu ? "Пул участников" : "Participant pool"}: <span className="font-medium text-qidra-dark">{formatUsdt(period.investorPoolUsdt)}</span></p>
+                      <p className="text-qidra-grayBlue">{isRu ? "Доля" : "Share"}: <span className="font-medium text-qidra-dark">{period.investorSharePercent.toString()}%</span></p>
+                      <p className="text-qidra-grayBlue">{isRu ? "Начислений" : "Accruals"}: <span className="font-medium text-qidra-dark">{period._count.payments}</span></p>
+                    </div>
+                    <div className="flex flex-wrap gap-2 xl:justify-end">
+                      {period.status === DividendPeriodStatus.DRAFT ? (
+                        <>
+                          <DividendPeriodActionForm action="approve" label={zeroDistribution ? (isRu ? "Утвердить без начислений" : "Approve no accruals") : undefined} locale={locale} periodId={period.id} />
+                          <DividendPeriodActionForm action="cancel" locale={locale} periodId={period.id} />
+                        </>
+                      ) : null}
+                      {period.status === DividendPeriodStatus.APPROVED ? (
+                        <>
+                          <DividendPeriodActionForm action="pay" label={zeroDistribution ? (isRu ? "Закрыть без выплаты" : "Close without payout") : undefined} locale={locale} periodId={period.id} />
+                          <DividendPeriodActionForm action="cancel" locale={locale} periodId={period.id} />
+                        </>
+                      ) : null}
+                    </div>
+                  </div>
+                  {zeroDistribution ? (
+                    <div className="rounded-qidra border border-qidra-gold bg-qidra-accent8 p-4 text-14 text-qidra-dark">
+                      <p className="font-medium">{isRu ? "Дивиденды за период не начисляются" : "No dividends are accrued for this period"}</p>
+                      <p className="mt-1 text-qidra-grayBlue">
+                        {isRu
+                          ? "Пул участников равен 0 USDT, потому что чистая прибыль периода не положительная. Период можно утвердить и закрыть без выплаты, чтобы сохранить квартальную отчётность."
+                          : "The participant pool is 0 USDT because the period net profit is not positive. You can approve and close the period without payout to preserve quarterly reporting."}
+                      </p>
+                    </div>
                   ) : null}
-                  {period.status === DividendPeriodStatus.APPROVED ? (
-                    <>
-                      <DividendPeriodActionForm action="pay" locale={locale} periodId={period.id} />
-                      <DividendPeriodActionForm action="cancel" locale={locale} periodId={period.id} />
-                    </>
+                  {period.adminNote ? (
+                    <div className="rounded-qidra bg-qidra-grayLight p-4 text-14 text-qidra-grayBlue">
+                      <span className="font-medium text-qidra-dark">{isRu ? "Комментарий администратора" : "Admin note"}: </span>
+                      {period.adminNote}
+                    </div>
                   ) : null}
-                </div>
-              </article>
-            ))}
+                </article>
+              );
+            })}
           </div>
         ) : (
           <NotificationCard
@@ -382,7 +414,7 @@ function DividendAccountingPanel({
   );
 }
 
-function DividendPeriodActionForm({ action, locale, periodId }: { action: "approve" | "cancel" | "pay"; locale: "ru" | "en"; periodId: string }) {
+function DividendPeriodActionForm({ action, label, locale, periodId }: { action: "approve" | "cancel" | "pay"; label?: string; locale: "ru" | "en"; periodId: string }) {
   const isRu = locale === "ru";
   const labels = {
     approve: isRu ? "Утвердить" : "Approve",
@@ -395,8 +427,15 @@ function DividendPeriodActionForm({ action, locale, periodId }: { action: "appro
       className="contents"
       endpoint={`/api/admin/dividends?lang=${locale}`}
       feedback={{
-        title: isRu ? "Период обновлён" : "Period updated",
-        text: isRu ? "Финансовое действие сохранено и отражено в журнале." : "The financial action was saved and logged.",
+        title: action === "pay" && label ? (isRu ? "Период закрыт" : "Period closed") : isRu ? "Период обновлён" : "Period updated",
+        text:
+          action === "pay" && label
+            ? isRu
+              ? "Отчётный период закрыт без начисления дивидендов и сохранён в журнале."
+              : "The reporting period was closed without dividend accruals and logged."
+            : isRu
+              ? "Финансовое действие сохранено и отражено в журнале."
+              : "The financial action was saved and logged.",
         buttonLabel: isRu ? "Понятно" : "Got it",
         dismissLabel: isRu ? "Закрыть уведомление" : "Close notification",
         tone: action === "cancel" ? "warning" : "success"
@@ -407,7 +446,7 @@ function DividendPeriodActionForm({ action, locale, periodId }: { action: "appro
       <input name="periodId" type="hidden" value={periodId} />
       <input name="confirmation" type="hidden" value="CONFIRM" />
       <button className={action === "cancel" ? "inline-flex h-10 items-center justify-center rounded-qidra border border-qidra-grayMedium bg-white px-4 text-14 font-medium text-qidra-dark transition-colors hover:border-qidra-red hover:text-qidra-red" : "inline-flex h-10 items-center justify-center rounded-qidra border border-qidra-accent bg-qidra-accent px-4 text-14 font-medium text-white transition-colors hover:bg-qidra-accent80"} type="submit">
-        {labels[action]}
+        {label ?? labels[action]}
       </button>
     </FeedbackForm>
   );
@@ -622,7 +661,15 @@ function formatDateRange(start: Date, end: Date, locale: "ru" | "en") {
   return `${formatDate(start, locale)} - ${formatDate(end, locale)}`;
 }
 
-function dividendStatusLabel(status: DividendPeriodStatus, locale: "ru" | "en") {
+function dividendStatusLabel(status: DividendPeriodStatus, locale: "ru" | "en", zeroDistribution = false) {
+  if (zeroDistribution && status === DividendPeriodStatus.PAID) {
+    return locale === "ru" ? "Закрыт без выплаты" : "Closed without payout";
+  }
+
+  if (zeroDistribution && status === DividendPeriodStatus.APPROVED) {
+    return locale === "ru" ? "Утверждён, ожидает закрытия без выплаты" : "Approved, pending no-payout close";
+  }
+
   const labels = {
     [DividendPeriodStatus.DRAFT]: { ru: "Рассчитан, ожидает утверждения", en: "Calculated, pending approval" },
     [DividendPeriodStatus.APPROVED]: { ru: "Утверждён", en: "Approved" },

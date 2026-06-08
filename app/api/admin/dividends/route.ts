@@ -347,11 +347,14 @@ async function payPeriod(periodId: string, adminNote: string | undefined, actorI
     return periodNotFound(localeRu);
   }
 
-  if (period.status !== DividendPeriodStatus.APPROVED || !period.payments.length) {
+  if (period.status !== DividendPeriodStatus.APPROVED || (!period.payments.length && period.investorPoolUsdt.gt(0))) {
     return NextResponse.json(
       {
         title: localeRu ? "Выплата недоступна" : "Payout unavailable",
-        message: localeRu ? "Сначала утвердите рассчитанный период." : "Approve the calculated period first."
+        message:
+          localeRu
+            ? "Сначала утвердите рассчитанный период. Если есть сумма к выплате, должны быть строки начислений."
+            : "Approve the calculated period first. If there is a payout pool, accrual rows are required."
       },
       { status: 409 }
     );
@@ -431,8 +434,14 @@ async function payPeriod(periodId: string, adminNote: string | undefined, actorI
   });
 
   return NextResponse.json({
-    title: localeRu ? "Выплата проведена" : "Payout completed",
-    message: localeRu ? "Дивиденды зачислены на балансы участников и отражены в истории операций." : "Dividends were credited to participant balances and transaction histories."
+    title: period.payments.length ? (localeRu ? "Выплата проведена" : "Payout completed") : localeRu ? "Период закрыт без выплаты" : "Period closed without payout",
+    message: period.payments.length
+      ? localeRu
+        ? "Дивиденды зачислены на балансы участников и отражены в истории операций."
+        : "Dividends were credited to participant balances and transaction histories."
+      : localeRu
+        ? "Период закрыт для отчётности. Начислений не было, потому что пул участников равен нулю."
+        : "The period was closed for reporting. No accruals were created because the participant pool is zero."
   });
 }
 
