@@ -1,10 +1,14 @@
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import { createReadStream, createWriteStream } from "node:fs";
+import { createReadStream, createWriteStream, existsSync } from "node:fs";
 import { mkdir, readdir, stat, unlink } from "node:fs/promises";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { pipeline } from "node:stream/promises";
 import { createGzip } from "node:zlib";
+
+import { loadLocalEnv } from "./load-local-env.mjs";
+
+loadLocalEnv();
 
 const databaseUrl = normalizeDatabaseUrl(process.env.DATABASE_URL);
 const backupDir = path.resolve(process.env.DATABASE_BACKUP_LOCAL_DIR || ".backups/database");
@@ -32,7 +36,7 @@ await pruneOldBackups();
 console.log(`Database backup created: ${filePath}`);
 
 async function dumpDatabase(outputPath) {
-  const pgDumpBin = process.env.PG_DUMP_BIN || "pg_dump";
+  const pgDumpBin = resolvePgDumpBin();
   const pgDump = spawn(
     pgDumpBin,
     [`--dbname=${databaseUrl}`, "--format=plain", "--no-owner", "--no-privileges"],
@@ -65,6 +69,20 @@ async function dumpDatabase(outputPath) {
   if (exitCode !== 0) {
     fail(`pg_dump failed with exit code ${exitCode}.${stderr ? `\n${stderr}` : ""}`);
   }
+}
+
+function resolvePgDumpBin() {
+  if (process.env.PG_DUMP_BIN) {
+    return process.env.PG_DUMP_BIN;
+  }
+
+  const candidates = [
+    "/usr/local/opt/postgresql@16/bin/pg_dump",
+    "/opt/homebrew/opt/postgresql@16/bin/pg_dump",
+    "pg_dump"
+  ];
+
+  return candidates.find((candidate) => candidate === "pg_dump" || existsSync(candidate)) || "pg_dump";
 }
 
 function normalizeDatabaseUrl(rawUrl) {
