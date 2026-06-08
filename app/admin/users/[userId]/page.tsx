@@ -239,6 +239,8 @@ export default async function AdminUserDetailPage({
               <MetricCard label={isRu ? "Доступ" : "Access"} value={accessStatusLabel(user, locale)} tone={userBlockMode(user) === "active" ? "success" : "danger"} />
               <MetricCard label={isRu ? "Email" : "Email"} value={user.emailVerified ? (isRu ? "Подтверждён" : "Verified") : isRu ? "Не подтверждён" : "Not verified"} tone={user.emailVerified ? "success" : "warning"} />
               <MetricCard label="KYC" value={kycStatusLabel(latestKyc?.status, locale)} tone={latestKyc?.status === KycStatus.APPROVED ? "success" : latestKyc?.status === KycStatus.REJECTED ? "danger" : "warning"} />
+              <MetricCard label={isRu ? "Активировано в проектах" : "Activated in projects"} value={formatUsdt(confirmedContractUsdt)} tone="accent" />
+              <MetricCard label={isRu ? "Начислено дивидендов" : "Dividends accrued"} value={formatUsdt(dividendAccruedUsdt)} />
               <MetricCard label={isRu ? "Доступный баланс" : "Available balance"} value={formatUsdt(wallet?.availableUsdt ?? 0)} tone="accent" />
               <MetricCard label={isRu ? "Заявки участия" : "Applications"} value={formatCount(user._count.investments)} />
               <MetricCard label={isRu ? "Свои проекты" : "Own projects"} value={formatCount(user._count.projectSubmissions)} />
@@ -1048,6 +1050,7 @@ function ContractDossierCard({
   const accruedUsdt = sumUsdt(application.dividendPayments.filter((payment) => payment.status !== DividendPaymentStatus.CANCELLED).map((payment) => payment.amountUsdt));
   const paidUsdt = sumUsdt(application.dividendPayments.filter((payment) => payment.status === DividendPaymentStatus.PAID).map((payment) => payment.amountUsdt));
   const withdrawnUsdt = sumUsdt(linkedWithdrawals.map((transaction) => transaction.amountUsdt));
+  const entryDate = application.contractAcceptedAt ?? application.termsAcceptedAt ?? application.createdAt;
 
   return (
     <article className="grid gap-5 rounded-qidra border border-qidra-grayLight bg-qidra-grayLight p-5">
@@ -1071,7 +1074,11 @@ function ContractDossierCard({
       </div>
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <InfoBlock label={isRu ? "Дата заявки" : "Application date"} value={formatDateTime(application.createdAt, locale)} locale={locale} />
+        <InfoBlock
+          label={application.status === InvestmentStatus.CONFIRMED ? (isRu ? "Дата входа" : "Entry date") : isRu ? "Дата заявки" : "Application date"}
+          value={formatDateTime(application.status === InvestmentStatus.CONFIRMED ? entryDate : application.createdAt, locale)}
+          locale={locale}
+        />
         <InfoBlock label={isRu ? "Активация договора" : "Contract activation"} value={application.contractAcceptedAt ? formatDateTime(application.contractAcceptedAt, locale) : null} locale={locale} />
         <InfoBlock label={isRu ? "Структура" : "Structure"} value={application.project.structure} locale={locale} />
         <InfoBlock label={isRu ? "Риск" : "Risk"} value={application.project.riskLevel} locale={locale} />

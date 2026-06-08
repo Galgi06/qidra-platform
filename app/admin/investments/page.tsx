@@ -135,6 +135,11 @@ export default async function AdminInvestmentsPage({ searchParams }: { searchPar
                       <div>
                         <p className="text-16 font-medium text-qidra-dark">{request.id.slice(-8).toUpperCase()}</p>
                         <p className="mt-1 text-14 text-qidra-grayBlue">{formatDate(request.createdAt, locale)}</p>
+                        {request.contractAcceptedAt ? (
+                          <p className="mt-1 text-13 font-medium text-qidra-green">
+                            {locale === "ru" ? "Вход" : "Entry"}: {formatDate(request.contractAcceptedAt, locale)}
+                          </p>
+                        ) : null}
                       </div>
                       <div>
                         <p className="text-14 text-qidra-grayBlue">{locale === "ru" ? "Участник" : "Participant"}</p>
