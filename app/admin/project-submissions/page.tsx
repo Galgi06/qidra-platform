@@ -13,6 +13,7 @@ import { requireAdmin } from "@/lib/access";
 import { getLocale, type SearchParams, withLocale } from "@/lib/i18n";
 import { prisma } from "@/lib/prisma";
 import { normalizeProjectSubmissionStatus, projectSubmissionStatusLabel, projectSubmissionStatuses } from "@/lib/project-submission-status";
+import { payoutFrequencyLabel } from "@/lib/project-catalog";
 
 type SubmissionDocument = {
   name: string;
@@ -132,6 +133,7 @@ export default async function AdminProjectSubmissionsPage({ searchParams }: { se
                         <Fact label={isRu ? "Период сбора" : "Raise period"} value={formatDateRange(submission.fundraisingStartAt, submission.fundraisingEndAt, locale)} />
                         <Fact label={isRu ? "План запуска" : "Planned launch"} value={submission.plannedLaunchAt ? formatDate(submission.plannedLaunchAt, locale) : isRu ? "Не указано" : "Not set"} />
                         <Fact label={isRu ? "Первые выплаты" : "First distributions"} value={submission.plannedDividendAt ? formatDate(submission.plannedDividendAt, locale) : isRu ? "Не указано" : "Not set"} />
+                        <Fact label={isRu ? "График выплат" : "Distribution schedule"} value={payoutFrequencyLabel(submission.payoutFrequency)[locale]} />
                         <Fact label={isRu ? "Срок участия" : "Participation term"} value={submission.participationTerm || (isRu ? "Не указано" : "Not set")} />
                       </dl>
                       <div>
@@ -207,6 +209,7 @@ export default async function AdminProjectSubmissionsPage({ searchParams }: { se
                           fundraisingEndAt: submission.fundraisingEndAt,
                           plannedLaunchAt: submission.plannedLaunchAt,
                           plannedDividendAt: submission.plannedDividendAt,
+                          payoutFrequency: submission.payoutFrequency,
                           participationTerm: submission.participationTerm,
                           raisePlan: submission.raisePlan
                         }}
@@ -307,6 +310,7 @@ function SubmissionActions({
     fundraisingEndAt: Date | null;
     plannedLaunchAt: Date | null;
     plannedDividendAt: Date | null;
+    payoutFrequency: string;
     participationTerm: string | null;
     raisePlan: string | null;
   };
@@ -490,6 +494,17 @@ function SubmissionActions({
               <Input label={isRu ? "Окончание сбора" : "Fundraising end"} name="fundraisingEndAt" type="date" defaultValue={dateInput(submission.fundraisingEndAt)} />
               <Input label={isRu ? "План запуска" : "Planned launch"} name="plannedLaunchAt" type="date" defaultValue={dateInput(submission.plannedLaunchAt)} />
               <Input label={isRu ? "Первые выплаты" : "First distributions"} name="plannedDividendAt" type="date" defaultValue={dateInput(submission.plannedDividendAt)} />
+              <Select
+                label={isRu ? "График выплат" : "Distribution schedule"}
+                name="payoutFrequency"
+                defaultValue={submission.payoutFrequency}
+                options={[
+                  { value: "MONTHLY", label: isRu ? "Ежемесячно" : "Monthly" },
+                  { value: "QUARTERLY", label: isRu ? "Ежеквартально" : "Quarterly" },
+                  { value: "ANNUAL", label: isRu ? "Ежегодно" : "Annual" },
+                  { value: "CUSTOM", label: isRu ? "Индивидуально по условиям проекта" : "Custom under project terms" }
+                ]}
+              />
               <Input label={isRu ? "Срок участия RU" : "Participation term RU"} name="participationTermRu" defaultValue={submission.participationTerm ?? ""} placeholder={isRu ? "Например: 12 месяцев после запуска" : "Example: 12 months after launch"} />
               <Input label={isRu ? "Срок участия EN" : "Participation term EN"} name="participationTermEn" defaultValue={submission.participationTerm ?? ""} placeholder={isRu ? "Напишите английскую версию срока участия" : "Example: 12 months after launch"} />
             </div>

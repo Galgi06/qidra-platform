@@ -1,4 +1,4 @@
-import { Prisma, ProjectStatus, type Project as DbProject, type ProjectDocument } from "@prisma/client";
+import { PayoutFrequency, Prisma, ProjectStatus, type Project as DbProject, type ProjectDocument } from "@prisma/client";
 import type { BadgeStatus } from "@/components/ui/ProjectStatusBadge";
 import { projects as baseProjects, type Project as ContentProject } from "@/lib/content";
 import type { Locale } from "@/lib/i18n";
@@ -17,6 +17,7 @@ export type CatalogProject = {
     participationTerm: Record<Locale, string>;
     plannedDividendAt: string | null;
     plannedLaunchAt: string | null;
+    payoutFrequency: Record<Locale, string>;
     raisePlan: Record<Locale, string>;
     stage: Record<Locale, string>;
   };
@@ -178,6 +179,7 @@ export function mapProject(project: ProjectWithPublicRelations): CatalogProject 
       fundraisingEndAt: project.fundraisingEndAt ? project.fundraisingEndAt.toISOString() : null,
       plannedLaunchAt: project.plannedLaunchAt ? project.plannedLaunchAt.toISOString() : null,
       plannedDividendAt: project.plannedDividendAt ? project.plannedDividendAt.toISOString() : null,
+      payoutFrequency: payoutFrequencyLabel(project.payoutFrequency),
       participationTerm: {
         ru: project.participationTermRu || defaultParticipationTerm("ru"),
         en: project.participationTermEn || defaultParticipationTerm("en")
@@ -235,6 +237,7 @@ function mapContentProject(project: ContentProject): CatalogProject {
       fundraisingEndAt: null,
       plannedLaunchAt: null,
       plannedDividendAt: null,
+      payoutFrequency: payoutFrequencyLabel(PayoutFrequency.CUSTOM),
       participationTerm: {
         ru: defaultParticipationTerm("ru"),
         en: defaultParticipationTerm("en")
@@ -277,6 +280,22 @@ function defaultParticipationTerm(locale: Locale) {
 
 function defaultRaisePlan(locale: Locale) {
   return locale === "ru" ? "Сбор открыт в пределах цели проекта; при достижении цели новые заявки автоматически закрываются." : "The raise is open within the project target; once the target is reached, new applications close automatically.";
+}
+
+export function payoutFrequencyLabel(frequency?: PayoutFrequency | string | null): Record<Locale, string> {
+  if (frequency === PayoutFrequency.MONTHLY || frequency === "MONTHLY") {
+    return { ru: "Ежемесячно", en: "Monthly" };
+  }
+
+  if (frequency === PayoutFrequency.QUARTERLY || frequency === "QUARTERLY") {
+    return { ru: "Ежеквартально", en: "Quarterly" };
+  }
+
+  if (frequency === PayoutFrequency.ANNUAL || frequency === "ANNUAL") {
+    return { ru: "Ежегодно", en: "Annual" };
+  }
+
+  return { ru: "Индивидуальный график по условиям проекта", en: "Custom schedule under project terms" };
 }
 
 function fallbackProjectBySlug(slug: string) {

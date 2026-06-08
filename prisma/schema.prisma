@@ -78,6 +78,13 @@ enum DocumentKind {
   CONTRACT
 }
 
+enum PayoutFrequency {
+  MONTHLY
+  QUARTERLY
+  ANNUAL
+  CUSTOM
+}
+
 model User {
   id                     String                  @id @default(cuid())
   email                  String                  @unique
@@ -192,6 +199,7 @@ model Project {
   fundraisingEndAt    DateTime?
   plannedLaunchAt     DateTime?
   plannedDividendAt   DateTime?
+  payoutFrequency     PayoutFrequency          @default(CUSTOM)
   participationTermRu String?
   participationTermEn String?
   raisePlanRu         String?                 @db.Text
@@ -251,6 +259,7 @@ model ProjectSubmission {
   fundraisingEndAt   DateTime?
   plannedLaunchAt    DateTime?
   plannedDividendAt  DateTime?
+  payoutFrequency    PayoutFrequency          @default(CUSTOM)
   participationTerm  String?
   raisePlan          String?                 @db.Text
   summary            String                  @db.Text

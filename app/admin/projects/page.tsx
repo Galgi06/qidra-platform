@@ -123,6 +123,17 @@ export default async function AdminProjectsPage({ searchParams }: { searchParams
                 <Input label={locale === "ru" ? "Окончание сбора" : "Fundraising end"} name="fundraisingEndAt" type="date" />
                 <Input label={locale === "ru" ? "План запуска" : "Planned launch"} name="plannedLaunchAt" type="date" />
                 <Input label={locale === "ru" ? "Первые выплаты" : "First distributions"} name="plannedDividendAt" type="date" />
+                <Select
+                  label={locale === "ru" ? "График выплат" : "Distribution schedule"}
+                  name="payoutFrequency"
+                  defaultValue="QUARTERLY"
+                  options={[
+                    { value: "MONTHLY", label: locale === "ru" ? "Ежемесячно" : "Monthly" },
+                    { value: "QUARTERLY", label: locale === "ru" ? "Ежеквартально" : "Quarterly" },
+                    { value: "ANNUAL", label: locale === "ru" ? "Ежегодно" : "Annual" },
+                    { value: "CUSTOM", label: locale === "ru" ? "Индивидуально по условиям проекта" : "Custom under project terms" }
+                  ]}
+                />
                 <Input label={locale === "ru" ? "Срок участия RU" : "Participation term RU"} name="participationTermRu" placeholder={locale === "ru" ? "12 месяцев после запуска" : "12 months after launch"} />
                 <Input label={locale === "ru" ? "Срок участия EN" : "Participation term EN"} name="participationTermEn" placeholder={locale === "ru" ? "Напишите английскую версию срока участия" : "12 months after launch"} />
               </div>
@@ -279,6 +290,7 @@ function AdminProjectPanel({ project, locale }: { project: CatalogProject; local
           <ProjectFact label={isRu ? "Период сбора" : "Raise period"} value={formatDateRange(project.lifecycle.fundraisingStartAt, project.lifecycle.fundraisingEndAt, locale)} />
           <ProjectFact label={isRu ? "План запуска" : "Planned launch"} value={formatDate(project.lifecycle.plannedLaunchAt, locale)} />
           <ProjectFact label={isRu ? "Первые выплаты" : "First distributions"} value={formatDate(project.lifecycle.plannedDividendAt, locale)} />
+          <ProjectFact label={isRu ? "График выплат" : "Distribution schedule"} value={project.lifecycle.payoutFrequency[locale]} />
           <ProjectFact label={isRu ? "Срок участия" : "Participation term"} value={project.lifecycle.participationTerm[locale]} />
           <ProjectFact label={isRu ? "Ориентир доходности" : "Return guidance"} value={project.expectedYield[locale]} />
         </dl>

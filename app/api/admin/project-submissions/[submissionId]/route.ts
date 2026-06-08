@@ -1,4 +1,4 @@
-import { DocumentKind, Prisma, ProjectStatus } from "@prisma/client";
+import { DocumentKind, PayoutFrequency, Prisma, ProjectStatus } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
@@ -53,6 +53,7 @@ const submissionActionSchema = z.discriminatedUnion("action", [
     fundraisingEndAt: optionalDate,
     plannedLaunchAt: optionalDate,
     plannedDividendAt: optionalDate,
+    payoutFrequency: z.nativeEnum(PayoutFrequency).default(PayoutFrequency.CUSTOM),
     participationTermRu: optionalText,
     participationTermEn: optionalText,
     raisePlanRu: optionalText,
@@ -329,6 +330,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         fundraisingEndAt: data.fundraisingEndAt,
         plannedLaunchAt: data.plannedLaunchAt,
         plannedDividendAt: data.plannedDividendAt,
+        payoutFrequency: data.payoutFrequency,
         participationTermRu: data.participationTermRu,
         participationTermEn: data.participationTermEn,
         raisePlanRu: data.raisePlanRu,
@@ -394,6 +396,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             publishedDocuments: projectDocuments.map((document) => document.titleRu),
             expectedReturnRu: created.expectedReturnRu,
             expectedYieldRu: created.expectedYieldRu,
+            payoutFrequency: created.payoutFrequency,
             to: "APPROVED"
           }
         },
@@ -407,6 +410,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             projectSlug: created.slug,
             status: created.status,
             submissionId: submission.id,
+            payoutFrequency: created.payoutFrequency,
             targetUsdt: created.targetUsdt.toString()
           }
         }

@@ -104,6 +104,17 @@ export default async function NewProjectSubmissionPage({ searchParams }: { searc
                   <Input label={isRu ? "Окончание сбора" : "Fundraising end"} name="fundraisingEndAt" type="date" required />
                   <Input label={isRu ? "План запуска проекта" : "Planned launch"} name="plannedLaunchAt" type="date" required />
                   <Input label={isRu ? "План первых выплат" : "Planned first distributions"} name="plannedDividendAt" type="date" required />
+                  <Select
+                    label={isRu ? "График выплат" : "Distribution schedule"}
+                    name="payoutFrequency"
+                    defaultValue="QUARTERLY"
+                    options={[
+                      { value: "MONTHLY", label: isRu ? "Ежемесячно" : "Monthly" },
+                      { value: "QUARTERLY", label: isRu ? "Ежеквартально" : "Quarterly" },
+                      { value: "ANNUAL", label: isRu ? "Ежегодно" : "Annual" },
+                      { value: "CUSTOM", label: isRu ? "Индивидуально по условиям проекта" : "Custom under project terms" }
+                    ]}
+                  />
                 </div>
                 <label className="grid gap-2 text-14 font-medium text-qidra-dark">
                   {isRu ? "Что уже сделано" : "Current progress"}

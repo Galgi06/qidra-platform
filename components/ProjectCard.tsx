@@ -68,6 +68,7 @@ export function ProjectCard({ project, locale }: { project: CatalogProject; loca
             <ProjectInfo label={isRu ? "Период сбора" : "Raise period"} value={formatDateRange(project.lifecycle.fundraisingStartAt, project.lifecycle.fundraisingEndAt, locale)} />
             <ProjectInfo label={isRu ? "План запуска" : "Planned launch"} value={formatDate(project.lifecycle.plannedLaunchAt, locale)} />
             <ProjectInfo label={isRu ? "Первые выплаты" : "First distributions"} value={formatDate(project.lifecycle.plannedDividendAt, locale)} />
+            <ProjectInfo label={isRu ? "График выплат" : "Distribution schedule"} value={project.lifecycle.payoutFrequency[locale]} />
             <ProjectInfo label={isRu ? "Срок участия" : "Participation term"} value={project.lifecycle.participationTerm[locale]} />
             <ProjectInfo
               label={isRu ? "Ожидаемый результат" : "Expected result"}

@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import path from "node:path";
+import { PayoutFrequency } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
@@ -43,6 +44,7 @@ const projectSubmissionSchema = z.object({
   fundraisingEndAt: dateSchema,
   plannedLaunchAt: dateSchema,
   plannedDividendAt: dateSchema,
+  payoutFrequency: z.nativeEnum(PayoutFrequency).default(PayoutFrequency.CUSTOM),
   participationTerm: requiredText(3, 180),
   raisePlan: z.string().trim().max(2500).optional(),
   summary: z.string().trim().min(120).max(5000)
@@ -199,6 +201,7 @@ export async function POST(request: NextRequest) {
     fundraisingEndAt: readText(formData, "fundraisingEndAt"),
     plannedLaunchAt: readText(formData, "plannedLaunchAt"),
     plannedDividendAt: readText(formData, "plannedDividendAt"),
+    payoutFrequency: readText(formData, "payoutFrequency"),
     participationTerm: readText(formData, "participationTerm"),
     raisePlan: readText(formData, "raisePlan"),
     summary: readText(formData, "summary")
@@ -306,6 +309,7 @@ export async function POST(request: NextRequest) {
         fundraisingEndAt: data.fundraisingEndAt,
         plannedLaunchAt: data.plannedLaunchAt,
         plannedDividendAt: data.plannedDividendAt,
+        payoutFrequency: data.payoutFrequency,
         participationTerm: data.participationTerm,
         raisePlan: data.raisePlan,
         summary: data.summary,
@@ -332,6 +336,7 @@ export async function POST(request: NextRequest) {
           fundraisingEndAt: data.fundraisingEndAt.toISOString(),
           plannedLaunchAt: data.plannedLaunchAt.toISOString(),
           plannedDividendAt: data.plannedDividendAt.toISOString(),
+          payoutFrequency: data.payoutFrequency,
           participationTerm: data.participationTerm,
           documents: savedDocuments.map((document) => document.name)
         }

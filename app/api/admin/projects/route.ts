@@ -1,4 +1,4 @@
-import { Prisma, ProjectStatus } from "@prisma/client";
+import { PayoutFrequency, Prisma, ProjectStatus } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
@@ -54,6 +54,7 @@ const projectSchema = z.object({
   fundraisingEndAt: optionalDate,
   plannedLaunchAt: optionalDate,
   plannedDividendAt: optionalDate,
+  payoutFrequency: z.nativeEnum(PayoutFrequency).default(PayoutFrequency.CUSTOM),
   participationTermRu: optionalText,
   participationTermEn: optionalText,
   raisePlanRu: optionalText,
@@ -158,6 +159,7 @@ export async function POST(request: NextRequest) {
       fundraisingEndAt: parsed.data.fundraisingEndAt,
       plannedLaunchAt: parsed.data.plannedLaunchAt,
       plannedDividendAt: parsed.data.plannedDividendAt,
+      payoutFrequency: parsed.data.payoutFrequency,
       participationTermRu: parsed.data.participationTermRu,
       participationTermEn: parsed.data.participationTermEn,
       raisePlanRu: parsed.data.raisePlanRu,
@@ -179,6 +181,7 @@ export async function POST(request: NextRequest) {
       entityId: project.id,
       payload: {
         slug: project.slug,
+        payoutFrequency: project.payoutFrequency,
         status: project.status
       }
     }
