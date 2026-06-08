@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { InvestmentStatus } from "@prisma/client";
+import { DividendPaymentStatus, InvestmentStatus } from "@prisma/client";
 import { FeedbackForm } from "@/components/ActionFeedback";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
@@ -21,7 +21,13 @@ export default async function InvestmentsPage({ searchParams }: { searchParams?:
   const statusFilter = parseInvestmentStatus(searchParamString(params?.status));
   const allApplications = await prisma.investmentApplication.findMany({
     where: { userId },
-    include: { project: true },
+    include: {
+      project: true,
+      dividendPayments: {
+        include: { period: true },
+        orderBy: { createdAt: "desc" }
+      }
+    },
     orderBy: { createdAt: "desc" }
   });
   const wallet = await prisma.wallet.findUnique({
@@ -37,6 +43,7 @@ export default async function InvestmentsPage({ searchParams }: { searchParams?:
   const freeUsdt = Math.max(availableUsdt, 0);
   const unbackedPendingUsdt = Math.max(pendingTotal - reservedUsdt - availableUsdt, 0);
   const stats = buildApplicationStats(allApplications);
+  const dividendTotals = buildDividendTotals(allApplications.flatMap((application) => application.dividendPayments));
 
   return (
     <>
@@ -65,6 +72,11 @@ export default async function InvestmentsPage({ searchParams }: { searchParams?:
               <SummaryCard label={isRu ? "Доступно для новых заявок" : "Available for new applications"} value={formatUsdt(freeUsdt)} />
               <SummaryCard label={isRu ? "Зарезервировано" : "Reserved"} value={formatUsdt(reservedUsdt)} />
               <SummaryCard label={isRu ? "Заявки на проверке" : "Pending applications"} value={formatUsdt(pendingTotal)} tone={unbackedPendingUsdt > 0 ? "warning" : "success"} />
+            </div>
+            <div className="grid gap-4 md:grid-cols-3">
+              <SummaryCard label={isRu ? "Начислено дивидендов" : "Dividends accrued"} value={formatUsdt(dividendTotals.accrued)} />
+              <SummaryCard label={isRu ? "Выплачено дивидендов" : "Dividends paid"} value={formatUsdt(dividendTotals.paid)} tone="success" />
+              <SummaryCard label={isRu ? "Ожидает выплаты" : "Awaiting payout"} value={formatUsdt(dividendTotals.awaiting)} tone={dividendTotals.awaiting > 0 ? "warning" : "default"} />
             </div>
             <InvestmentFilters locale={locale} stats={stats} statusFilter={statusFilter} />
             {applications.length ? (
@@ -130,6 +142,30 @@ export default async function InvestmentsPage({ searchParams }: { searchParams?:
                           <CancelApplicationForm applicationId={application.id} locale={locale} />
                         </div>
                       ) : null}
+                      {application.dividendPayments.length ? (
+                        <div className="mt-6 rounded-qidra border border-qidra-grayLight bg-qidra-grayLight p-4">
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                              <p className="text-16 font-medium text-qidra-dark">{isRu ? "Начисления по контракту" : "Contract accruals"}</p>
+                              <p className="mt-1 text-14 text-qidra-grayBlue">
+                                {isRu ? "История квартальных и иных выплат по выбранному проекту." : "History of quarterly and other payouts for this project."}
+                              </p>
+                            </div>
+                            <p className="text-16 font-medium text-qidra-dark">
+                              {formatUsdt(application.dividendPayments.reduce((total, payment) => total + Number(payment.amountUsdt.toString()), 0))}
+                            </p>
+                          </div>
+                          <div className="mt-4 grid gap-2">
+                            {application.dividendPayments.slice(0, 4).map((payment) => (
+                              <div key={payment.id} className="grid gap-2 rounded-qidra bg-white p-3 text-14 sm:grid-cols-[1fr_auto_auto] sm:items-center">
+                                <span className="font-medium text-qidra-dark">{payment.period.periodLabel}</span>
+                                <span className="text-qidra-grayBlue">{dividendStatusLabel(payment.status, locale)}</span>
+                                <span className="font-medium text-qidra-dark">{formatUsdt(payment.amountUsdt)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
                     </article>
                   );
                 })}
@@ -179,6 +215,11 @@ type ApplicationStats = {
   pendingCount: number;
   rejectedCount: number;
   totalCount: number;
+};
+
+type DividendPaymentSummary = {
+  amountUsdt: { toString(): string };
+  status: DividendPaymentStatus;
 };
 
 function InvestmentFilters({ locale, stats, statusFilter }: { locale: "ru" | "en"; stats: ApplicationStats; statusFilter?: InvestmentStatus }) {
@@ -284,6 +325,36 @@ function buildApplicationStats(applications: Array<{ status: InvestmentStatus }>
       totalCount: 0
     }
   );
+}
+
+function buildDividendTotals(payments: DividendPaymentSummary[]) {
+  return payments.reduce(
+    (totals, payment) => {
+      const amount = Number(payment.amountUsdt.toString());
+
+      totals.accrued += amount;
+
+      if (payment.status === DividendPaymentStatus.PAID) {
+        totals.paid += amount;
+      } else if (payment.status !== DividendPaymentStatus.CANCELLED) {
+        totals.awaiting += amount;
+      }
+
+      return totals;
+    },
+    { accrued: 0, awaiting: 0, paid: 0 }
+  );
+}
+
+function dividendStatusLabel(status: DividendPaymentStatus, locale: "ru" | "en") {
+  const labels = {
+    [DividendPaymentStatus.CALCULATED]: { ru: "Рассчитано", en: "Calculated" },
+    [DividendPaymentStatus.APPROVED]: { ru: "Утверждено", en: "Approved" },
+    [DividendPaymentStatus.PAID]: { ru: "Выплачено", en: "Paid" },
+    [DividendPaymentStatus.CANCELLED]: { ru: "Отменено", en: "Cancelled" }
+  };
+
+  return labels[status][locale];
 }
 
 function searchParamString(value: string | string[] | undefined) {

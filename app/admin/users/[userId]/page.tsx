@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { InvestmentStatus, KycStatus, PaymentStatus, Role, SupportThreadStatus, TransactionType } from "@prisma/client";
+import { DividendPaymentStatus, InvestmentStatus, KycStatus, PaymentStatus, Role, SupportThreadStatus, TransactionType } from "@prisma/client";
 import { AdminTabs } from "@/components/AdminTabs";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { FeedbackForm } from "@/components/ActionFeedback";
@@ -54,6 +54,21 @@ export default async function AdminUserDetailPage({
       investorProfile: true,
       investments: {
         include: {
+          dividendPayments: {
+            include: {
+              period: {
+                include: {
+                  project: {
+                    select: {
+                      titleEn: true,
+                      titleRu: true
+                    }
+                  }
+                }
+              }
+            },
+            orderBy: { createdAt: "desc" }
+          },
           project: {
             include: {
               documents: true,
@@ -176,6 +191,9 @@ export default async function AdminUserDetailPage({
     : [];
   const confirmedContractUsdt = sumUsdt(user.investments.filter((item) => item.status === InvestmentStatus.CONFIRMED).map((item) => item.amountUsdt));
   const pendingContractUsdt = sumUsdt(user.investments.filter((item) => item.status === InvestmentStatus.PENDING).map((item) => item.amountUsdt));
+  const dividendPayments = user.investments.flatMap((item) => item.dividendPayments);
+  const dividendAccruedUsdt = sumUsdt(dividendPayments.filter((item) => item.status !== DividendPaymentStatus.CANCELLED).map((item) => item.amountUsdt));
+  const dividendPaidUsdt = sumUsdt(dividendPayments.filter((item) => item.status === DividendPaymentStatus.PAID).map((item) => item.amountUsdt));
   const walletTransactions = wallet?.transactions ?? [];
   const filteredWalletTransactions = walletTransactions.filter((transaction) => {
     const typeMatches = walletTypeFilter ? transaction.type === walletTypeFilter : true;
@@ -420,6 +438,8 @@ export default async function AdminUserDetailPage({
               <div className="grid gap-4 md:grid-cols-3">
                 <InfoBlock label={isRu ? "Активировано в проектах" : "Activated in projects"} value={formatUsdt(confirmedContractUsdt)} locale={locale} />
                 <InfoBlock label={isRu ? "Заявки на проверке" : "Pending applications"} value={formatUsdt(pendingContractUsdt)} locale={locale} />
+                <InfoBlock label={isRu ? "Начислено дивидендов" : "Dividends accrued"} value={formatUsdt(dividendAccruedUsdt)} locale={locale} />
+                <InfoBlock label={isRu ? "Выплачено дивидендов" : "Dividends paid"} value={formatUsdt(dividendPaidUsdt)} locale={locale} />
                 <InfoBlock label={isRu ? "Всего контрактов и заявок" : "Total contracts and applications"} value={formatCount(user.investments.length)} locale={locale} />
               </div>
               {user.investments.length ? (
@@ -920,6 +940,20 @@ type ContractApplication = {
   amountUsdt: { toString(): string };
   contractAcceptedAt: Date | null;
   createdAt: Date;
+  dividendPayments: {
+    amountUsdt: { toString(): string };
+    createdAt: Date;
+    eligibleDays: number;
+    id: string;
+    paidAt: Date | null;
+    period: {
+      periodEnd: Date;
+      periodLabel: string;
+      periodStart: Date;
+      status: string;
+    };
+    status: DividendPaymentStatus;
+  }[];
   id: string;
   project: {
     documents: { fileUrl: string; id: string; titleEn: string; titleRu: string }[];
@@ -966,9 +1000,9 @@ function ContractDossierCard({
 }) {
   const isRu = locale === "ru";
   const projectTitle = isRu ? application.project.titleRu : application.project.titleEn;
-  const linkedReturns = transactions.filter((transaction) => transaction.type === TransactionType.RETURN && transaction.status === PaymentStatus.CONFIRMED);
   const linkedWithdrawals = transactions.filter((transaction) => transaction.type === TransactionType.WITHDRAWAL && transaction.status === PaymentStatus.CONFIRMED);
-  const accruedUsdt = sumUsdt(linkedReturns.map((transaction) => transaction.amountUsdt));
+  const accruedUsdt = sumUsdt(application.dividendPayments.filter((payment) => payment.status !== DividendPaymentStatus.CANCELLED).map((payment) => payment.amountUsdt));
+  const paidUsdt = sumUsdt(application.dividendPayments.filter((payment) => payment.status === DividendPaymentStatus.PAID).map((payment) => payment.amountUsdt));
   const withdrawnUsdt = sumUsdt(linkedWithdrawals.map((transaction) => transaction.amountUsdt));
 
   return (
@@ -988,6 +1022,7 @@ function ContractDossierCard({
         <InfoBlock label={isRu ? "Сумма участия" : "Participation amount"} value={formatUsdt(application.amountUsdt)} locale={locale} />
         <InfoBlock label={isRu ? "Резерв заявки" : "Application reserve"} value={formatUsdt(application.reservedUsdt)} locale={locale} />
         <InfoBlock label={isRu ? "Начислено по контракту" : "Accrued by contract"} value={formatUsdt(accruedUsdt)} locale={locale} />
+        <InfoBlock label={isRu ? "Выплачено по контракту" : "Paid by contract"} value={formatUsdt(paidUsdt)} locale={locale} />
         <InfoBlock label={isRu ? "Выведено по контракту" : "Withdrawn by contract"} value={formatUsdt(withdrawnUsdt)} locale={locale} />
       </div>
 
@@ -1017,6 +1052,31 @@ function ContractDossierCard({
           <p className="mt-2 whitespace-pre-wrap text-14 text-qidra-grayBlue">{application.adminNote}</p>
         </div>
       ) : null}
+
+      <div className="rounded-qidra border border-qidra-grayLight bg-white p-4">
+        <p className="text-16 font-semibold text-qidra-dark">{isRu ? "Дивидендные начисления" : "Dividend accruals"}</p>
+        {application.dividendPayments.length ? (
+          <div className="mt-3 grid gap-2">
+            {application.dividendPayments.map((payment) => (
+              <div key={payment.id} className="grid gap-2 rounded-qidra bg-qidra-grayLight p-3 text-13 md:grid-cols-[1fr_auto_auto_auto] md:items-center">
+                <div>
+                  <p className="font-medium text-qidra-dark">{payment.period.periodLabel}</p>
+                  <p className="mt-1 text-qidra-grayBlue">
+                    {formatDate(payment.period.periodStart, locale)} - {formatDate(payment.period.periodEnd, locale)}
+                  </p>
+                </div>
+                <p className="text-qidra-grayBlue">
+                  {isRu ? "Дней" : "Days"}: <span className="font-medium text-qidra-dark">{payment.eligibleDays}</span>
+                </p>
+                <p className="font-medium text-qidra-accent">{dividendPaymentStatusLabel(payment.status, locale)}</p>
+                <p className="font-medium text-qidra-dark">{formatUsdt(payment.amountUsdt)}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-3 text-14 text-qidra-grayBlue">{isRu ? "По этому контракту начислений пока нет." : "No accruals for this contract yet."}</p>
+        )}
+      </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="rounded-qidra border border-qidra-grayLight bg-white p-4">
@@ -1385,6 +1445,13 @@ function investmentStatusLabel(status: InvestmentStatus, locale: Locale) {
   if (status === InvestmentStatus.REJECTED) return locale === "ru" ? "Отклонено" : "Rejected";
   if (status === InvestmentStatus.CANCELLED) return locale === "ru" ? "Отменено" : "Cancelled";
   return locale === "ru" ? "На проверке" : "Pending";
+}
+
+function dividendPaymentStatusLabel(status: DividendPaymentStatus, locale: Locale) {
+  if (status === DividendPaymentStatus.PAID) return locale === "ru" ? "Выплачено" : "Paid";
+  if (status === DividendPaymentStatus.APPROVED) return locale === "ru" ? "Утверждено" : "Approved";
+  if (status === DividendPaymentStatus.CANCELLED) return locale === "ru" ? "Отменено" : "Cancelled";
+  return locale === "ru" ? "Рассчитано" : "Calculated";
 }
 
 function investmentTone(status: InvestmentStatus): Tone {

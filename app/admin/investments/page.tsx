@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { InvestmentStatus, Prisma } from "@prisma/client";
+import { DividendPeriodStatus, InvestmentStatus, Prisma } from "@prisma/client";
 import { AdminTabs } from "@/components/AdminTabs";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { FeedbackForm } from "@/components/ActionFeedback";
@@ -18,7 +18,7 @@ export default async function AdminInvestmentsPage({ searchParams }: { searchPar
   await requireAdmin(locale, "/admin/investments");
   const statusFilter = parseInvestmentStatus(searchParamString(params.status));
   const applicationWhere: Prisma.InvestmentApplicationWhereInput = statusFilter ? { status: statusFilter } : {};
-  const [requests, totalCount, pendingCount, confirmedCount, rejectedCount, cancelledCount] = await Promise.all([
+  const [requests, totalCount, pendingCount, confirmedCount, rejectedCount, cancelledCount, dividendProjects, dividendPeriods] = await Promise.all([
     prisma.investmentApplication.findMany({
       where: applicationWhere,
       include: {
@@ -40,7 +40,40 @@ export default async function AdminInvestmentsPage({ searchParams }: { searchPar
     prisma.investmentApplication.count({ where: { status: InvestmentStatus.PENDING } }),
     prisma.investmentApplication.count({ where: { status: InvestmentStatus.CONFIRMED } }),
     prisma.investmentApplication.count({ where: { status: InvestmentStatus.REJECTED } }),
-    prisma.investmentApplication.count({ where: { status: InvestmentStatus.CANCELLED } })
+    prisma.investmentApplication.count({ where: { status: InvestmentStatus.CANCELLED } }),
+    prisma.project.findMany({
+      where: {
+        investments: {
+          some: { status: InvestmentStatus.CONFIRMED }
+        }
+      },
+      select: {
+        id: true,
+        titleRu: true,
+        titleEn: true,
+        payoutFrequency: true,
+        fundedUsdt: true,
+        targetUsdt: true,
+        _count: {
+          select: {
+            investments: { where: { status: InvestmentStatus.CONFIRMED } }
+          }
+        }
+      },
+      orderBy: { updatedAt: "desc" }
+    }),
+    prisma.projectDividendPeriod.findMany({
+      include: {
+        project: {
+          select: { titleRu: true, titleEn: true }
+        },
+        _count: {
+          select: { payments: true }
+        }
+      },
+      orderBy: { createdAt: "desc" },
+      take: 12
+    })
   ]);
   const stats = { cancelledCount, confirmedCount, pendingCount, rejectedCount, totalCount };
 
@@ -68,6 +101,12 @@ export default async function AdminInvestmentsPage({ searchParams }: { searchPar
         <section className="section">
           <div className="container-qidra grid gap-8">
             <AdminTabs activePath="/admin/investments" locale={locale} />
+            <DividendAccountingPanel
+              defaultDates={currentQuarterDefaults()}
+              locale={locale}
+              periods={dividendPeriods}
+              projects={dividendProjects}
+            />
             <InvestmentDashboard locale={locale} stats={stats} />
             <InvestmentFilters locale={locale} stats={stats} statusFilter={statusFilter} />
             {requests.length ? (
@@ -163,6 +202,216 @@ type InvestmentStats = {
   rejectedCount: number;
   totalCount: number;
 };
+
+type DividendProject = {
+  id: string;
+  titleRu: string;
+  titleEn: string;
+  payoutFrequency: string;
+  fundedUsdt: Prisma.Decimal;
+  targetUsdt: Prisma.Decimal;
+  _count: { investments: number };
+};
+
+type DividendPeriod = {
+  id: string;
+  periodLabel: string;
+  periodStart: Date;
+  periodEnd: Date;
+  netProfitUsdt: Prisma.Decimal;
+  investorPoolUsdt: Prisma.Decimal;
+  investorSharePercent: Prisma.Decimal;
+  status: DividendPeriodStatus;
+  project: { titleRu: string; titleEn: string };
+  _count: { payments: number };
+};
+
+function DividendAccountingPanel({
+  defaultDates,
+  locale,
+  periods,
+  projects
+}: {
+  defaultDates: { end: string; label: string; start: string };
+  locale: "ru" | "en";
+  periods: DividendPeriod[];
+  projects: DividendProject[];
+}) {
+  const isRu = locale === "ru";
+
+  return (
+    <section className="grid gap-5 rounded-[20px] bg-white p-6 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] sm:p-8">
+      <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-start">
+        <div>
+          <p className="text-14 font-medium uppercase text-qidra-accent">{isRu ? "Финансовый учёт" : "Financial accounting"}</p>
+          <h2 className="mt-2 text-[32px] font-medium leading-tight tracking-[0] text-qidra-dark">
+            {isRu ? "Отчётные периоды и дивиденды" : "Reporting periods and dividends"}
+          </h2>
+          <p className="mt-3 max-w-4xl text-16 text-qidra-grayBlue">
+            {isRu
+              ? "Рассчитайте квартальный результат проекта, утвердите начисления и проведите выплату на балансы участников. Распределение учитывает сумму участия и количество дней в периоде."
+              : "Calculate a project period, approve accruals and credit payouts to participant balances. Allocation uses participation amount and eligible days in the period."}
+          </p>
+        </div>
+        <div className="rounded-qidra border border-qidra-grayLight bg-qidra-grayLight p-4 text-14 text-qidra-grayBlue">
+          {isRu ? "Для квартальных продуктов Al Amana Gold используйте метку вроде 2026 Q1." : "For quarterly Al Amana Gold products, use labels such as 2026 Q1."}
+        </div>
+      </div>
+
+      <FeedbackForm
+        className="grid gap-4 rounded-qidra border border-qidra-grayLight bg-qidra-grayLight p-4"
+        endpoint={`/api/admin/dividends?lang=${locale}`}
+        feedback={{
+          title: isRu ? "Период рассчитан" : "Period calculated",
+          text: isRu ? "Начисления подготовлены. Проверьте строки и утвердите расчёт перед выплатой." : "Accruals are prepared. Review the rows and approve the calculation before payout.",
+          buttonLabel: isRu ? "Понятно" : "Got it",
+          dismissLabel: isRu ? "Закрыть уведомление" : "Close notification",
+          tone: "success"
+        }}
+        refreshOnSuccess
+      >
+        <input name="action" type="hidden" value="calculate" />
+        <div className="grid gap-4 lg:grid-cols-4">
+          <label className="grid gap-2 text-14 font-medium text-qidra-dark lg:col-span-2">
+            {isRu ? "Проект" : "Project"}
+            <select className="h-14 rounded-qidra border border-qidra-grayLight bg-white px-4 text-16 font-medium text-qidra-dark outline-none transition-colors focus:border-qidra-accent" name="projectId" required>
+              <option value="">{isRu ? "Выберите проект" : "Choose project"}</option>
+              {projects.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {isRu ? project.titleRu : project.titleEn} · {payoutFrequencyLabel(project.payoutFrequency, locale)} · {project._count.investments} {isRu ? "уч." : "part."}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="grid gap-2 text-14 font-medium text-qidra-dark">
+            {isRu ? "Период" : "Period"}
+            <input className="h-14 rounded-qidra border border-qidra-grayLight bg-white px-4 text-16 font-medium text-qidra-dark outline-none transition-colors focus:border-qidra-accent" defaultValue={defaultDates.label} name="periodLabel" placeholder="2026 Q1" required />
+          </label>
+          <label className="grid gap-2 text-14 font-medium text-qidra-dark">
+            {isRu ? "Доля участникам, %" : "Participant share, %"}
+            <input className="h-14 rounded-qidra border border-qidra-grayLight bg-white px-4 text-16 font-medium text-qidra-dark outline-none transition-colors focus:border-qidra-accent" defaultValue="30" inputMode="decimal" min="0.0001" name="investorSharePercent" required step="0.0001" type="number" />
+          </label>
+        </div>
+        <div className="grid gap-4 lg:grid-cols-5">
+          <label className="grid gap-2 text-14 font-medium text-qidra-dark">
+            {isRu ? "Начало периода" : "Period start"}
+            <input className="h-14 rounded-qidra border border-qidra-grayLight bg-white px-4 text-16 font-medium text-qidra-dark outline-none transition-colors focus:border-qidra-accent" defaultValue={defaultDates.start} name="periodStart" required type="date" />
+          </label>
+          <label className="grid gap-2 text-14 font-medium text-qidra-dark">
+            {isRu ? "Конец периода" : "Period end"}
+            <input className="h-14 rounded-qidra border border-qidra-grayLight bg-white px-4 text-16 font-medium text-qidra-dark outline-none transition-colors focus:border-qidra-accent" defaultValue={defaultDates.end} name="periodEnd" required type="date" />
+          </label>
+          <label className="grid gap-2 text-14 font-medium text-qidra-dark">
+            {isRu ? "Выручка USDT" : "Revenue USDT"}
+            <input className="h-14 rounded-qidra border border-qidra-grayLight bg-white px-4 text-16 font-medium text-qidra-dark outline-none transition-colors focus:border-qidra-accent" inputMode="decimal" min="0" name="grossRevenueUsdt" placeholder="100000" required step="0.000001" type="number" />
+          </label>
+          <label className="grid gap-2 text-14 font-medium text-qidra-dark">
+            {isRu ? "Прямые расходы" : "Direct costs"}
+            <input className="h-14 rounded-qidra border border-qidra-grayLight bg-white px-4 text-16 font-medium text-qidra-dark outline-none transition-colors focus:border-qidra-accent" defaultValue="0" inputMode="decimal" min="0" name="directCostUsdt" required step="0.000001" type="number" />
+          </label>
+          <label className="grid gap-2 text-14 font-medium text-qidra-dark">
+            {isRu ? "Опер. расходы" : "Operating expenses"}
+            <input className="h-14 rounded-qidra border border-qidra-grayLight bg-white px-4 text-16 font-medium text-qidra-dark outline-none transition-colors focus:border-qidra-accent" defaultValue="0" inputMode="decimal" min="0" name="operatingExpenseUsdt" required step="0.000001" type="number" />
+          </label>
+        </div>
+        <label className="grid gap-2 text-14 font-medium text-qidra-dark">
+          {isRu ? "Комментарий администратора" : "Admin note"}
+          <textarea
+            className="min-h-24 rounded-qidra border border-qidra-grayLight bg-white px-4 py-3 text-16 font-medium text-qidra-dark outline-none transition-colors focus:border-qidra-accent"
+            name="adminNote"
+            placeholder={isRu ? "Например: квартальный отчёт Al Amana Gold, Q1 2026" : "Example: Al Amana Gold quarterly report, Q1 2026"}
+          />
+        </label>
+        <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
+          <label className="grid gap-2 text-14 font-medium text-qidra-dark">
+            {isRu ? "Подтверждение" : "Confirmation"}
+            <input className="h-14 rounded-qidra border border-qidra-grayLight bg-white px-4 text-16 font-medium text-qidra-dark outline-none transition-colors focus:border-qidra-accent" name="confirmation" placeholder="CONFIRM" required />
+          </label>
+          <button className="inline-flex h-12 items-center justify-center rounded-qidra border border-qidra-accent bg-qidra-accent px-5 text-16 font-medium text-white transition-colors hover:bg-qidra-accent80" type="submit">
+            {isRu ? "Рассчитать начисления" : "Calculate accruals"}
+          </button>
+        </div>
+      </FeedbackForm>
+
+      <div className="grid gap-3">
+        <h3 className="text-20 font-medium text-qidra-dark">{isRu ? "Последние периоды" : "Recent periods"}</h3>
+        {periods.length ? (
+          <div className="grid gap-3">
+            {periods.map((period) => (
+              <article key={period.id} className="grid gap-4 rounded-qidra border border-qidra-grayLight bg-white p-4 xl:grid-cols-[1.2fr_0.9fr_0.9fr_auto] xl:items-center">
+                <div>
+                  <p className="text-16 font-medium text-qidra-dark">{isRu ? period.project.titleRu : period.project.titleEn}</p>
+                  <p className="mt-1 text-14 text-qidra-grayBlue">
+                    {period.periodLabel} · {formatDateRange(period.periodStart, period.periodEnd, locale)}
+                  </p>
+                </div>
+                <div className="grid gap-1 text-14">
+                  <p className="text-qidra-grayBlue">{isRu ? "Чистый результат" : "Net result"}: <span className="font-medium text-qidra-dark">{formatUsdt(period.netProfitUsdt)}</span></p>
+                  <p className="text-qidra-grayBlue">{isRu ? "Пул участников" : "Participant pool"}: <span className="font-medium text-qidra-dark">{formatUsdt(period.investorPoolUsdt)}</span></p>
+                </div>
+                <div className="grid gap-1 text-14">
+                  <p className="text-qidra-grayBlue">{isRu ? "Доля" : "Share"}: <span className="font-medium text-qidra-dark">{period.investorSharePercent.toString()}%</span></p>
+                  <p className="text-qidra-grayBlue">{isRu ? "Начислений" : "Accruals"}: <span className="font-medium text-qidra-dark">{period._count.payments}</span></p>
+                  <p className="font-medium text-qidra-accent">{dividendStatusLabel(period.status, locale)}</p>
+                </div>
+                <div className="flex flex-wrap gap-2 xl:justify-end">
+                  {period.status === DividendPeriodStatus.DRAFT ? (
+                    <>
+                      <DividendPeriodActionForm action="approve" locale={locale} periodId={period.id} />
+                      <DividendPeriodActionForm action="cancel" locale={locale} periodId={period.id} />
+                    </>
+                  ) : null}
+                  {period.status === DividendPeriodStatus.APPROVED ? (
+                    <>
+                      <DividendPeriodActionForm action="pay" locale={locale} periodId={period.id} />
+                      <DividendPeriodActionForm action="cancel" locale={locale} periodId={period.id} />
+                    </>
+                  ) : null}
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <NotificationCard
+            title={isRu ? "Периодов пока нет" : "No periods yet"}
+            text={isRu ? "После расчёта квартала он появится здесь для утверждения и выплаты." : "After calculating a quarter, it will appear here for approval and payout."}
+          />
+        )}
+      </div>
+    </section>
+  );
+}
+
+function DividendPeriodActionForm({ action, locale, periodId }: { action: "approve" | "cancel" | "pay"; locale: "ru" | "en"; periodId: string }) {
+  const isRu = locale === "ru";
+  const labels = {
+    approve: isRu ? "Утвердить" : "Approve",
+    cancel: isRu ? "Отменить" : "Cancel",
+    pay: isRu ? "Провести выплату" : "Pay"
+  };
+
+  return (
+    <FeedbackForm
+      className="contents"
+      endpoint={`/api/admin/dividends?lang=${locale}`}
+      feedback={{
+        title: isRu ? "Период обновлён" : "Period updated",
+        text: isRu ? "Финансовое действие сохранено и отражено в журнале." : "The financial action was saved and logged.",
+        buttonLabel: isRu ? "Понятно" : "Got it",
+        dismissLabel: isRu ? "Закрыть уведомление" : "Close notification",
+        tone: action === "cancel" ? "warning" : "success"
+      }}
+      refreshOnSuccess
+    >
+      <input name="action" type="hidden" value={action} />
+      <input name="periodId" type="hidden" value={periodId} />
+      <input name="confirmation" type="hidden" value="CONFIRM" />
+      <button className={action === "cancel" ? "inline-flex h-10 items-center justify-center rounded-qidra border border-qidra-grayMedium bg-white px-4 text-14 font-medium text-qidra-dark transition-colors hover:border-qidra-red hover:text-qidra-red" : "inline-flex h-10 items-center justify-center rounded-qidra border border-qidra-accent bg-qidra-accent px-4 text-14 font-medium text-white transition-colors hover:bg-qidra-accent80"} type="submit">
+        {labels[action]}
+      </button>
+    </FeedbackForm>
+  );
+}
 
 function InvestmentDashboard({ locale, stats }: { locale: "ru" | "en"; stats: InvestmentStats }) {
   return (
@@ -349,6 +598,50 @@ function investmentFilterHref(locale: "ru" | "en", status?: InvestmentStatus) {
   if (status) params.set("status", status.toLowerCase());
 
   return `/admin/investments?${params.toString()}`;
+}
+
+function currentQuarterDefaults() {
+  const now = new Date();
+  const quarter = Math.floor(now.getMonth() / 3);
+  const year = now.getFullYear();
+  const start = new Date(Date.UTC(year, quarter * 3, 1));
+  const end = new Date(Date.UTC(year, quarter * 3 + 3, 0));
+
+  return {
+    label: `${year} Q${quarter + 1}`,
+    start: formatDateInput(start),
+    end: formatDateInput(end)
+  };
+}
+
+function formatDateInput(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function formatDateRange(start: Date, end: Date, locale: "ru" | "en") {
+  return `${formatDate(start, locale)} - ${formatDate(end, locale)}`;
+}
+
+function dividendStatusLabel(status: DividendPeriodStatus, locale: "ru" | "en") {
+  const labels = {
+    [DividendPeriodStatus.DRAFT]: { ru: "Рассчитан, ожидает утверждения", en: "Calculated, pending approval" },
+    [DividendPeriodStatus.APPROVED]: { ru: "Утверждён", en: "Approved" },
+    [DividendPeriodStatus.PAID]: { ru: "Выплачен", en: "Paid" },
+    [DividendPeriodStatus.CANCELLED]: { ru: "Отменён", en: "Cancelled" }
+  };
+
+  return labels[status][locale];
+}
+
+function payoutFrequencyLabel(value: string, locale: "ru" | "en") {
+  const labels: Record<string, { ru: string; en: string }> = {
+    MONTHLY: { ru: "ежемесячно", en: "monthly" },
+    QUARTERLY: { ru: "квартально", en: "quarterly" },
+    ANNUAL: { ru: "ежегодно", en: "annual" },
+    CUSTOM: { ru: "по условиям", en: "custom" }
+  };
+
+  return (labels[value] ?? labels.CUSTOM)[locale];
 }
 
 function formatCount(value: number) {
