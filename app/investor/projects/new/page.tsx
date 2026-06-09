@@ -73,9 +73,9 @@ export default async function NewProjectSubmissionPage({ searchParams }: { searc
                   </p>
                 </div>
                 <div className="grid gap-4 md:grid-cols-2">
-                  <Input label={isRu ? "Название проекта" : "Project title"} name="title" placeholder={isRu ? "Например: Производство халяльной продукции" : "Example: Halal product manufacturing"} required />
+                  <Input label={isRu ? "Название проекта" : "Project title"} name="title" maxLength={180} minLength={5} placeholder={isRu ? "Например: Производство халяльной продукции" : "Example: Halal product manufacturing"} required />
                   <ProjectSectorFields locale={locale} />
-                  <Input label={isRu ? "Страна / город реализации" : "Country / city"} name="location" placeholder={isRu ? "ОАЭ, Дубай" : "UAE, Dubai"} />
+                  <Input label={isRu ? "Страна / город реализации" : "Country / city"} name="location" maxLength={180} minLength={5} placeholder={isRu ? "ОАЭ, Дубай" : "UAE, Dubai"} />
                   <Input label={isRu ? "Целевой объём, USDT" : "Target amount, USDT"} name="targetUsdt" inputMode="decimal" placeholder="100000" />
                   <Select
                     label={isRu ? "Предполагаемая структура" : "Expected structure"}
@@ -89,17 +89,21 @@ export default async function NewProjectSubmissionPage({ searchParams }: { searc
                   <Input
                     label={isRu ? "Ожидаемый результат проекта" : "Expected project result"}
                     name="expectedReturn"
+                    maxLength={180}
+                    minLength={8}
                     placeholder={isRu ? "Например: расширение производства и доля прибыли по итогам периода" : "Example: production expansion and profit share by period"}
                     required
                   />
                   <Input
                     label={isRu ? "Ориентир доходности" : "Return guidance"}
                     name="expectedYield"
+                    maxLength={180}
+                    minLength={5}
                     placeholder={isRu ? "Например: ориентировочно 30-40% по итогам проекта, не гарантия" : "Example: approximately 30-40% by project outcome, not guaranteed"}
                     required
                   />
-                  <Input label={isRu ? "Стадия проекта" : "Project stage"} name="stage" placeholder={isRu ? "Стартап, действующий бизнес, расширение" : "Startup, operating business, expansion"} required />
-                  <Input label={isRu ? "Срок участия" : "Participation term"} name="participationTerm" placeholder={isRu ? "Например: 12 месяцев после запуска" : "Example: 12 months after launch"} required />
+                  <Input label={isRu ? "Стадия проекта" : "Project stage"} name="stage" maxLength={180} minLength={5} placeholder={isRu ? "Стартап, действующий бизнес, расширение" : "Startup, operating business, expansion"} required />
+                  <Input label={isRu ? "Срок участия" : "Participation term"} name="participationTerm" maxLength={180} minLength={5} placeholder={isRu ? "Например: 12 месяцев после запуска" : "Example: 12 months after launch"} required />
                   <Input label={isRu ? "Начало сбора" : "Fundraising start"} name="fundraisingStartAt" type="date" required />
                   <Input label={isRu ? "Окончание сбора" : "Fundraising end"} name="fundraisingEndAt" type="date" required />
                   <Input label={isRu ? "План запуска проекта" : "Planned launch"} name="plannedLaunchAt" type="date" required />
@@ -121,7 +125,7 @@ export default async function NewProjectSubmissionPage({ searchParams }: { searc
                   <textarea
                     className="min-h-[140px] rounded-qidra border border-transparent bg-qidra-grayLight px-4 py-3 text-16 outline-none transition-colors placeholder:text-qidra-grayMedium focus:border-qidra-accent"
                     maxLength={2500}
-                    minLength={20}
+                    minLength={30}
                     name="currentProgress"
                     placeholder={
                       isRu
@@ -136,6 +140,7 @@ export default async function NewProjectSubmissionPage({ searchParams }: { searc
                   <textarea
                     className="min-h-[120px] rounded-qidra border border-transparent bg-qidra-grayLight px-4 py-3 text-16 outline-none transition-colors placeholder:text-qidra-grayMedium focus:border-qidra-accent"
                     maxLength={2500}
+                    minLength={20}
                     name="raisePlan"
                     placeholder={
                       isRu

@@ -15,6 +15,7 @@ export type FeedbackMessage = {
 };
 
 type FeedbackPlacement = "top-right" | "center";
+type FieldErrors = Record<string, string | string[]>;
 
 const storedFeedbackKey = "qidra:feedback";
 
@@ -128,12 +129,14 @@ export function FeedbackForm({
     const form = event.currentTarget;
 
     if (!form.checkValidity()) {
+      markBrowserInvalidFields(form);
       form.reportValidity();
       return;
     }
 
     if (endpoint) {
       setSubmitting(true);
+      clearFieldErrors(form);
 
       try {
         const formData = new FormData(form);
@@ -154,13 +157,14 @@ export function FeedbackForm({
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(Object.fromEntries(formData.entries()))
               });
-        const data = (await response.json().catch(() => ({}))) as { title?: string; message?: string; tone?: FeedbackTone };
+        const data = (await response.json().catch(() => ({}))) as { fieldErrors?: FieldErrors; title?: string; message?: string; tone?: FeedbackTone };
         const english = feedback.buttonLabel === "Got it" || feedback.dismissLabel === "Close notification";
+        const fieldErrorText = formatFieldErrorSummary(data.fieldErrors);
         const nextFeedback = {
           ...feedback,
           title: data.title ?? (response.ok ? feedback.title : english ? "Action failed" : "Действие не выполнено"),
           text:
-            data.message ??
+            [data.message, fieldErrorText].filter(Boolean).join(" ") ||
             (response.ok
               ? feedback.text
               : english
@@ -172,6 +176,7 @@ export function FeedbackForm({
         setActiveFeedback(nextFeedback);
 
         if (!response.ok) {
+          applyFieldErrors(form, data.fieldErrors);
           setOpen(true);
           return;
         }
@@ -223,6 +228,78 @@ export function FeedbackForm({
       {open ? <FeedbackPopup feedback={activeFeedback} onClose={() => setOpen(false)} placement={popupPlacement} /> : null}
     </>
   );
+}
+
+function markBrowserInvalidFields(form: HTMLFormElement) {
+  clearFieldErrors(form);
+
+  for (const element of Array.from(form.elements)) {
+    if (!isFieldElement(element) || element.validity.valid) continue;
+    markInvalidField(element, element.validationMessage);
+  }
+}
+
+function applyFieldErrors(form: HTMLFormElement, fieldErrors: FieldErrors | undefined) {
+  if (!fieldErrors) return;
+
+  for (const [fieldName, message] of Object.entries(fieldErrors)) {
+    const field = form.elements.namedItem(fieldName);
+    const fieldMessage = Array.isArray(message) ? message[0] : message;
+
+    if (field instanceof RadioNodeList) {
+      const firstField = Array.from(field).find(isFieldElement);
+      if (firstField) markInvalidField(firstField, fieldMessage);
+      continue;
+    }
+
+    if (isFieldElement(field)) {
+      markInvalidField(field, fieldMessage);
+    }
+  }
+
+  const firstInvalid = form.querySelector<HTMLElement>("[aria-invalid='true']");
+  firstInvalid?.scrollIntoView({ behavior: "smooth", block: "center" });
+  firstInvalid?.focus({ preventScroll: true });
+}
+
+function clearFieldErrors(form: HTMLFormElement) {
+  form.querySelectorAll("[aria-invalid='true']").forEach((element) => {
+    element.setAttribute("aria-invalid", "false");
+    element.removeAttribute("aria-describedby");
+  });
+  form.querySelectorAll("[data-field-error-message]").forEach((element) => element.remove());
+}
+
+function markInvalidField(field: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement, message: string | undefined) {
+  const wrapper = field.closest<HTMLElement>("[data-field-wrapper]") ?? field.closest<HTMLElement>("label") ?? field.parentElement;
+  const target = wrapper ?? field;
+  const errorId = `${field.name || field.id}-error`;
+
+  field.setAttribute("aria-invalid", "true");
+  target.setAttribute("aria-invalid", "true");
+
+  if (!message || wrapper?.querySelector(`[data-field-error-message='${field.name}']`)) return;
+
+  const error = document.createElement("span");
+  error.className = "text-12 text-qidra-red";
+  error.dataset.fieldErrorMessage = field.name;
+  error.id = errorId;
+  error.textContent = message;
+  field.setAttribute("aria-describedby", errorId);
+  target.append(error);
+}
+
+function formatFieldErrorSummary(fieldErrors: FieldErrors | undefined) {
+  if (!fieldErrors || !Object.keys(fieldErrors).length) return "";
+  return Object.values(fieldErrors)
+    .map((message) => (Array.isArray(message) ? message[0] : message))
+    .filter(Boolean)
+    .slice(0, 3)
+    .join(" ");
+}
+
+function isFieldElement(element: unknown): element is HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement {
+  return element instanceof HTMLInputElement || element instanceof HTMLSelectElement || element instanceof HTMLTextAreaElement;
 }
 
 function readStoredFeedback(fallback: FeedbackMessage) {

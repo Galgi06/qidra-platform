@@ -103,6 +103,18 @@
     background: var(--qidra-white);
   }
 
+  input[aria-invalid="true"],
+  select[aria-invalid="true"],
+  textarea[aria-invalid="true"],
+  [data-field-wrapper][aria-invalid="true"] {
+    border-color: var(--qidra-red) !important;
+    box-shadow: 0 0 0 1px rgba(214, 69, 69, 0.16);
+  }
+
+  [data-field-wrapper][aria-invalid="true"] {
+    background: rgba(214, 69, 69, 0.03);
+  }
+
   .muted {
     color: var(--qidra-gray-blue);
   }

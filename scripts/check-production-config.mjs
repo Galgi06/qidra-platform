@@ -1,3 +1,7 @@
+import { loadLocalEnv } from "./load-local-env.mjs";
+
+loadLocalEnv();
+
 const placeholderPatterns = [/replace-with/i, /example\.com/i, /localhost/i, /^changeme$/i, /^secret$/i];
 
 const required = [
@@ -17,18 +21,24 @@ const required = [
   "QIDRA_TRON_WALLET_ADDRESS",
   "SMTP_HOST",
   "SMTP_PORT",
+  "SMTP_SECURE",
   "SMTP_USER",
   "SMTP_PASSWORD",
   "SMTP_FROM",
   "FILE_STORAGE_DRIVER",
   "FILE_STORAGE_S3_BUCKET",
   "FILE_STORAGE_S3_REGION",
+  "FILE_STORAGE_S3_ENDPOINT",
+  "FILE_STORAGE_S3_FORCE_PATH_STYLE",
   "FILE_STORAGE_S3_ACCESS_KEY_ID",
   "FILE_STORAGE_S3_SECRET_ACCESS_KEY",
   "DATABASE_BACKUP_REQUIRE_S3",
   "DATABASE_BACKUP_RETENTION_DAYS",
   "DATABASE_BACKUP_S3_BUCKET",
   "DATABASE_BACKUP_S3_REGION",
+  "DATABASE_BACKUP_S3_ENDPOINT",
+  "DATABASE_BACKUP_S3_FORCE_PATH_STYLE",
+  "DATABASE_BACKUP_S3_PREFIX",
   "DATABASE_BACKUP_S3_ACCESS_KEY_ID",
   "DATABASE_BACKUP_S3_SECRET_ACCESS_KEY"
 ];
@@ -75,6 +85,23 @@ if (!Number.isFinite(retentionDays) || retentionDays < 7) {
 
 if (process.env.SMTP_FROM && !/^[^<]*<[^@\s]+@[^@\s]+\.[^@\s]+>$/.test(process.env.SMTP_FROM)) {
   failures.push("SMTP_FROM: expected format like Qidra <no-reply@qidra.io>");
+}
+
+const smtpPort = Number.parseInt(process.env.SMTP_PORT || "", 10);
+if (!Number.isFinite(smtpPort) || smtpPort <= 0) {
+  failures.push("SMTP_PORT: expected numeric port");
+}
+
+if (process.env.SMTP_SECURE && !["true", "false"].includes(process.env.SMTP_SECURE)) {
+  failures.push("SMTP_SECURE: expected true or false");
+}
+
+if (process.env.FILE_STORAGE_S3_FORCE_PATH_STYLE !== "true") {
+  failures.push("FILE_STORAGE_S3_FORCE_PATH_STYLE: Cloudflare R2 requires true");
+}
+
+if (process.env.DATABASE_BACKUP_S3_FORCE_PATH_STYLE !== "true") {
+  failures.push("DATABASE_BACKUP_S3_FORCE_PATH_STYLE: Cloudflare R2 requires true");
 }
 
 if (failures.length) {

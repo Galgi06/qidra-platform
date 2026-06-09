@@ -1,0 +1,9 @@
+[Unit]
+Description=Qidra wallet deposit sync
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/qidra/qidra.env
+ExecStart=/usr/local/bin/qidra-wallet-sync.sh

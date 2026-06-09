@@ -85,7 +85,7 @@ export function FileUpload({
   }
 
   return (
-    <div className="surface grid gap-3 border-dashed p-5 text-14 text-qidra-grayBlue transition-colors hover:border-qidra-accent">
+    <div className="surface grid gap-3 border-dashed p-5 text-14 text-qidra-grayBlue transition-colors hover:border-qidra-accent" data-field-wrapper={props.name}>
       <span className="flex items-center justify-between gap-3">
         <span className="font-medium text-qidra-dark">{label}</span>
         {activeText ? <CheckIcon /> : null}

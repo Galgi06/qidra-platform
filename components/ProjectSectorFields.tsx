@@ -27,6 +27,7 @@ export function ProjectSectorFields({ locale }: { locale: "ru" | "en" }) {
           { value: "logistics", label: isRu ? "Логистика" : "Logistics" },
           { value: "other", label: isRu ? "Другое" : "Other" }
         ]}
+        required
         value={sector}
       />
       {sector === "other" ? (

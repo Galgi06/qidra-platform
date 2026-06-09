@@ -123,10 +123,13 @@ export default async function KycPage({ searchParams }: { searchParams?: SearchP
                     name="phone"
                     type="tel"
                     defaultValue={profile?.phone ?? ""}
+                    maxLength={32}
+                    minLength={6}
                     placeholder={isRu ? "50 000 0000" : "50 000 0000"}
+                    required
                   />
                 </div>
-                <Input label={isRu ? "Дата рождения" : "Date of birth"} name="dateOfBirth" type="date" defaultValue={dateOfBirth} />
+                <Input label={isRu ? "Дата рождения" : "Date of birth"} name="dateOfBirth" type="date" defaultValue={dateOfBirth} required />
                 <Select
                   label={isRu ? "Страна проживания" : "Country of residence"}
                   name="country"
@@ -134,7 +137,7 @@ export default async function KycPage({ searchParams }: { searchParams?: SearchP
                   options={[{ value: "", label: isRu ? "Выберите страну" : "Select country" }, ...countries]}
                   required
                 />
-                <Input label={isRu ? "Город" : "City"} name="city" defaultValue={profile?.city ?? ""} required />
+                <Input label={isRu ? "Город" : "City"} name="city" defaultValue={profile?.city ?? ""} maxLength={120} minLength={2} required />
                 <Select
                   label={isRu ? "Гражданство" : "Citizenship"}
                   name="citizenship"
@@ -142,7 +145,7 @@ export default async function KycPage({ searchParams }: { searchParams?: SearchP
                   options={[{ value: "", label: isRu ? "Выберите гражданство" : "Select citizenship" }, ...countries]}
                   required
                 />
-                <Input label={isRu ? "Профессия" : "Occupation"} name="occupation" defaultValue={application?.occupation ?? ""} required />
+                <Input label={isRu ? "Профессия" : "Occupation"} name="occupation" defaultValue={application?.occupation ?? ""} maxLength={160} minLength={3} required />
                 <Select
                   label={isRu ? "Источник средств" : "Source of funds"}
                   name="sourceOfFunds"
@@ -157,7 +160,15 @@ export default async function KycPage({ searchParams }: { searchParams?: SearchP
                   ]}
                   required
                 />
-                <Input label={isRu ? "Адрес проживания" : "Residential address"} name="address" defaultValue={profile?.address ?? ""} required />
+                <Input
+                  hint={isRu ? "Укажите полный адрес: город, район/улица, дом или ориентир." : "Enter a full address: city, area/street and building or landmark."}
+                  label={isRu ? "Адрес проживания" : "Residential address"}
+                  name="address"
+                  defaultValue={profile?.address ?? ""}
+                  maxLength={240}
+                  minLength={12}
+                  required
+                />
               </div>
               <div className="grid gap-4 md:grid-cols-2">
                 <FileUpload

@@ -30,14 +30,16 @@ export default async function AdminUserDetailPage({
   searchParams
 }: {
   params: Promise<{ userId: string }>;
-  searchParams?: SearchParams;
+  searchParams: Promise<SearchParams>;
 }) {
-  const [{ userId }, locale] = await Promise.all([params, getLocale(searchParams)]);
+  const [routeParams, resolvedSearchParams] = await Promise.all([params, searchParams]);
+  const { userId } = routeParams;
+  const locale = await getLocale(resolvedSearchParams);
   const session = await requireSupportDesk(locale, `/admin/users/${userId}`);
   const isRu = locale === "ru";
-  const view = parseDossierView(searchParamString(searchParams?.view));
-  const walletTypeFilter = parseWalletType(searchParamString(searchParams?.walletType));
-  const walletStatusFilter = parseWalletStatus(searchParamString(searchParams?.walletStatus));
+  const view = parseDossierView(searchParamString(resolvedSearchParams.view));
+  const walletTypeFilter = parseWalletType(searchParamString(resolvedSearchParams.walletType));
+  const walletStatusFilter = parseWalletStatus(searchParamString(resolvedSearchParams.walletStatus));
   const canAdjustBalance = session.user?.role === Role.SUPER_ADMIN;
   const canManageBlock = session.user?.role === Role.SUPER_ADMIN;
   const canManageRoles = canManageManagers(session.user?.role as "ADMIN" | "SUPER_ADMIN" | "TECH_SUPPORT" | "SALES_MANAGER" | "guest" | undefined);

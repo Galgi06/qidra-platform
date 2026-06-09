@@ -10,11 +10,17 @@
     "check:env": "node scripts/production-env-status.mjs",
     "check:production": "node scripts/check-production-config.mjs",
     "backup:database": "node scripts/backup-database.mjs",
+    "backup:status": "node scripts/backup-status.mjs",
+    "restore:database": "node scripts/restore-database.mjs",
     "test:smtp": "node scripts/test-smtp.mjs",
     "test:storage": "node scripts/test-s3-storage.mjs",
     "import:al-amana-gold": "node scripts/import-al-amana-gold.mjs",
     "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev"
+    "prisma:migrate": "prisma migrate dev",
+    "healthcheck:production": "node scripts/qidra-healthcheck.mjs",
+    "backup:postgres": "bash scripts/backup-postgres.sh",
+    "restore:postgres": "bash scripts/restore-postgres.sh",
+    "prisma:deploy": "prisma migrate deploy"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.1",

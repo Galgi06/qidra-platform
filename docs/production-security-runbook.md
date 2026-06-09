@@ -69,22 +69,27 @@ KYC и документы проектов не должны храниться 
 - `DATABASE_BACKUP_S3_FORCE_PATH_STYLE=true`
 - `DATABASE_BACKUP_S3_PREFIX=qidra/database`
 
-Команда ручной проверки:
+Команда ручной проверки для Docker Compose PostgreSQL на VPS:
 
 ```bash
-npm run backup:database
+cd /opt/qidra-platform
+set -a && . ./.env.production && set +a
+BACKUP_POSTGRES_COMPOSE=true BACKUP_UPLOAD_S3=true BACKUP_DIR=/var/backups/qidra/postgres RETENTION_DAYS=14 scripts/backup-postgres.sh
 ```
 
-Пример ежедневного cron на production-сервере:
+Ежедневный cron на production-сервере:
 
 ```bash
-15 2 * * * cd /var/www/qidra-platform && NODE_ENV=production npm run backup:database >> /var/log/qidra-db-backup.log 2>&1
+15 2 * * * cd /opt/qidra-platform && bash -lc 'set -a && . ./.env.production && set +a && BACKUP_POSTGRES_COMPOSE=true BACKUP_UPLOAD_S3=true BACKUP_DIR=/var/backups/qidra/postgres RETENTION_DAYS=14 scripts/backup-postgres.sh >> /var/log/qidra-backup.log 2>&1' # qidra-postgres-backup
 ```
 
-Восстановление из архива:
+Восстановление из архива в отдельную тестовую базу:
 
 ```bash
-gunzip -c qidra-db-YYYY-MM-DD.sql.gz | psql "$DATABASE_URL"
+docker compose -f docker-compose.prod.yml exec -T postgres createdb -U qidra qidra_restore_test
+gunzip -c /var/backups/qidra/postgres/qidra-postgres-YYYYMMDDTHHMMSSZ.dump.gz | docker compose -f docker-compose.prod.yml exec -T postgres pg_restore --no-owner --no-privileges -U qidra -d qidra_restore_test
+docker compose -f docker-compose.prod.yml exec -T postgres psql -U qidra -d qidra_restore_test -tAc 'select count(*) from "User"; select count(*) from "Project"; select count(*) from "KycApplication";'
+docker compose -f docker-compose.prod.yml exec -T postgres dropdb -U qidra qidra_restore_test
 ```
 
 Перед запуском с реальными деньгами нужно сделать тест: создать backup, скачать его из bucket, поднять восстановленную базу на отдельном окружении и проверить клиентов, платежи, заявки, контракты, чаты, KYC и журнал действий.
@@ -173,6 +178,46 @@ DNS:
 - лимиты документов project submission: до 20 файлов и до 100 МБ суммарно за одну отправку.
 
 Перед production обязательно добавить внешний rate limit/WAF на инфраструктурном уровне. Встроенный rate limit является дополнительным защитным слоем и не заменяет Cloudflare/Vercel/nginx rules.
+
+На VPS nginx должен включать infrastructure rate limit для чувствительных API:
+
+- `/api/auth/*`: отдельная зона `qidra_auth`, 30 запросов в минуту на IP с burst 30.
+- `/api/wallet/*`, `/api/investments*`, `/api/support/*`: зона `qidra_sensitive_api`, 60 запросов в минуту на IP с burst 60.
+
+Cloudflare WAF/rate limit можно включить только после перевода nameservers домена на Cloudflare. Пока `qidra.io` обслуживается Namecheap nameservers, Cloudflare WAF не участвует в трафике.
+
+Рекомендуемые Cloudflare rules после перевода:
+
+- rate limit `/api/auth/*`: challenge/block при аномальных попытках входа и регистрации;
+- rate limit `/api/wallet/*`: строгий лимит mutating requests;
+- rate limit `/api/investments*`: лимит заявок и изменений;
+- rate limit `/api/support/*`: лимит сообщений;
+- Managed WAF rules: enabled;
+- Bot Fight Mode или аналогичная bot-защита: enabled;
+- SSL/TLS mode: Full strict;
+- Always Use HTTPS: enabled.
+
+Точные выражения и параметры правил зафиксированы в `ops/cloudflare/qidra-waf-rules.md`.
+
+## 9.1. Серверный firewall и мониторинг
+
+UFW:
+
+- default incoming: deny;
+- outgoing: allow;
+- open: `22/tcp`, `80/tcp`, `443/tcp`;
+- application port `8091` должен слушать только `127.0.0.1`.
+
+SSH:
+
+- `PasswordAuthentication no`;
+- `fail2ban` включён для `sshd`;
+- ограничение SSH по IP желательно включать только при наличии стабильного admin IP и fallback-доступа через DigitalOcean console.
+
+Systemd timers:
+
+- `qidra-wallet-sync.timer`: wallet deposit sync каждые 5 минут;
+- `qidra-monitor.timer`: проверка сайта, контейнеров, свежести backup, checksum, диска, TLS-сертификата и wallet timer каждые 5 минут.
 
 ## 10. Перед деплоем
 

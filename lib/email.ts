@@ -14,8 +14,13 @@ export function getAppBaseUrl() {
 export async function sendEmail({ to, subject, text, html }: EmailPayload) {
   const host = process.env.SMTP_HOST;
   const from = process.env.SMTP_FROM || "Qidra <no-reply@qidra.io>";
+  const isProduction = process.env.NODE_ENV === "production";
 
   if (!host) {
+    if (isProduction) {
+      throw new Error("production_smtp_not_configured");
+    }
+
     console.info(`\n[Qidra email dev]\nTo: ${to}\nSubject: ${subject}\n${text}\n`);
     return { mode: "console" as const };
   }
@@ -23,6 +28,10 @@ export async function sendEmail({ to, subject, text, html }: EmailPayload) {
   const port = Number(process.env.SMTP_PORT || 587);
   const user = process.env.SMTP_USER;
   const pass = process.env.SMTP_PASSWORD;
+
+  if (isProduction && (!process.env.SMTP_FROM || !user || !pass)) {
+    throw new Error("production_smtp_credentials_not_configured");
+  }
 
   const transporter = nodemailer.createTransport({
     host,

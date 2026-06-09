@@ -31,7 +31,7 @@ export default async function TelegramAuthPage({ searchParams }: { searchParams?
       <main className="section">
         <div className="container-qidra grid max-w-xl gap-5">
           {socialAuth.telegramEnabled ? (
-            <TelegramLoginPanel botUsername={socialAuth.telegramBotUsername} locale={locale} nextPath={nextPath} />
+            <TelegramLoginPanel botId={socialAuth.telegramBotId} locale={locale} nextPath={nextPath} />
           ) : (
             <>
               <NotificationCard

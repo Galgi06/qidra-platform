@@ -38,4 +38,4 @@ For TRC20 deposits, set `TRONGRID_API_KEY` and `QIDRA_WALLET_KEY_ENCRYPTION_SECR
 - Do not publish fixed-return claims.
 - Keep KYC, contracts and risk disclosures visible in project flows.
 
-Production infrastructure notes are stored in `docs/qidra-infrastructure-inventory.md`.
+Production infrastructure notes are stored in `docs/qidra-infrastructure-inventory.md`. The self-hosted launch, backup, restore and healthcheck runbook is stored in `docs/production-launch-runbook.md`.

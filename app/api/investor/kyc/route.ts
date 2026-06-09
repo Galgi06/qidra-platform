@@ -5,6 +5,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { countryCodes, dialCodes } from "@/lib/countries";
 import { saveUploadedFile } from "@/lib/file-storage";
+import { isPlausibleAddress, isPlausibleCity, isPlausibleOccupation, isPlausiblePhone, zodFieldErrors } from "@/lib/form-validation";
 import { readKycDocuments, type KycDocumentKind, type KycDocuments, type KycFileMeta } from "@/lib/kyc-documents";
 import { authOptions } from "@/lib/next-auth";
 import { prisma } from "@/lib/prisma";
@@ -12,22 +13,16 @@ import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
-const optionalText = z.preprocess((value) => {
-  if (typeof value !== "string") return undefined;
-  const trimmed = value.trim();
-  return trimmed ? trimmed : undefined;
-}, z.string().max(180).optional());
-
 const kycSchema = z.object({
-  phone: optionalText,
+  phone: z.string().trim().min(1).max(32).refine(isPlausiblePhone),
   phoneDialCode: z.string().trim().refine((value) => dialCodes.has(value)).optional(),
   country: z.string().trim().refine((value) => countryCodes.has(value)),
-  city: z.string().trim().min(2).max(120),
+  city: z.string().trim().min(2).max(120).refine(isPlausibleCity),
   citizenship: z.string().trim().refine((value) => countryCodes.has(value)),
-  dateOfBirth: optionalText,
-  address: z.string().trim().min(5).max(240),
+  dateOfBirth: z.string().trim().min(1).refine(isValidAdultBirthDate),
+  address: z.string().trim().min(12).max(240).refine(isPlausibleAddress),
   sourceOfFunds: z.enum(["salary", "business", "savings", "family", "other"]),
-  occupation: z.string().trim().min(2).max(160)
+  occupation: z.string().trim().min(3).max(160).refine(isPlausibleOccupation)
 });
 
 type SessionUser = {
@@ -75,6 +70,33 @@ function parseDate(value: string | undefined) {
   if (!value) return undefined;
   const date = new Date(`${value}T00:00:00.000Z`);
   return Number.isNaN(date.getTime()) ? undefined : date;
+}
+
+function isValidAdultBirthDate(value: string) {
+  const date = parseDate(value);
+  if (!date) return false;
+
+  const today = new Date();
+  const minimumBirthDate = new Date(Date.UTC(today.getUTCFullYear() - 18, today.getUTCMonth(), today.getUTCDate()));
+  const oldestBirthDate = new Date(Date.UTC(today.getUTCFullYear() - 120, today.getUTCMonth(), today.getUTCDate()));
+
+  return date <= minimumBirthDate && date >= oldestBirthDate;
+}
+
+function kycFieldLabels(localeRu: boolean) {
+  return {
+    address: localeRu ? "Укажите полный адрес проживания: город, район/улица, дом или ориентир." : "Enter a full residential address: city, area/street and building or landmark.",
+    addressProof: localeRu ? "Прикрепите подтверждение адреса в PDF, JPG или PNG." : "Attach proof of address as PDF, JPG or PNG.",
+    citizenship: localeRu ? "Выберите гражданство из списка." : "Select citizenship from the list.",
+    city: localeRu ? "Укажите реальный город буквами, без набора символов или цифр." : "Enter a real city name with letters, not random symbols or numbers.",
+    country: localeRu ? "Выберите страну проживания из списка." : "Select country of residence from the list.",
+    dateOfBirth: localeRu ? "Укажите корректную дату рождения. Участнику должно быть не меньше 18 лет." : "Enter a valid date of birth. The participant must be at least 18.",
+    identityDocument: localeRu ? "Прикрепите документ личности в PDF, JPG или PNG." : "Attach an identity document as PDF, JPG or PNG.",
+    occupation: localeRu ? "Укажите профессию словами, без набора букв или цифр." : "Enter an occupation in words, not random letters or numbers.",
+    phone: localeRu ? "Укажите корректный номер телефона." : "Enter a valid phone number.",
+    phoneDialCode: localeRu ? "Выберите телефонный код страны." : "Select a country phone code.",
+    sourceOfFunds: localeRu ? "Выберите источник средств." : "Select source of funds."
+  };
 }
 
 async function saveKycFile(file: File, userId: string, kind: KycDocumentKind): Promise<KycFileMeta> {
@@ -156,13 +178,16 @@ export async function POST(request: NextRequest) {
   const addressUpload = readUploadedFile(formData, "addressProof");
 
   if (!parsed.success) {
+    const fieldErrors = zodFieldErrors(parsed.error, kycFieldLabels(localeRu));
+
     return NextResponse.json(
       {
         title: localeRu ? "Проверьте анкету" : "Check the profile",
         message:
           localeRu
-            ? "Заполните обязательные поля и прикрепите документ личности вместе с подтверждением адреса."
-            : "Complete the required fields and attach an identity document plus proof of address."
+            ? "Исправьте поля, выделенные красным, и отправьте анкету ещё раз."
+            : "Fix the fields highlighted in red and submit the profile again.",
+        fieldErrors
       },
       { status: 400 }
     );
@@ -182,6 +207,8 @@ export async function POST(request: NextRequest) {
     const error = validateKycFile(file);
 
     if (error) {
+      const fileField = file === identityUpload ? "identityDocument" : "addressProof";
+
       return NextResponse.json(
         {
           title: localeRu ? "Проверьте документы" : "Check documents",
@@ -192,7 +219,10 @@ export async function POST(request: NextRequest) {
                 : "Each file must be no larger than 10 MB."
               : localeRu
                 ? "Загрузите документы в формате PDF, JPG или PNG."
-                : "Upload documents as PDF, JPG or PNG."
+                : "Upload documents as PDF, JPG or PNG.",
+          fieldErrors: {
+            [fileField]: kycFieldLabels(localeRu)[fileField]
+          }
         },
         { status: 400 }
       );
@@ -200,13 +230,19 @@ export async function POST(request: NextRequest) {
   }
 
   if ((!identityUpload && !previousDocuments.identityDocument) || (!addressUpload && !previousDocuments.addressProof)) {
+    const fieldErrors = {
+      ...(!identityUpload && !previousDocuments.identityDocument ? { identityDocument: kycFieldLabels(localeRu).identityDocument } : {}),
+      ...(!addressUpload && !previousDocuments.addressProof ? { addressProof: kycFieldLabels(localeRu).addressProof } : {})
+    };
+
     return NextResponse.json(
       {
         title: localeRu ? "Прикрепите документы" : "Attach documents",
         message:
           localeRu
             ? "Для первой отправки нужны документ личности и подтверждение адреса."
-            : "The first submission requires an identity document and proof of address."
+            : "The first submission requires an identity document and proof of address.",
+        fieldErrors
       },
       { status: 400 }
     );

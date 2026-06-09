@@ -6,6 +6,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { authOptions } from "@/lib/next-auth";
 import { saveUploadedFile } from "@/lib/file-storage";
+import { isDetailedText, isMeaningfulText, zodFieldErrors } from "@/lib/form-validation";
 import { prisma } from "@/lib/prisma";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
@@ -17,7 +18,8 @@ const optionalText = z.preprocess((value) => {
   return trimmed ? trimmed : undefined;
 }, z.string().max(180).optional());
 
-const requiredText = (min = 2, max = 5000) => z.string().trim().min(min).max(max);
+const meaningfulText = (min = 2, max = 5000, minLetters = min) => z.string().trim().min(min).max(max).refine((value) => isMeaningfulText(value, { allowDigits: true, minLetters }));
+const detailedText = (min = 20, max = 5000, minLetters = 12, minWords = 6) => z.string().trim().min(min).max(max).refine((value) => isDetailedText(value, { minLetters, minWords }));
 
 const dateSchema = z.preprocess((value) => {
   if (typeof value !== "string" || !value.trim()) return value;
@@ -26,28 +28,28 @@ const dateSchema = z.preprocess((value) => {
 }, z.date());
 
 const projectSubmissionSchema = z.object({
-  title: z.string().trim().min(3).max(180),
-  sector: optionalText,
-  sectorOther: optionalText,
-  location: optionalText,
+  title: meaningfulText(5, 180, 4),
+  sector: z.enum(["real-estate", "trade", "production", "technology", "logistics", "other"]),
+  sectorOther: optionalText.refine((value) => !value || isMeaningfulText(value, { minLetters: 3 })),
+  location: optionalText.refine((value) => !value || isMeaningfulText(value, { allowDigits: true, minLetters: 3, minWords: 2 })),
   targetUsdt: z.preprocess((value) => {
     if (typeof value !== "string" || !value.trim()) return undefined;
     const normalized = Number(value.replace(",", "."));
     return Number.isFinite(normalized) ? normalized : value;
   }, z.number().positive().max(100000000).optional()),
   structure: optionalText,
-  expectedReturn: z.string().trim().min(5).max(180),
-  expectedYield: z.string().trim().min(2).max(180),
-  stage: requiredText(3, 180),
-  currentProgress: requiredText(20, 2500),
+  expectedReturn: meaningfulText(8, 180, 6),
+  expectedYield: meaningfulText(5, 180, 3),
+  stage: meaningfulText(5, 180, 4),
+  currentProgress: detailedText(30, 2500, 18, 8),
   fundraisingStartAt: dateSchema,
   fundraisingEndAt: dateSchema,
   plannedLaunchAt: dateSchema,
   plannedDividendAt: dateSchema,
   payoutFrequency: z.nativeEnum(PayoutFrequency).default(PayoutFrequency.CUSTOM),
-  participationTerm: requiredText(3, 180),
-  raisePlan: z.string().trim().max(2500).optional(),
-  summary: z.string().trim().min(120).max(5000)
+  participationTerm: meaningfulText(5, 180, 3),
+  raisePlan: z.string().trim().max(2500).optional().refine((value) => !value || isDetailedText(value, { minLetters: 12, minWords: 5 })),
+  summary: detailedText(120, 5000, 70, 25)
 }).superRefine((data, context) => {
   const fundraisingDays = Math.ceil((data.fundraisingEndAt.getTime() - data.fundraisingStartAt.getTime()) / 86_400_000);
 
@@ -84,6 +86,29 @@ const allowedExtensions = new Set([".doc", ".docx", ".pdf", ".jpg", ".jpeg", ".p
 
 function isRu(request: NextRequest) {
   return request.nextUrl.searchParams.get("lang") !== "en";
+}
+
+function projectFieldLabels(localeRu: boolean) {
+  return {
+    currentProgress: localeRu ? "Опишите, что реально уже сделано: активы, договоры, команда, готовность к запуску." : "Describe what is already done: assets, contracts, team and launch readiness.",
+    documents: localeRu ? "Прикрепите минимум один документ проекта." : "Attach at least one project document.",
+    expectedReturn: localeRu ? "Опишите ожидаемый результат проекта словами, не набором символов." : "Describe the expected project result in words, not random characters.",
+    expectedYield: localeRu ? "Укажите ориентир доходности понятным текстом, например период и что это не гарантия." : "Enter return guidance as clear text, including period and that it is not guaranteed.",
+    fundraisingEndAt: localeRu ? "Срок сбора должен быть от 1 до 93 дней." : "Fundraising period must be from 1 to 93 days.",
+    fundraisingStartAt: localeRu ? "Укажите корректную дату начала сбора." : "Enter a valid fundraising start date.",
+    location: localeRu ? "Укажите страну и город реализации проекта." : "Enter the project country and city.",
+    participationTerm: localeRu ? "Укажите срок участия понятным текстом." : "Enter the participation term as clear text.",
+    payoutFrequency: localeRu ? "Выберите график выплат." : "Select distribution schedule.",
+    plannedDividendAt: localeRu ? "Укажите дату планируемых первых выплат." : "Enter planned first distribution date.",
+    plannedLaunchAt: localeRu ? "Укажите дату планируемого запуска." : "Enter planned launch date.",
+    raisePlan: localeRu ? "Опишите этапы сбора понятным текстом или оставьте поле пустым." : "Describe raise phases clearly or leave this field empty.",
+    sector: localeRu ? "Выберите отрасль проекта." : "Select project sector.",
+    sectorOther: localeRu ? "Укажите отрасль словами." : "Enter the sector in words.",
+    stage: localeRu ? "Укажите реальную стадию проекта словами." : "Enter the real project stage in words.",
+    summary: localeRu ? "Добавьте подробное описание: бизнес-модель, активы, участники, сроки, риски и документы." : "Add a detailed description: business model, assets, parties, timeline, risks and documents.",
+    targetUsdt: localeRu ? "Укажите корректную сумму цели в USDT." : "Enter a valid target amount in USDT.",
+    title: localeRu ? "Укажите нормальное название проекта, не набор букв или цифр." : "Enter a real project title, not random letters or numbers."
+  };
 }
 
 function readText(formData: FormData, key: string) {
@@ -209,13 +234,16 @@ export async function POST(request: NextRequest) {
   const documents = readFiles(formData, "documents");
 
   if (!parsed.success) {
+    const fieldErrors = zodFieldErrors(parsed.error, projectFieldLabels(localeRu));
+
     return NextResponse.json(
       {
         title: localeRu ? "Проверьте заявку" : "Check application",
         message:
           localeRu
-            ? "Заполните название, описание проекта и основные параметры. Описание должно быть достаточно подробным."
-            : "Complete the title, project description and core parameters. The description must be detailed enough."
+            ? "Исправьте поля, выделенные красным. Описание должно быть осмысленным и достаточно подробным."
+            : "Fix the fields highlighted in red. The description must be meaningful and detailed enough.",
+        fieldErrors
       },
       { status: 400 }
     );
@@ -228,7 +256,10 @@ export async function POST(request: NextRequest) {
         message:
           localeRu
             ? "Для первичной проверки нужен минимум один файл: презентация, регистрационный документ или финансовая модель."
-            : "Initial review requires at least one file: presentation, registration document or financial model."
+            : "Initial review requires at least one file: presentation, registration document or financial model.",
+        fieldErrors: {
+          documents: projectFieldLabels(localeRu).documents
+        }
       },
       { status: 400 }
     );
@@ -238,7 +269,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         title: localeRu ? "Слишком много файлов" : "Too many files",
-        message: localeRu ? "За один раз можно загрузить до 20 файлов проекта." : "You can upload up to 20 project files at a time."
+        message: localeRu ? "За один раз можно загрузить до 20 файлов проекта." : "You can upload up to 20 project files at a time.",
+        fieldErrors: {
+          documents: projectFieldLabels(localeRu).documents
+        }
       },
       { status: 400 }
     );
@@ -250,7 +284,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         title: localeRu ? "Файлы слишком большие" : "Files are too large",
-        message: localeRu ? "Общий размер документов проекта должен быть не больше 100 МБ." : "The total project document size must be no larger than 100 MB."
+        message: localeRu ? "Общий размер документов проекта должен быть не больше 100 МБ." : "The total project document size must be no larger than 100 MB.",
+        fieldErrors: {
+          documents: projectFieldLabels(localeRu).documents
+        }
       },
       { status: 400 }
     );
@@ -270,7 +307,10 @@ export async function POST(request: NextRequest) {
                 : "Each file must be no larger than 20 MB."
               : localeRu
                 ? "Можно загрузить PDF, DOCX, XLSX, PPTX, JPG или PNG."
-                : "Upload PDF, DOCX, XLSX, PPTX, JPG or PNG files."
+                : "Upload PDF, DOCX, XLSX, PPTX, JPG or PNG files.",
+          fieldErrors: {
+            documents: projectFieldLabels(localeRu).documents
+          }
         },
         { status: 400 }
       );
@@ -286,7 +326,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         title: localeRu ? "Укажите отрасль" : "Specify sector",
-        message: localeRu ? "Если выбрано «Другое», напишите название отрасли проекта." : "If you choose Other, enter the project's sector."
+        message: localeRu ? "Если выбрано «Другое», напишите название отрасли проекта." : "If you choose Other, enter the project's sector.",
+        fieldErrors: {
+          sectorOther: projectFieldLabels(localeRu).sectorOther
+        }
       },
       { status: 400 }
     );

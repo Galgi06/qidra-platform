@@ -1,6 +1,5 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { Prisma } from "@prisma/client";
 import { AdminTabs } from "@/components/AdminTabs";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { Footer } from "@/components/Footer";
@@ -58,7 +57,7 @@ export default async function AdminAuditPage({ searchParams }: { searchParams: P
   await requireAdmin(locale, "/admin/audit");
   const categoryFilter = parseAuditCategory(searchParamString(params.category));
   const auditWhere = auditCategoryWhere(categoryFilter);
-  const [logs, totalCount, paymentCount, investmentCount, kycCount, projectCount, userCount, systemCount] = await Promise.all([
+  const [logs, totalCount, paymentCount, investmentCount, kycCount, projectCount, userCount, systemCount] = (await Promise.all([
     prisma.adminAuditLog.findMany({
       where: auditWhere,
       include: {
@@ -80,7 +79,7 @@ export default async function AdminAuditPage({ searchParams }: { searchParams: P
     prisma.adminAuditLog.count({ where: auditCategoryWhere("project") }),
     prisma.adminAuditLog.count({ where: auditCategoryWhere("user") }),
     prisma.adminAuditLog.count({ where: auditCategoryWhere("system") })
-  ]);
+  ])) as [AuditLogEntry[], number, number, number, number, number, number, number];
   const stats = { investmentCount, kycCount, paymentCount, projectCount, systemCount, totalCount, userCount };
 
   return (
@@ -171,6 +170,18 @@ export default async function AdminAuditPage({ searchParams }: { searchParams: P
 
 type AuditCategory = "investment" | "kyc" | "payment" | "project" | "system" | "user";
 
+type AuditWhere = {
+  action?: {
+    startsWith: string;
+  };
+  actorId?: null;
+  OR?: Array<{
+    action: {
+      startsWith: string;
+    };
+  }>;
+};
+
 type AuditStats = {
   investmentCount: number;
   kycCount: number;
@@ -179,6 +190,20 @@ type AuditStats = {
   systemCount: number;
   totalCount: number;
   userCount: number;
+};
+
+type AuditLogEntry = {
+  action: string;
+  actor: {
+    email: string;
+    name: string | null;
+    role: string;
+  } | null;
+  createdAt: Date;
+  entityId: string | null;
+  entityType: string;
+  id: string;
+  payload: unknown;
 };
 
 function AuditDashboard({ locale, stats }: { locale: Locale; stats: AuditStats }) {
@@ -377,7 +402,7 @@ function parseAuditCategory(value: string | undefined): AuditCategory | undefine
   return undefined;
 }
 
-function auditCategoryWhere(category?: AuditCategory): Prisma.AdminAuditLogWhereInput {
+function auditCategoryWhere(category?: AuditCategory): AuditWhere {
   if (!category) return {};
   if (category === "system") return { actorId: null };
   if (category === "payment") {
