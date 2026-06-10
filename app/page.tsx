@@ -42,25 +42,32 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
           />
           <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(18,20,23,0.98)_0%,rgba(6,63,55,0.88)_42%,rgba(79,70,229,0.44)_70%,rgba(18,20,23,0.12)_100%)]" />
           <div className="relative z-10 mx-auto max-w-[1840px] px-5 py-6 sm:px-8 lg:px-11">
-            <div className="flex items-center justify-between gap-4 border-b border-white/60 pb-5">
-              <Link href={withLocale("/", locale)} className="text-[30px] font-semibold leading-none text-white sm:text-[34px]" aria-label="Qidra">
-                Qidra
-              </Link>
-              <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-                <LanguageSwitcher locale={locale} path="/" tone="dark" />
+            <div className="grid gap-4 border-b border-white/60 pb-5 sm:flex sm:items-center sm:justify-between">
+              <div className="flex items-center justify-between gap-3">
+                <Link href={withLocale("/", locale)} className="text-[30px] font-semibold leading-none text-white sm:text-[34px]" aria-label="Qidra">
+                  Qidra
+                </Link>
+                <div className="sm:hidden">
+                  <LanguageSwitcher locale={locale} path="/" tone="dark" />
+                </div>
+              </div>
+              <div className="grid min-w-0 grid-cols-2 gap-2 sm:flex sm:shrink-0 sm:items-center sm:gap-3">
+                <div className="hidden sm:block">
+                  <LanguageSwitcher locale={locale} path="/" tone="dark" />
+                </div>
                 {signedIn ? (
                   <>
-                    <ButtonLink href={withLocale(accountHref, locale)} variant="white" size="sm" className="h-11 px-4 sm:min-w-44 sm:px-6">
+                    <ButtonLink href={withLocale(accountHref, locale)} variant="white" size="sm" className="h-11 min-w-0 px-3 text-14 sm:min-w-44 sm:px-6 sm:text-16">
                       {adminSession ? (isRu ? "Операционный центр" : "Operations") : isRu ? "Профиль" : "Profile"}
                     </ButtonLink>
-                    <SignOutButton callbackUrl={withLocale("/", locale)} label={isRu ? "Выход" : "Sign out"} />
+                    <SignOutButton callbackUrl={withLocale("/", locale)} label={isRu ? "Выход" : "Sign out"} className="h-11 min-w-0 px-3 text-14 sm:px-4 sm:text-16" />
                   </>
                 ) : (
                   <>
-                    <ButtonLink href={withLocale("/auth/sign-up", locale)} variant="white" size="sm" className="h-11 px-4 sm:min-w-44 sm:px-6">
+                    <ButtonLink href={withLocale("/auth/sign-up", locale)} variant="white" size="sm" className="h-11 min-w-0 px-3 text-14 sm:min-w-44 sm:px-6 sm:text-16">
                       {t.nav.signUp}
                     </ButtonLink>
-                    <ButtonLink href={withLocale("/auth/sign-in", locale)} size="sm" className="h-11 border-white/16 bg-white/14 px-4 text-white hover:bg-white/22 sm:min-w-32 sm:px-6">
+                    <ButtonLink href={withLocale("/auth/sign-in", locale)} size="sm" className="h-11 min-w-0 border-white/16 bg-white/14 px-3 text-14 text-white hover:bg-white/22 sm:min-w-32 sm:px-6 sm:text-16">
                       {t.nav.signIn}
                     </ButtonLink>
                   </>
