@@ -1,8 +1,8 @@
-import { KycStatus } from "@prisma/client";
+import { KycStatus, Role } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import { canAccessSupportDesk } from "@/lib/auth";
+import { canEditParticipantCards } from "@/lib/auth";
 import { countryCodes, dialCodes } from "@/lib/countries";
 import { isPlausibleAddress, isPlausibleCity, isPlausibleOccupation, isPlausiblePhone, zodFieldErrors } from "@/lib/form-validation";
 import { authOptions } from "@/lib/next-auth";
@@ -17,6 +17,7 @@ const profileUpdateSchema = z.object({
   confirmation: z.string().trim(),
   country: z.string().trim().refine((value) => !value || countryCodes.has(value)),
   dateOfBirth: z.string().trim().refine((value) => !value || isValidAdultBirthDate(value)),
+  email: z.string().trim().email().max(180).transform((value) => value.toLowerCase()),
   name: z.string().trim().min(2).max(120).refine((value) => isPlausibleName(value)),
   occupation: z.string().trim().max(160).refine((value) => !value || isPlausibleOccupation(value)),
   phone: z.string().trim().max(32).refine((value) => !value || isPlausiblePhone(value)),
@@ -40,11 +41,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const localeRu = isRu(request);
   const session = (await getServerSession(authOptions)) as SessionUser | null;
 
-  if (!canAccessSupportDesk(session?.user?.role as "ADMIN" | "SUPER_ADMIN" | "TECH_SUPPORT" | "SALES_MANAGER" | "guest" | undefined)) {
+  if (!canEditParticipantCards(session?.user?.role as "ADMIN" | "SUPER_ADMIN" | "TECH_SUPPORT" | "guest" | undefined)) {
     return NextResponse.json(
       {
         title: localeRu ? "Нет доступа" : "Access denied",
-        message: localeRu ? "Карточку участника могут корректировать только сотрудники Qidra." : "Only Qidra staff can update participant cards."
+        message: localeRu
+          ? "Полную карточку участника могут корректировать только главный администратор, администратор и менеджер техподдержки."
+          : "Only super administrators, administrators and technical support managers can update the full participant card."
       },
       { status: 403 }
     );
@@ -102,6 +105,38 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
 
   const data = parsed.data;
+  const emailChanged = targetUser.email.toLowerCase() !== data.email;
+
+  if (targetUser.role !== Role.INVESTOR) {
+    return NextResponse.json(
+      {
+        title: localeRu ? "Это не участник" : "Not a participant",
+        message: localeRu ? "Эта форма предназначена для корректировки карточек участников." : "This form is intended for participant card updates."
+      },
+      { status: 400 }
+    );
+  }
+
+  if (emailChanged) {
+    const existingEmailUser = await prisma.user.findUnique({
+      where: { email: data.email },
+      select: { id: true }
+    });
+
+    if (existingEmailUser && existingEmailUser.id !== userId) {
+      return NextResponse.json(
+        {
+          title: localeRu ? "Email уже занят" : "Email already used",
+          message: localeRu ? "Этот email уже привязан к другой карточке. Проверьте клиента или используйте другой адрес." : "This email is already linked to another card. Check the client or use another address.",
+          fieldErrors: {
+            email: localeRu ? "Email уже используется другой карточкой." : "Email is already used by another card."
+          }
+        },
+        { status: 409 }
+      );
+    }
+  }
+
   const birthDate = parseDate(data.dateOfBirth);
   const latestKyc = targetUser.kycApplications[0];
   const before = {
@@ -110,6 +145,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     city: targetUser.investorProfile?.city ?? "",
     country: targetUser.investorProfile?.country ?? "",
     dateOfBirth: targetUser.investorProfile?.dateOfBirth?.toISOString().slice(0, 10) ?? "",
+    email: targetUser.email,
     name: targetUser.name ?? "",
     occupation: latestKyc?.occupation ?? "",
     phone: targetUser.investorProfile?.phone ?? "",
@@ -122,6 +158,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     city: data.city,
     country: data.country,
     dateOfBirth: data.dateOfBirth,
+    email: data.email,
     name: data.name,
     occupation: data.occupation,
     phone: data.phone,
@@ -145,7 +182,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   await prisma.$transaction(async (tx) => {
     await tx.user.update({
       where: { id: userId },
-      data: { name: data.name }
+      data: {
+        email: data.email,
+        emailVerified: emailChanged ? new Date() : targetUser.emailVerified,
+        name: data.name
+      }
     });
 
     await tx.investorProfile.upsert({
@@ -244,6 +285,7 @@ function profileFieldLabels(localeRu: boolean) {
     confirmation: localeRu ? "Введите CONFIRM." : "Enter CONFIRM.",
     country: localeRu ? "Выберите страну проживания из списка." : "Select country of residence from the list.",
     dateOfBirth: localeRu ? "Укажите корректную дату рождения. Участнику должно быть не меньше 18 лет." : "Enter a valid date of birth. The participant must be at least 18.",
+    email: localeRu ? "Укажите корректный email участника." : "Enter a valid participant email.",
     name: localeRu ? "Укажите имя участника буквами." : "Enter the participant name with letters.",
     occupation: localeRu ? "Укажите профессию словами, без набора букв или цифр." : "Enter an occupation in words, not random letters or numbers.",
     phone: localeRu ? "Укажите корректный номер телефона." : "Enter a valid phone number.",

@@ -18,3 +18,7 @@ export function canManageManagers(role?: Role | "guest") {
 export function canAccessSupportDesk(role?: Role | "guest") {
   return role === "TECH_SUPPORT" || role === "SALES_MANAGER" || role === "ADMIN" || role === "SUPER_ADMIN";
 }
+
+export function canEditParticipantCards(role?: Role | "guest") {
+  return role === "TECH_SUPPORT" || role === "ADMIN" || role === "SUPER_ADMIN";
+}

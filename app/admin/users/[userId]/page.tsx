@@ -16,7 +16,7 @@ import { Button, ButtonLink } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { requireSupportDesk } from "@/lib/access";
-import { canAccessSupportDesk, canManageManagers } from "@/lib/auth";
+import { canAccessSupportDesk, canEditParticipantCards, canManageManagers } from "@/lib/auth";
 import { countryName, countryOptions, dialCodeOptions, normalizeCountryCode } from "@/lib/countries";
 import { getLocale, t, type Locale, type SearchParams, withLocale } from "@/lib/i18n";
 import { readKycDocuments, type KycDocumentKind } from "@/lib/kyc-documents";
@@ -44,6 +44,7 @@ export default async function AdminUserDetailPage({
   const canAdjustBalance = session.user?.role === Role.SUPER_ADMIN;
   const canManageBlock = session.user?.role === Role.SUPER_ADMIN;
   const canManageRoles = canManageManagers(session.user?.role as "ADMIN" | "SUPER_ADMIN" | "TECH_SUPPORT" | "SALES_MANAGER" | "guest" | undefined);
+  const canEditParticipantCard = canEditParticipantCards(session.user?.role as "ADMIN" | "SUPER_ADMIN" | "TECH_SUPPORT" | "guest" | undefined);
   const canSendAccessRecovery = canAccessSupportDesk(session.user?.role as "ADMIN" | "SUPER_ADMIN" | "TECH_SUPPORT" | "SALES_MANAGER" | "guest" | undefined);
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -191,6 +192,7 @@ export default async function AdminUserDetailPage({
     city: user.investorProfile?.city ?? "",
     country: normalizeCountryCode(user.investorProfile?.country),
     dateOfBirth: user.investorProfile?.dateOfBirth?.toISOString().slice(0, 10) ?? "",
+    email: user.email,
     name: user.name ?? "",
     occupation: latestKyc?.occupation ?? "",
     phone: user.investorProfile?.phone ?? "",
@@ -321,7 +323,7 @@ export default async function AdminUserDetailPage({
                       <InfoBlock label={isRu ? "Гражданство" : "Citizenship"} value={countryName(user.investorProfile?.citizenship, locale)} locale={locale} />
                       <InfoBlock label={isRu ? "Адрес" : "Address"} value={user.investorProfile?.address} locale={locale} />
                     </div>
-                    {canSendAccessRecovery ? (
+                    {canEditParticipantCard && user.role === Role.INVESTOR ? (
                       <div className="premium-panel p-5">
                         <ParticipantProfileEditForm
                           countryOptions={countryOptions(locale)}
@@ -331,7 +333,16 @@ export default async function AdminUserDetailPage({
                           locale={locale}
                         />
                       </div>
-                    ) : null}
+                    ) : (
+                      <NotificationCard
+                        title={isRu ? "Карточка только для просмотра" : "Card is view-only"}
+                        text={
+                          isRu
+                            ? "Полная правка email и данных участника доступна главному администратору, администратору и менеджеру техподдержки. Роль назначается в блоке доступа."
+                            : "Full email and participant data updates are available to super admins, admins and technical support managers. The role is assigned in the access block."
+                        }
+                      />
+                    )}
                   </Panel>
 
                   <Panel title={isRu ? "KYC и решения" : "KYC and decisions"} description={isRu ? "История анкет, статусов и комментариев проверяющих." : "History of profiles, statuses and reviewer notes."}>

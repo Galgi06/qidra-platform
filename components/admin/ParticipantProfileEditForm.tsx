@@ -16,6 +16,7 @@ export type ParticipantProfileEditDefaults = {
   city: string;
   country: string;
   dateOfBirth: string;
+  email: string;
   name: string;
   occupation: string;
   phone: string;
@@ -54,8 +55,8 @@ export function ParticipantProfileEditForm({
         title={isRu ? "Административная правка карточки" : "Administrative card update"}
         text={
           isRu
-            ? "Используйте только после обращения клиента или внутренней проверки. Причина и изменённые поля сохраняются в журнале действий."
-            : "Use only after a client request or internal verification. The reason and changed fields are saved to the audit log."
+            ? "Используйте только после обращения клиента или внутренней проверки. Email, причина и изменённые поля сохраняются в журнале действий."
+            : "Use only after a client request or internal verification. Email, the reason and changed fields are saved to the audit log."
         }
         tone="warning"
       />
@@ -73,6 +74,7 @@ export function ParticipantProfileEditForm({
         reloadOnSuccess
       >
         <div className="grid gap-4 md:grid-cols-2">
+          <Input defaultValue={defaults.email} label="Email" name="email" required type="email" />
           <Input defaultValue={defaults.name} label={isRu ? "Имя участника" : "Participant name"} name="name" required />
           <Input defaultValue={defaults.dateOfBirth} label={isRu ? "Дата рождения" : "Date of birth"} name="dateOfBirth" type="date" />
           <Select defaultValue={defaults.phoneDialCode} label={isRu ? "Код телефона" : "Phone code"} name="phoneDialCode" options={optionalDialCodes} />
