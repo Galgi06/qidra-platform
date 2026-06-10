@@ -186,6 +186,7 @@ export default async function AdminUserDetailPage({
   const roleEndpoint = `/api/admin/users/${user.id}/role?lang=${locale}`;
   const accessRecoveryEndpoint = `/api/admin/users/${user.id}/password-reset?lang=${locale}`;
   const participantProfileEndpoint = `/api/admin/users/${user.id}/profile?lang=${locale}`;
+  const permanentDeleteEndpoint = `/api/admin/users/${user.id}/delete?lang=${locale}`;
   const participantProfileDefaults = {
     address: user.investorProfile?.address ?? "",
     citizenship: normalizeCountryCode(user.investorProfile?.citizenship),
@@ -218,6 +219,7 @@ export default async function AdminUserDetailPage({
 
     return typeMatches && statusMatches;
   });
+  const canDeleteParticipant = session.user?.role === Role.SUPER_ADMIN && user.role === Role.INVESTOR && user.id !== session.user?.id;
 
   return (
     <>
@@ -497,6 +499,16 @@ export default async function AdminUserDetailPage({
               }))}
               walletAvailable={wallet?.availableUsdt}
             />
+            ) : null}
+
+            {view === "overview" ? (
+              <PermanentUserDeletePanel
+                canDeleteParticipant={canDeleteParticipant}
+                endpoint={permanentDeleteEndpoint}
+                locale={locale}
+                targetEmail={user.email}
+                targetRole={user.role}
+              />
             ) : null}
 
             {view === "contracts" ? (
@@ -832,6 +844,84 @@ function SafeAdjustmentsPanel({
           )}
         </div>
       </div>
+    </Panel>
+  );
+}
+
+function PermanentUserDeletePanel({
+  canDeleteParticipant,
+  endpoint,
+  locale,
+  targetEmail,
+  targetRole
+}: {
+  canDeleteParticipant: boolean;
+  endpoint: string;
+  locale: Locale;
+  targetEmail: string;
+  targetRole: Role;
+}) {
+  const isRu = locale === "ru";
+
+  return (
+    <Panel
+      title={isRu ? "Полное удаление участника" : "Permanent participant deletion"}
+      description={
+        isRu
+          ? "Опасное действие для главного администратора: удаляет участника, его историю, кошелёк, заявки, тестовые платежи и пересчитывает суммы проектов."
+          : "Dangerous super-admin action: deletes the participant, history, wallet, applications, test payments and recalculates project totals."
+      }
+    >
+      {canDeleteParticipant ? (
+        <FeedbackForm
+          className="grid gap-4 rounded-[14px] border border-qidra-red/30 bg-qidra-red/5 p-5"
+          endpoint={endpoint}
+          feedback={{
+            title: isRu ? "Участник удалён" : "Participant deleted",
+            text: isRu ? "Карточка, история и финансовые записи удалены. Суммы проектов пересчитаны." : "The card, history and financial records were removed. Project totals were recalculated.",
+            buttonLabel: isRu ? "Понятно" : "Got it",
+            dismissLabel: isRu ? "Закрыть уведомление" : "Close notification",
+            tone: "warning"
+          }}
+          popupPlacement="center"
+        >
+          <NotificationCard
+            title={isRu ? "Это действие нельзя отменить" : "This cannot be undone"}
+            text={
+              isRu
+                ? "Используйте только для тестовых или ошибочно созданных участников. Для обычной остановки доступа лучше применять блокировку."
+                : "Use only for test or mistakenly created participants. For normal access removal, use blocking instead."
+            }
+            tone="warning"
+          />
+          <div className="grid gap-4 md:grid-cols-2">
+            <Input label={isRu ? "Email удаляемого участника" : "Participant email to delete"} name="email" placeholder={targetEmail} required type="email" />
+            <Input label={isRu ? "Подтверждение" : "Confirmation"} name="confirmation" pattern="DELETE" placeholder="DELETE" required />
+          </div>
+          <ReasonField
+            label={isRu ? "Причина полного удаления" : "Permanent deletion reason"}
+            locale={locale}
+            name="reason"
+            placeholder={isRu ? "Например: удаление тестового аккаунта и всех тестовых платежей перед запуском" : "For example: removing a test account and all test payments before launch"}
+          />
+          <Button className="border-qidra-red bg-qidra-red hover:bg-qidra-red/90" type="submit" variant="dark">
+            {isRu ? "Удалить участника полностью" : "Delete participant permanently"}
+          </Button>
+        </FeedbackForm>
+      ) : (
+        <NotificationCard
+          title={isRu ? "Удаление недоступно" : "Deletion unavailable"}
+          text={
+            targetRole !== Role.INVESTOR
+              ? isRu
+                ? "Полное удаление разрешено только для участников. Аккаунты сотрудников удаляются отдельной административной процедурой."
+                : "Permanent deletion is only allowed for participants. Staff accounts require a separate administrative procedure."
+              : isRu
+                ? "Полное удаление доступно только главному администратору и не применяется к собственному аккаунту."
+                : "Permanent deletion is only available to the super administrator and cannot be used on your own account."
+          }
+        />
+      )}
     </Panel>
   );
 }
@@ -1664,6 +1754,7 @@ function auditActionLabel(action: string, locale: Locale) {
     "user.block.unblock": { ru: "Пользователь разблокирован", en: "User unblocked" },
     "user.password_reset.identity_mismatch": { ru: "Восстановление доступа отклонено: документы не совпали", en: "Access recovery rejected: documents did not match" },
     "user.password_reset.link_sent": { ru: "Ссылка восстановления доступа отправлена", en: "Access recovery link sent" },
+    "user.delete.permanent": { ru: "Пользователь удалён полностью", en: "User permanently deleted" },
     "user.profile.update": { ru: "Карточка участника обновлена", en: "Participant card updated" },
     "user.role.update": { ru: "Роль пользователя изменена", en: "User role updated" },
     "wallet.adjustment.credit": { ru: "Баланс увеличен корректировкой", en: "Balance increased by adjustment" },

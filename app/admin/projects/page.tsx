@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { InvestmentStatus } from "@prisma/client";
 import { AdminTabs } from "@/components/AdminTabs";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { FeedbackForm } from "@/components/ActionFeedback";
@@ -14,6 +15,7 @@ import { Select } from "@/components/ui/Select";
 import { requireAdmin } from "@/lib/access";
 import { getLocale, t, type Locale, type SearchParams, withLocale } from "@/lib/i18n";
 import { getAdminProjects, type CatalogProject } from "@/lib/project-catalog";
+import { prisma } from "@/lib/prisma";
 
 export default async function AdminProjectsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const params = await searchParams;
@@ -21,7 +23,8 @@ export default async function AdminProjectsPage({ searchParams }: { searchParams
   await requireAdmin(locale, "/admin/projects");
   const statusFilter = parseProjectStatus(searchParamString(params.status));
   const projects = await getAdminProjects();
-  const stats = buildProjectStats(projects);
+  const fundingByProject = await getProjectFundingStats(projects.map((project) => project.id));
+  const stats = buildProjectStats(projects, fundingByProject);
   const filteredProjects = statusFilter ? projects.filter((project) => project.status === statusFilter) : projects;
 
   return (
@@ -158,7 +161,7 @@ export default async function AdminProjectsPage({ searchParams }: { searchParams
 
             <div className="grid gap-5">
               {filteredProjects.length ? (
-                filteredProjects.map((project) => <AdminProjectPanel key={project.id} project={project} locale={locale} />)
+                filteredProjects.map((project) => <AdminProjectPanel key={project.id} fundingStats={fundingByProject[project.id] ?? emptyProjectFundingStats()} project={project} locale={locale} />)
               ) : (
                 <NotificationCard
                   title={locale === "ru" ? "Проекты не найдены" : "No projects found"}
@@ -184,8 +187,19 @@ type ProjectStats = {
   pausedCount: number;
   reviewCount: number;
   totalCount: number;
+  totalConfirmedContractUsdt: number;
+  totalPendingContractUsdt: number;
   totalFundedUsdt: number;
   totalTargetUsdt: number;
+};
+
+type ProjectFundingStats = {
+  confirmedApplicationsCount: number;
+  confirmedParticipantsCount: number;
+  confirmedUsdt: number;
+  pendingApplicationsCount: number;
+  pendingUsdt: number;
+  reservedUsdt: number;
 };
 
 function ProjectsDashboard({ locale, stats }: { locale: Locale; stats: ProjectStats }) {
@@ -194,8 +208,8 @@ function ProjectsDashboard({ locale, stats }: { locale: Locale; stats: ProjectSt
       <ProjectStatCard label={locale === "ru" ? "Всего проектов" : "Total projects"} value={stats.totalCount} />
       <ProjectStatCard label={locale === "ru" ? "Опубликовано" : "Published"} tone="success" value={stats.activeCount} />
       <ProjectStatCard label={locale === "ru" ? "На проверке" : "In review"} tone="accent" value={stats.reviewCount} />
-      <ProjectStatCard label={locale === "ru" ? "Черновики" : "Drafts"} value={stats.draftCount} />
-      <ProjectStatCard label={locale === "ru" ? "Собрано" : "Funded"} tone="success" value={formatUsdt(stats.totalFundedUsdt)} />
+      <ProjectStatCard label={locale === "ru" ? "Подтверждено" : "Confirmed"} tone="success" value={formatUsdt(stats.totalConfirmedContractUsdt)} />
+      <ProjectStatCard label={locale === "ru" ? "На проверке" : "Pending"} tone="accent" value={formatUsdt(stats.totalPendingContractUsdt)} />
     </div>
   );
 }
@@ -255,7 +269,7 @@ function ProjectFilterPill({ active, children, href }: { active: boolean; childr
   );
 }
 
-function AdminProjectPanel({ project, locale }: { project: CatalogProject; locale: Locale }) {
+function AdminProjectPanel({ fundingStats, project, locale }: { fundingStats: ProjectFundingStats; project: CatalogProject; locale: Locale }) {
   const isRu = locale === "ru";
   const progress = project.targetUsdt > 0 ? Math.round((project.fundedUsdt / project.targetUsdt) * 100) : 0;
 
@@ -294,6 +308,33 @@ function AdminProjectPanel({ project, locale }: { project: CatalogProject; local
           <ProjectFact label={isRu ? "Срок участия" : "Participation term"} value={project.lifecycle.participationTerm[locale]} />
           <ProjectFact label={isRu ? "Ориентир доходности" : "Return guidance"} value={project.expectedYield[locale]} />
         </dl>
+      </div>
+
+      <div className="grid gap-3 rounded-[14px] border border-qidra-grayLight bg-white p-4 shadow-[0_10px_30px_rgba(18,20,23,0.04)]">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 className="text-18 font-medium text-qidra-dark">{isRu ? "Финансы контракта" : "Contract finances"}</h3>
+            <p className="mt-1 text-13 text-qidra-grayBlue">
+              {isRu
+                ? "Реальные суммы по заявкам участников. Тестовые аккаунты @qidra.local не учитываются."
+                : "Real participant application totals. Test @qidra.local accounts are excluded."}
+            </p>
+          </div>
+          <span className="rounded-full bg-qidra-grayLight px-3 py-1 text-13 font-medium text-qidra-grayBlue">
+            {isRu ? "Участников" : "Participants"}: {formatCount(fundingStats.confirmedParticipantsCount)}
+          </span>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <ProjectMoneyStat label={isRu ? "Подтверждено по контрактам" : "Confirmed contracts"} tone="success" value={formatUsdt(fundingStats.confirmedUsdt)} />
+          <ProjectMoneyStat label={isRu ? "Собрано в карточке проекта" : "Project funded record"} tone="success" value={formatUsdt(project.fundedUsdt)} />
+          <ProjectMoneyStat label={isRu ? "Заявки на проверке" : "Pending applications"} value={formatUsdt(fundingStats.pendingUsdt)} />
+          <ProjectMoneyStat label={isRu ? "Зарезервировано" : "Reserved"} value={formatUsdt(fundingStats.reservedUsdt)} />
+        </div>
+        <p className="text-12 text-qidra-grayBlue">
+          {isRu
+            ? `Подтверждённых заявок: ${formatCount(fundingStats.confirmedApplicationsCount)}. Заявок на проверке: ${formatCount(fundingStats.pendingApplicationsCount)}.`
+            : `Confirmed applications: ${formatCount(fundingStats.confirmedApplicationsCount)}. Pending applications: ${formatCount(fundingStats.pendingApplicationsCount)}.`}
+        </p>
       </div>
 
       <div className="grid gap-4 rounded-[14px] bg-qidra-grayLight p-4 lg:grid-cols-2">
@@ -422,6 +463,15 @@ function ProjectFact({ label, value }: { label: string; value: string }) {
   );
 }
 
+function ProjectMoneyStat({ label, tone = "neutral", value }: { label: string; tone?: "neutral" | "success"; value: string }) {
+  return (
+    <div className="rounded-qidra border border-qidra-grayLight bg-qidra-grayLight/60 p-4">
+      <p className="text-12 font-semibold uppercase tracking-[0.04em] text-qidra-grayBlue">{label}</p>
+      <p className={`mt-2 text-[24px] font-medium leading-tight tracking-[0] ${tone === "success" ? "text-qidra-green" : "text-qidra-dark"}`}>{value}</p>
+    </div>
+  );
+}
+
 function TextArea({ label, name, placeholder }: { label: string; name: string; placeholder: string }) {
   return (
     <label className="grid gap-2 text-14 font-medium text-qidra-dark">
@@ -451,10 +501,83 @@ function formatDateRange(start: string | null, end: string | null, locale: Local
   return formatDate(start ?? end, locale);
 }
 
-function buildProjectStats(projects: CatalogProject[]): ProjectStats {
+async function getProjectFundingStats(projectIds: string[]) {
+  const stats: Record<string, ProjectFundingStats> = {};
+
+  for (const projectId of projectIds) {
+    stats[projectId] = emptyProjectFundingStats();
+  }
+
+  if (!projectIds.length) return stats;
+
+  const applications = await prisma.investmentApplication.findMany({
+    where: {
+      projectId: { in: projectIds },
+      user: {
+        email: {
+          not: {
+            endsWith: "@qidra.local"
+          }
+        }
+      }
+    },
+    select: {
+      amountUsdt: true,
+      projectId: true,
+      reservedUsdt: true,
+      status: true,
+      userId: true
+    }
+  });
+  const confirmedParticipants = new Map<string, Set<string>>();
+
+  for (const application of applications) {
+    const projectStats = stats[application.projectId] ?? emptyProjectFundingStats();
+
+    if (application.status === InvestmentStatus.CONFIRMED) {
+      projectStats.confirmedApplicationsCount += 1;
+      projectStats.confirmedUsdt += Number(application.amountUsdt.toString());
+
+      const participants = confirmedParticipants.get(application.projectId) ?? new Set<string>();
+      participants.add(application.userId);
+      confirmedParticipants.set(application.projectId, participants);
+    }
+
+    if (application.status === InvestmentStatus.PENDING) {
+      projectStats.pendingApplicationsCount += 1;
+      projectStats.pendingUsdt += Number(application.amountUsdt.toString());
+      projectStats.reservedUsdt += Number(application.reservedUsdt.toString());
+    }
+
+    stats[application.projectId] = projectStats;
+  }
+
+  for (const [projectId, participants] of confirmedParticipants.entries()) {
+    stats[projectId].confirmedParticipantsCount = participants.size;
+  }
+
+  return stats;
+}
+
+function emptyProjectFundingStats(): ProjectFundingStats {
+  return {
+    confirmedApplicationsCount: 0,
+    confirmedParticipantsCount: 0,
+    confirmedUsdt: 0,
+    pendingApplicationsCount: 0,
+    pendingUsdt: 0,
+    reservedUsdt: 0
+  };
+}
+
+function buildProjectStats(projects: CatalogProject[], fundingByProject: Record<string, ProjectFundingStats>): ProjectStats {
   return projects.reduce<ProjectStats>(
     (stats, project) => {
+      const fundingStats = fundingByProject[project.id] ?? emptyProjectFundingStats();
+
       stats.totalCount += 1;
+      stats.totalConfirmedContractUsdt += fundingStats.confirmedUsdt;
+      stats.totalPendingContractUsdt += fundingStats.pendingUsdt;
       stats.totalFundedUsdt += project.fundedUsdt;
       stats.totalTargetUsdt += project.targetUsdt;
 
@@ -475,6 +598,8 @@ function buildProjectStats(projects: CatalogProject[]): ProjectStats {
       pausedCount: 0,
       reviewCount: 0,
       totalCount: 0,
+      totalConfirmedContractUsdt: 0,
+      totalPendingContractUsdt: 0,
       totalFundedUsdt: 0,
       totalTargetUsdt: 0
     }

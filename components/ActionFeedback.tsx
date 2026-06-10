@@ -157,7 +157,13 @@ export function FeedbackForm({
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(Object.fromEntries(formData.entries()))
               });
-        const data = (await response.json().catch(() => ({}))) as { fieldErrors?: FieldErrors; title?: string; message?: string; tone?: FeedbackTone };
+        const data = (await response.json().catch(() => ({}))) as {
+          fieldErrors?: FieldErrors;
+          message?: string;
+          redirectTo?: string;
+          title?: string;
+          tone?: FeedbackTone;
+        };
         const english = feedback.buttonLabel === "Got it" || feedback.dismissLabel === "Close notification";
         const fieldErrorText = formatFieldErrorSummary(data.fieldErrors);
         const nextFeedback = {
@@ -178,6 +184,13 @@ export function FeedbackForm({
         if (!response.ok) {
           applyFieldErrors(form, data.fieldErrors);
           setOpen(true);
+          return;
+        }
+
+        if (data.redirectTo) {
+          storeFeedback(nextFeedback);
+          router.push(data.redirectTo);
+          router.refresh();
           return;
         }
 
