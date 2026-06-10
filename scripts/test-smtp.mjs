@@ -1,4 +1,3 @@
-import nodemailer from "nodemailer";
 import { loadLocalEnv } from "./load-local-env.mjs";
 
 loadLocalEnv();
@@ -54,6 +53,7 @@ if (!host || !from || !to) {
   process.exit(1);
 }
 
+const { default: nodemailer } = await import("nodemailer");
 const transporter = nodemailer.createTransport({
   auth: user && pass ? { user, pass } : undefined,
   host,
