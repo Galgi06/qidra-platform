@@ -78,6 +78,11 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
                 <ButtonLink href={withLocale("/projects", locale)} variant="white" className="mt-8 h-14 w-full max-w-[520px] text-18 sm:h-[64px] lg:mt-14">
                   {isRu ? "Перейти к проектам" : "Go to projects"}
                 </ButtonLink>
+                <div className="grid max-w-[760px] gap-3 pt-2 sm:grid-cols-3">
+                  <HeroSignalTile label={isRu ? "ПРОВЕРКА" : "REVIEW"} value={isRu ? "Отбор проектов" : "Project screening"} />
+                  <HeroSignalTile label={isRu ? "ДОКУМЕНТЫ" : "DOCUMENTS"} value={isRu ? "Условия открыты" : "Clear terms"} />
+                  <HeroSignalTile label={isRu ? "КАБИНЕТ" : "WORKSPACE"} value={isRu ? "Статусы и связь" : "Status and support"} />
+                </div>
               </div>
             </div>
           </div>
@@ -315,6 +320,15 @@ function InsightTile({ title, text }: { title: string; text: string }) {
     <div className="rounded-qidra bg-qidra-grayLight p-4 shadow-[inset_0_0_0_1px_rgba(18,20,23,0.06)]">
       <p className="text-13 font-semibold uppercase text-qidra-accent">{title}</p>
       <p className="mt-3 text-15 leading-snug text-qidra-grayBlue">{text}</p>
+    </div>
+  );
+}
+
+function HeroSignalTile({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-h-24 rounded-qidra border border-white/18 bg-white/12 p-5 shadow-[0_18px_48px_rgba(0,0,0,0.18)] backdrop-blur-md">
+      <p className="text-12 font-semibold text-white/66">{label}</p>
+      <p className="mt-3 text-[20px] font-semibold leading-tight text-white">{value}</p>
     </div>
   );
 }
