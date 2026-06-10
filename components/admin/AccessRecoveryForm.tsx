@@ -52,8 +52,18 @@ export function AccessRecoveryForm({
           </div>
         </div>
       ) : null}
-      {hasApprovedKyc ? (
-        <FeedbackForm
+      {!hasApprovedKyc ? (
+        <NotificationCard
+          title={isRu ? "Анкета ещё не одобрена" : "Profile is not approved yet"}
+          text={
+            isRu
+              ? "Перед отправкой ссылки сверяйте email, историю обращений и доступные данные карточки клиента."
+              : "Before sending the link, verify the email, support history and available client card details."
+          }
+          tone="warning"
+        />
+      ) : null}
+      <FeedbackForm
           className="grid gap-3"
           endpoint={endpoint}
           feedback={{
@@ -67,25 +77,25 @@ export function AccessRecoveryForm({
           resetOnSubmit
         >
           <NotificationCard
-            title={isRu ? "Решение принимается по первичным KYC-документам" : "Decision is based on original KYC documents"}
+            title={isRu ? "Сначала подтвердите личность клиента" : "Confirm the client's identity first"}
             text={
               isRu
-                ? "Если документы клиента не совпадают с одобренной анкетой, выберите вариант несоответствия. Ссылка не будет отправлена, а отказ сохранится в журнале действий."
-                : "If the client's documents do not match the approved profile, choose the mismatch option. No link will be sent and the rejection will be saved in the audit log."
+                ? "Сверьте email, историю клиента, документы или другие внутренние признаки. Если личность не подтверждена, ссылка не будет отправлена, а отказ сохранится в журнале действий."
+                : "Check the email, client history, documents or other internal signals. If identity is not confirmed, no link will be sent and the rejection will be saved in the audit log."
             }
             tone="warning"
           />
           <Select
-            label={isRu ? "Решение по сверке личности" : "Identity verification decision"}
+            label={isRu ? "Решение по подтверждению личности" : "Identity confirmation decision"}
             name="identityCheck"
             options={[
               {
-                label: isRu ? "Документы совпадают — отправить ссылку восстановления" : "Documents match — send recovery link",
-                value: "KYC_DOCUMENTS_MATCH"
+                label: isRu ? "Личность подтверждена — отправить ссылку восстановления" : "Identity confirmed — send recovery link",
+                value: "CLIENT_IDENTITY_CONFIRMED"
               },
               {
-                label: isRu ? "Документы не совпадают — отказать и записать в журнал" : "Documents do not match — reject and record in audit log",
-                value: "KYC_DOCUMENTS_MISMATCH"
+                label: isRu ? "Личность не подтверждена — отказать и записать в журнал" : "Identity not confirmed — reject and record in audit log",
+                value: "CLIENT_IDENTITY_REJECTED"
               }
             ]}
             required
@@ -94,21 +104,11 @@ export function AccessRecoveryForm({
             label={isRu ? "Причина решения" : "Decision reason"}
             locale={locale}
             name="reason"
-            placeholder={isRu ? "Например: клиент обратился в чат поддержки, документы сверены с одобренной KYC-анкетой" : "For example: client contacted support chat, documents were checked against the approved KYC profile"}
+            placeholder={isRu ? "Например: клиент обратился с email аккаунта, данные сверены с карточкой и историей обращений" : "For example: client contacted from the account email, details matched the profile and support history"}
           />
           <Input label={isRu ? "Подтверждение" : "Confirmation"} name="confirmation" pattern="CONFIRM" placeholder="CONFIRM" required />
           <Button type="submit">{isRu ? "Зафиксировать решение" : "Record decision"}</Button>
-        </FeedbackForm>
-      ) : (
-        <NotificationCard
-          title={isRu ? "Сначала нужен одобренный KYC" : "Approved KYC required first"}
-          text={
-            isRu
-              ? "Через поддержку можно отправлять ссылку восстановления только клиенту, чья личность уже подтверждена документами."
-              : "Support-assisted recovery links can only be sent to a client whose identity has already been verified by documents."
-          }
-        />
-      )}
+      </FeedbackForm>
     </div>
   );
 }

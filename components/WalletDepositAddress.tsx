@@ -37,7 +37,7 @@ export function WalletDepositAddress({ address, locale }: { address: string; loc
 
   async function handleCopy() {
     try {
-      await navigator.clipboard.writeText(address);
+      await copyText(address);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1800);
     } catch {
@@ -56,7 +56,12 @@ export function WalletDepositAddress({ address, locale }: { address: string; loc
       </div>
       <div className="min-w-0">
         <p className="text-14 font-semibold text-qidra-dark">{isRu ? "Личный адрес для USDT TRC20" : "Personal USDT TRC20 address"}</p>
-        <code className="mt-3 block max-w-full overflow-hidden break-all rounded-[12px] bg-white px-4 py-4 font-mono text-14 leading-relaxed text-qidra-dark">{address}</code>
+        <div className="mt-3 grid gap-2 rounded-[12px] bg-white p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+          <code className="block max-w-full select-all overflow-hidden break-all px-1 font-mono text-14 leading-relaxed text-qidra-dark">{address}</code>
+          <Button aria-label={isRu ? "Скопировать адрес USDT TRC20" : "Copy USDT TRC20 address"} className="w-full sm:w-auto" onClick={handleCopy} size="sm" type="button" variant="outline">
+            {copied ? (isRu ? "Скопировано" : "Copied") : isRu ? "Копировать" : "Copy"}
+          </Button>
+        </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-[auto_1fr] sm:items-center">
           <Button className="w-full sm:w-auto" onClick={handleCopy} size="sm" type="button" variant="dark">
             {copied ? (isRu ? "Скопировано" : "Copied") : isRu ? "Скопировать" : "Copy"}
@@ -66,4 +71,28 @@ export function WalletDepositAddress({ address, locale }: { address: string; loc
       </div>
     </div>
   );
+}
+
+async function copyText(value: string) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(value);
+    return;
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = value;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.left = "-9999px";
+  textarea.style.top = "0";
+  document.body.append(textarea);
+  textarea.select();
+
+  try {
+    if (!document.execCommand("copy")) {
+      throw new Error("copy_failed");
+    }
+  } finally {
+    textarea.remove();
+  }
 }

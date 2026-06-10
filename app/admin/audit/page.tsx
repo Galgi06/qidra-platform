@@ -42,10 +42,12 @@ const actionLabels: Record<string, Record<Locale, string>> = {
   "support.thread.update": { ru: "Диалог поддержки обновлён", en: "Support thread updated" },
   "user.staff.create": { ru: "Создан аккаунт сотрудника", en: "Staff account created" },
   "support.rating.user": { ru: "Участник оценил поддержку", en: "Participant rated support" },
+  "test_financial_records.cleanup": { ru: "Тестовые финансовые записи очищены", en: "Test financial records cleaned" },
   "user.block.permanent": { ru: "Пользователь заблокирован постоянно", en: "User permanently blocked" },
   "user.block.temporary": { ru: "Пользователь заблокирован временно", en: "User temporarily blocked" },
   "user.block.unblock": { ru: "Пользователь разблокирован", en: "User unblocked" },
   "user.password_reset.link_sent": { ru: "Ссылка восстановления доступа отправлена", en: "Access recovery link sent" },
+  "user.profile.update": { ru: "Карточка участника обновлена", en: "Participant card updated" },
   "user.role.update": { ru: "Роль пользователя изменена", en: "User role updated" },
   "wallet.adjustment.credit": { ru: "Баланс увеличен корректировкой", en: "Balance increased by adjustment" },
   "wallet.adjustment.debit": { ru: "Баланс уменьшен корректировкой", en: "Balance decreased by adjustment" }

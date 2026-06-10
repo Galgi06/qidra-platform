@@ -1,5 +1,3 @@
-import nodemailer from "nodemailer";
-
 type EmailPayload = {
   to: string;
   subject: string;
@@ -80,6 +78,7 @@ export async function sendEmail({ to, subject, text, html }: EmailPayload) {
     throw new Error("production_smtp_credentials_not_configured");
   }
 
+  const nodemailer = await import("nodemailer");
   const transporter = nodemailer.createTransport({
     host,
     port,

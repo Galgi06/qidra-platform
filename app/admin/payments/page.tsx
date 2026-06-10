@@ -22,11 +22,17 @@ export default async function AdminPaymentsPage({ searchParams }: { searchParams
   const typeFilter = parseTransactionType(searchParamString(params.type));
   const query = searchParamString(params.q)?.trim() ?? "";
   const userIdFilter = searchParamString(params.userId)?.trim() ?? "";
+  const realPaymentsWhere = realClientPaymentWhere();
   const paymentWhere: Prisma.WalletTransactionWhereInput = {
-    ...(statusFilter ? { status: statusFilter } : {}),
-    ...(typeFilter ? { type: typeFilter } : {}),
-    ...(userIdFilter ? { wallet: { is: { userId: userIdFilter } } } : {}),
-    ...(query ? { OR: paymentSearchConditions(query) } : {})
+    AND: [
+      realPaymentsWhere,
+      {
+        ...(statusFilter ? { status: statusFilter } : {}),
+        ...(typeFilter ? { type: typeFilter } : {}),
+        ...(userIdFilter ? { wallet: { is: { userId: userIdFilter } } } : {}),
+        ...(query ? { OR: paymentSearchConditions(query) } : {})
+      }
+    ]
   };
   const [payments, totalCount, pendingCount, confirmedCount, rejectedCount, depositCount, withdrawalCount] = await Promise.all([
     prisma.walletTransaction.findMany({
@@ -42,12 +48,12 @@ export default async function AdminPaymentsPage({ searchParams }: { searchParams
       orderBy: { createdAt: "desc" },
       take: 80
     }),
-    prisma.walletTransaction.count(),
-    prisma.walletTransaction.count({ where: { status: PaymentStatus.PENDING } }),
-    prisma.walletTransaction.count({ where: { status: PaymentStatus.CONFIRMED } }),
-    prisma.walletTransaction.count({ where: { status: PaymentStatus.REJECTED } }),
-    prisma.walletTransaction.count({ where: { type: TransactionType.DEPOSIT } }),
-    prisma.walletTransaction.count({ where: { type: TransactionType.WITHDRAWAL } })
+    prisma.walletTransaction.count({ where: realPaymentsWhere }),
+    prisma.walletTransaction.count({ where: { AND: [realPaymentsWhere, { status: PaymentStatus.PENDING }] } }),
+    prisma.walletTransaction.count({ where: { AND: [realPaymentsWhere, { status: PaymentStatus.CONFIRMED }] } }),
+    prisma.walletTransaction.count({ where: { AND: [realPaymentsWhere, { status: PaymentStatus.REJECTED }] } }),
+    prisma.walletTransaction.count({ where: { AND: [realPaymentsWhere, { type: TransactionType.DEPOSIT }] } }),
+    prisma.walletTransaction.count({ where: { AND: [realPaymentsWhere, { type: TransactionType.WITHDRAWAL }] } })
   ]);
   const stats = { confirmedCount, depositCount, pendingCount, rejectedCount, totalCount, withdrawalCount };
 
@@ -211,6 +217,26 @@ export default async function AdminPaymentsPage({ searchParams }: { searchParams
       <Footer locale={locale} />
     </>
   );
+}
+
+function realClientPaymentWhere(): Prisma.WalletTransactionWhereInput {
+  return {
+    NOT: [
+      {
+        wallet: {
+          is: {
+            user: {
+              is: {
+                email: {
+                  endsWith: "@qidra.local"
+                }
+              }
+            }
+          }
+        }
+      }
+    ]
+  };
 }
 
 type PaymentStats = {

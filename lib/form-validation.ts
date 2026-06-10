@@ -28,7 +28,11 @@ const repeatedCharactersPattern = /(.)\1{4,}/u;
 const repeatedShortWordsPattern = /\b([\p{L}\p{N}]{2,})\b(?:[\s,.-]+\1\b){2,}/iu;
 
 export function cleanText(value: string) {
-  return value.trim().replace(/\s+/g, " ");
+  return value
+    .normalize("NFKC")
+    .replace(/\p{Cf}/gu, "")
+    .trim()
+    .replace(/\s+/g, " ");
 }
 
 export function isMeaningfulText(value: string, options: { allowDigits?: boolean; minLetters?: number; minWords?: number } = {}) {

@@ -1,4 +1,3 @@
-import { KycStatus } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
@@ -10,7 +9,7 @@ import { createRawToken, expiresIn, hashToken } from "@/lib/tokens";
 
 const accessRecoverySchema = z.object({
   confirmation: z.string().trim(),
-  identityCheck: z.enum(["KYC_DOCUMENTS_MATCH", "KYC_DOCUMENTS_MISMATCH"]),
+  identityCheck: z.enum(["CLIENT_IDENTITY_CONFIRMED", "CLIENT_IDENTITY_REJECTED"]),
   reason: z.string().trim().min(12).max(800)
 });
 
@@ -85,22 +84,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     );
   }
 
-  const approvedKyc = user.kycApplications.find((application) => application.status === KycStatus.APPROVED);
+  const referenceKyc = user.kycApplications[0];
 
-  if (!approvedKyc) {
-    return NextResponse.json(
-      {
-        title: localeRu ? "Нет подтверждённого KYC" : "No approved KYC",
-        message:
-          localeRu
-            ? "Ссылка восстановления через поддержку доступна только после подтверждённой KYC-анкеты клиента."
-            : "Support-assisted recovery links are available only after the client's KYC profile has been approved."
-      },
-      { status: 409 }
-    );
-  }
-
-  if (parsed.data.identityCheck === "KYC_DOCUMENTS_MISMATCH") {
+  if (parsed.data.identityCheck === "CLIENT_IDENTITY_REJECTED") {
     await prisma.adminAuditLog.create({
       data: {
         actorId: session?.user?.id,
@@ -109,7 +95,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         entityType: "User",
         payload: {
           identityCheck: parsed.data.identityCheck,
-          kycApplicationId: approvedKyc.id,
+          kycApplicationId: referenceKyc?.id,
           reason: parsed.data.reason,
           targetEmail: user.email
         }
@@ -166,7 +152,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       entityType: "User",
       payload: {
         identityCheck: parsed.data.identityCheck,
-        kycApplicationId: approvedKyc.id,
+        kycApplicationId: referenceKyc?.id,
         reason: parsed.data.reason,
         targetEmail: user.email,
         tokenExpiresInHours: 2

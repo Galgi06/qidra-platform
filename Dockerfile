@@ -36,6 +36,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/scripts/check-production-config.m
 COPY --from=builder --chown=nextjs:nodejs /app/scripts/qidra-healthcheck.mjs ./scripts/qidra-healthcheck.mjs
 COPY --from=builder --chown=nextjs:nodejs /app/scripts/load-local-env.mjs ./scripts/load-local-env.mjs
 COPY --from=builder --chown=nextjs:nodejs /app/scripts/test-smtp.mjs ./scripts/test-smtp.mjs
+COPY --from=builder --chown=nextjs:nodejs /app/scripts/cleanup-test-financial-records.mjs ./scripts/cleanup-test-financial-records.mjs
 
 USER nextjs
 EXPOSE 8091

@@ -9,6 +9,7 @@ import { Header } from "@/components/Header";
 import { NotificationCard } from "@/components/NotificationCard";
 import { UserAvatar } from "@/components/UserAvatar";
 import { AccessRecoveryForm } from "@/components/admin/AccessRecoveryForm";
+import { ParticipantProfileEditForm } from "@/components/admin/ParticipantProfileEditForm";
 import { RoleManagementForm } from "@/components/admin/RoleManagementForm";
 import { UserBlockForm } from "@/components/admin/UserBlockForm";
 import { Button, ButtonLink } from "@/components/ui/Button";
@@ -16,7 +17,7 @@ import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { requireSupportDesk } from "@/lib/access";
 import { canAccessSupportDesk, canManageManagers } from "@/lib/auth";
-import { countryName } from "@/lib/countries";
+import { countryName, countryOptions, dialCodeOptions, normalizeCountryCode } from "@/lib/countries";
 import { getLocale, t, type Locale, type SearchParams, withLocale } from "@/lib/i18n";
 import { readKycDocuments, type KycDocumentKind } from "@/lib/kyc-documents";
 import { prisma } from "@/lib/prisma";
@@ -184,6 +185,19 @@ export default async function AdminUserDetailPage({
   const blockEndpoint = `/api/admin/users/${user.id}/block?lang=${locale}`;
   const roleEndpoint = `/api/admin/users/${user.id}/role?lang=${locale}`;
   const accessRecoveryEndpoint = `/api/admin/users/${user.id}/password-reset?lang=${locale}`;
+  const participantProfileEndpoint = `/api/admin/users/${user.id}/profile?lang=${locale}`;
+  const participantProfileDefaults = {
+    address: user.investorProfile?.address ?? "",
+    citizenship: normalizeCountryCode(user.investorProfile?.citizenship),
+    city: user.investorProfile?.city ?? "",
+    country: normalizeCountryCode(user.investorProfile?.country),
+    dateOfBirth: user.investorProfile?.dateOfBirth?.toISOString().slice(0, 10) ?? "",
+    name: user.name ?? "",
+    occupation: latestKyc?.occupation ?? "",
+    phone: user.investorProfile?.phone ?? "",
+    phoneDialCode: user.investorProfile?.phoneDialCode ?? "",
+    sourceOfFunds: latestKyc?.sourceOfFunds ?? ""
+  };
   const pendingPaymentTransactions =
     wallet?.transactions.filter((transaction) => transaction.status === PaymentStatus.PENDING && (transaction.type === TransactionType.DEPOSIT || transaction.type === TransactionType.WITHDRAWAL)) ?? [];
   const hasApprovedKyc = user.kycApplications.some((application) => application.status === KycStatus.APPROVED);
@@ -307,6 +321,17 @@ export default async function AdminUserDetailPage({
                       <InfoBlock label={isRu ? "Гражданство" : "Citizenship"} value={countryName(user.investorProfile?.citizenship, locale)} locale={locale} />
                       <InfoBlock label={isRu ? "Адрес" : "Address"} value={user.investorProfile?.address} locale={locale} />
                     </div>
+                    {canSendAccessRecovery ? (
+                      <div className="premium-panel p-5">
+                        <ParticipantProfileEditForm
+                          countryOptions={countryOptions(locale)}
+                          defaults={participantProfileDefaults}
+                          dialCodeOptions={dialCodeOptions(locale)}
+                          endpoint={participantProfileEndpoint}
+                          locale={locale}
+                        />
+                      </div>
+                    ) : null}
                   </Panel>
 
                   <Panel title={isRu ? "KYC и решения" : "KYC and decisions"} description={isRu ? "История анкет, статусов и комментариев проверяющих." : "History of profiles, statuses and reviewer notes."}>
@@ -1639,6 +1664,7 @@ function auditActionLabel(action: string, locale: Locale) {
     "user.block.unblock": { ru: "Пользователь разблокирован", en: "User unblocked" },
     "user.password_reset.identity_mismatch": { ru: "Восстановление доступа отклонено: документы не совпали", en: "Access recovery rejected: documents did not match" },
     "user.password_reset.link_sent": { ru: "Ссылка восстановления доступа отправлена", en: "Access recovery link sent" },
+    "user.profile.update": { ru: "Карточка участника обновлена", en: "Participant card updated" },
     "user.role.update": { ru: "Роль пользователя изменена", en: "User role updated" },
     "wallet.adjustment.credit": { ru: "Баланс увеличен корректировкой", en: "Balance increased by adjustment" },
     "wallet.adjustment.debit": { ru: "Баланс уменьшен корректировкой", en: "Balance decreased by adjustment" }
