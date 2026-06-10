@@ -19,11 +19,7 @@ const required = [
   "TRONGRID_API_BASE_URL",
   "QIDRA_USDT_TRC20_CONTRACT",
   "QIDRA_TRON_WALLET_ADDRESS",
-  "SMTP_HOST",
-  "SMTP_PORT",
-  "SMTP_SECURE",
-  "SMTP_USER",
-  "SMTP_PASSWORD",
+  "EMAIL_PROVIDER",
   "SMTP_FROM",
   "FILE_STORAGE_DRIVER",
   "FILE_STORAGE_S3_BUCKET",
@@ -87,13 +83,44 @@ if (process.env.SMTP_FROM && !/^[^<]*<[^@\s]+@[^@\s]+\.[^@\s]+>$/.test(process.e
   failures.push("SMTP_FROM: expected format like Qidra <no-reply@qidra.io>");
 }
 
-const smtpPort = Number.parseInt(process.env.SMTP_PORT || "", 10);
-if (!Number.isFinite(smtpPort) || smtpPort <= 0) {
-  failures.push("SMTP_PORT: expected numeric port");
+const emailProvider = (process.env.EMAIL_PROVIDER || "").trim().toLowerCase();
+
+if (!["smtp", "resend"].includes(emailProvider)) {
+  failures.push("EMAIL_PROVIDER: expected smtp or resend");
 }
 
-if (process.env.SMTP_SECURE && !["true", "false"].includes(process.env.SMTP_SECURE)) {
-  failures.push("SMTP_SECURE: expected true or false");
+if (emailProvider === "smtp") {
+  for (const key of ["SMTP_HOST", "SMTP_PORT", "SMTP_SECURE", "SMTP_USER", "SMTP_PASSWORD"]) {
+    const value = process.env[key]?.trim();
+
+    if (!value) {
+      failures.push(`${key}: missing`);
+      continue;
+    }
+
+    if (placeholderPatterns.some((pattern) => pattern.test(value))) {
+      failures.push(`${key}: placeholder value`);
+    }
+  }
+
+  const smtpPort = Number.parseInt(process.env.SMTP_PORT || "", 10);
+  if (!Number.isFinite(smtpPort) || smtpPort <= 0) {
+    failures.push("SMTP_PORT: expected numeric port");
+  }
+
+  if (process.env.SMTP_SECURE && !["true", "false"].includes(process.env.SMTP_SECURE)) {
+    failures.push("SMTP_SECURE: expected true or false");
+  }
+}
+
+if (emailProvider === "resend") {
+  const resendApiKey = process.env.RESEND_API_KEY?.trim();
+
+  if (!resendApiKey) {
+    failures.push("RESEND_API_KEY: missing");
+  } else if (placeholderPatterns.some((pattern) => pattern.test(resendApiKey))) {
+    failures.push("RESEND_API_KEY: placeholder value");
+  }
 }
 
 if (process.env.FILE_STORAGE_S3_FORCE_PATH_STYLE !== "true") {

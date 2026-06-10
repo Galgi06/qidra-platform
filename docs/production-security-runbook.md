@@ -107,9 +107,18 @@ Telegram:
 - `TELEGRAM_BOT_TOKEN` хранить только в secrets.
 - `TELEGRAM_BOT_USERNAME` указывать без `@`.
 
-## 6. SMTP
+## 6. Email delivery
 
-Нужно подключить доменную почту Qidra:
+На DigitalOcean Droplets исходящие SMTP-порты часто недоступны, поэтому production-письма Qidra должны идти через HTTPS email API. SMTP остаётся fallback-вариантом только для инфраструктуры, где `25/465/587` разрешены.
+
+Рекомендуемый production-вариант:
+
+- `EMAIL_PROVIDER=resend`
+- `RESEND_API_KEY`
+- `SMTP_FROM=Qidra <no-reply@qidra.io>`
+- `SMTP_TEST_TO`
+
+Fallback SMTP-вариант:
 
 - `SMTP_HOST`
 - `SMTP_PORT`
@@ -130,6 +139,12 @@ DNS:
 - подтверждение email
 - восстановление пароля
 - восстановление доступа через поддержку
+
+Smoke test:
+
+```bash
+npm run test:smtp
+```
 
 ## 7. TronGrid и USDT TRC20
 
