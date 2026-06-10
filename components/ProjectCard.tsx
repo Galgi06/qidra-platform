@@ -13,33 +13,33 @@ export function ProjectCard({ project, locale }: { project: CatalogProject; loca
   const availability = projectAvailability(project, locale);
 
   return (
-    <article className="grid min-h-[360px] gap-7 rounded-[20px] bg-qidra-grayLight p-7 shadow-[0_0_0_1px_rgba(18,20,23,0.06)] sm:p-9">
+    <article className="premium-card grid min-h-[360px] gap-7 p-7 transition-transform duration-150 hover:-translate-y-0.5 sm:p-9">
       <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
         <div className="grid gap-2">
           <ProjectStatusBadge status={project.status} locale={locale} />
           <h3 className="text-[30px] font-medium leading-[1.15] tracking-[0] text-qidra-dark sm:text-[36px]">{project.title[locale]}</h3>
         </div>
-        <span className="w-fit rounded-full bg-white px-4 py-2 text-14 font-medium text-qidra-accent shadow-[0_0_0_1px_rgba(86,87,246,0.16)]">{project.structure}</span>
+        <span className="w-fit rounded-full bg-qidra-accent8 px-4 py-2 text-14 font-semibold text-qidra-accent shadow-[inset_0_0_0_1px_rgba(79,70,229,0.14)]">{project.structure}</span>
       </div>
       <p className="max-w-3xl text-18 text-qidra-grayBlue">{project.summary[locale]}</p>
       {project.initiator ? (
         <a
-          className="w-fit rounded-full bg-white px-4 py-2 text-14 font-medium text-qidra-dark shadow-[0_0_0_1px_rgba(18,20,23,0.08)] transition-colors hover:text-qidra-accent"
+          className="w-fit rounded-full bg-qidra-grayLight px-4 py-2 text-14 font-semibold text-qidra-dark shadow-[inset_0_0_0_1px_rgba(18,20,23,0.08)] transition-colors hover:text-qidra-accent"
           href={withLocale(`/profiles/${project.initiator.id}`, locale)}
         >
           {isRu ? "Инициатор" : "Initiator"}: {project.initiator.name || (isRu ? "Участник Qidra" : "Qidra participant")}
         </a>
       ) : null}
       <dl className="grid gap-3 text-14 text-qidra-grayBlue sm:grid-cols-3">
-        <div className="rounded-[12px] bg-white p-4">
+        <div className="rounded-qidra bg-qidra-grayLight p-4">
           <dt>{isRu ? "Локация" : "Location"}</dt>
           <dd className="mt-1 font-medium text-qidra-dark">{project.location}</dd>
         </div>
-        <div className="rounded-[12px] bg-white p-4">
+        <div className="rounded-qidra bg-qidra-grayLight p-4">
           <dt>{isRu ? "Риск" : "Risk"}</dt>
           <dd className="mt-1 font-medium text-qidra-dark">{riskLabel}</dd>
         </div>
-        <div className="rounded-[12px] bg-white p-4">
+        <div className="rounded-qidra bg-qidra-grayLight p-4">
           <dt>
             <a className="transition-colors hover:text-qidra-accent" href={`${withLocale(`/projects/${project.slug}`, locale)}#documents`}>
               {isRu ? "Документы" : "Documents"}
@@ -52,7 +52,7 @@ export function ProjectCard({ project, locale }: { project: CatalogProject; loca
           </dd>
         </div>
       </dl>
-      <details className="group rounded-[14px] bg-white p-4 text-15 text-qidra-grayBlue shadow-[0_0_0_1px_rgba(18,20,23,0.06)]">
+      <details className="group rounded-qidra bg-qidra-grayLight p-4 text-15 text-qidra-grayBlue shadow-[inset_0_0_0_1px_rgba(18,20,23,0.06)]">
         <summary className="cursor-pointer list-none font-medium text-qidra-dark">
           <span className="inline-flex items-center gap-2">
             {isRu ? "Описание проекта и условия" : "Project description and terms"}
@@ -76,7 +76,7 @@ export function ProjectCard({ project, locale }: { project: CatalogProject; loca
             />
             <ProjectInfo label={isRu ? "Ориентир доходности" : "Return guidance"} value={project.expectedYield[locale]} />
           </dl>
-          <div className="rounded-[10px] bg-qidra-grayLight px-3 py-2 text-14">
+          <div className="rounded-qidra bg-white px-3 py-2 text-14">
             <p className="font-medium text-qidra-dark">{isRu ? "Что сделано сейчас" : "Current progress"}</p>
             <p className="mt-1">{project.lifecycle.currentProgress[locale]}</p>
           </div>
@@ -87,7 +87,7 @@ export function ProjectCard({ project, locale }: { project: CatalogProject; loca
                 {project.documents.slice(0, 3).map((document) => (
                   <a
                     key={document.href}
-                    className="flex items-center justify-between gap-3 rounded-[10px] bg-qidra-grayLight px-3 py-2 text-14 font-medium text-qidra-dark transition-colors hover:text-qidra-accent"
+                    className="flex items-center justify-between gap-3 rounded-qidra bg-white px-3 py-2 text-14 font-medium text-qidra-dark transition-colors hover:text-qidra-accent"
                     href={document.href}
                     rel="noreferrer"
                     target="_blank"
@@ -99,7 +99,7 @@ export function ProjectCard({ project, locale }: { project: CatalogProject; loca
               </div>
             </div>
           ) : (
-            <p className="rounded-[10px] bg-qidra-grayLight px-3 py-2 text-14">
+            <p className="rounded-qidra bg-white px-3 py-2 text-14">
               {isRu ? "Документы появятся после завершения подготовки проекта." : "Documents will appear after project preparation is complete."}
             </p>
           )}
@@ -112,7 +112,7 @@ export function ProjectCard({ project, locale }: { project: CatalogProject; loca
           <span>{isRu ? "Цель" : "Target"}: {project.targetUsdt.toLocaleString()} USDT</span>
         </div>
       </div>
-      <div className={`rounded-[14px] px-4 py-3 text-14 shadow-[0_0_0_1px_rgba(18,20,23,0.06)] ${availability.className}`}>
+      <div className={`rounded-qidra px-4 py-3 text-14 shadow-[inset_0_0_0_1px_rgba(18,20,23,0.06)] ${availability.className}`}>
         <p className="font-medium">{availability.title}</p>
         <p className="mt-1 opacity-80">{availability.text}</p>
       </div>

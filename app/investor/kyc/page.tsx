@@ -64,11 +64,11 @@ export default async function KycPage({ searchParams }: { searchParams?: SearchP
   return (
     <>
       <Header locale={locale} path="/investor/kyc" />
-      <main>
-        <section className="bg-qidra-grayLight px-5 py-10 sm:px-8 lg:px-11 lg:py-14">
+      <main className="premium-page">
+        <section className="px-5 py-10 sm:px-8 lg:px-11 lg:py-14">
           <div className="mx-auto grid max-w-[1840px] gap-8">
             <div>
-              <p className="text-14 font-medium uppercase text-qidra-accent">{isRu ? "Проверка участника" : "Participant review"}</p>
+              <p className="section-kicker">{isRu ? "Проверка участника" : "Participant review"}</p>
               <h1 className="mt-3 max-w-4xl text-[42px] font-medium leading-tight tracking-[0] text-qidra-dark sm:text-[56px]">
                 {isRu ? "Профиль для участия в проектах" : "Profile for project participation"}
               </h1>
@@ -85,7 +85,7 @@ export default async function KycPage({ searchParams }: { searchParams?: SearchP
           <InvestorWorkspace activePath="/investor/kyc" locale={locale}>
           <div className="grid gap-8 xl:grid-cols-[1fr_0.46fr]">
             <FeedbackForm
-              className="grid gap-6 rounded-[20px] bg-white p-6 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] sm:p-8"
+              className="premium-card grid gap-6 p-6 sm:p-8"
               endpoint={`/api/investor/kyc?lang=${locale}`}
               feedback={{
                 title: isRu ? "Анкета отправлена" : "Profile submitted",
@@ -197,7 +197,7 @@ export default async function KycPage({ searchParams }: { searchParams?: SearchP
 
             <aside className="grid content-start gap-5">
               <NotificationCard title={statusTitle} text={statusText} tone={approved ? "success" : rejected ? "error" : submitted ? "info" : "warning"} />
-              <section className="rounded-[20px] bg-qidra-grayLight p-6 sm:p-8">
+              <section className="premium-card p-6 sm:p-8">
                 <h2 className="text-[26px] font-medium leading-tight tracking-[0] text-qidra-dark">{isRu ? "Что проверяется" : "What is reviewed"}</h2>
                 <div className="mt-5 grid gap-4 text-16 text-qidra-grayBlue">
                   <CheckItem text={isRu ? "Личность и контактные данные" : "Identity and contact details"} />

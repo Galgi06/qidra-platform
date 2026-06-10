@@ -10,7 +10,7 @@ export function CreateStaffAccountForm({ locale }: { locale: Locale }) {
 
   return (
     <FeedbackForm
-      className="grid gap-5 rounded-[20px] bg-white p-6 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] sm:p-8"
+      className="premium-card grid gap-5 p-6 sm:p-8"
       endpoint={`/api/admin/users?lang=${locale}`}
       feedback={{
         title: isRu ? "Сотрудник создан" : "Staff account created",
@@ -56,7 +56,7 @@ export function CreateStaffAccountForm({ locale }: { locale: Locale }) {
       <label className="grid gap-2 text-14 font-medium text-qidra-dark">
         {isRu ? "Причина создания доступа" : "Reason for creating access"}
         <textarea
-          className="min-h-24 rounded-qidra border border-transparent bg-qidra-grayLight px-4 py-3 text-16 outline-none transition-colors placeholder:text-qidra-grayMedium focus:border-qidra-accent"
+          className="field-shell min-h-24 px-4 py-3 text-16 outline-none placeholder:text-qidra-grayMedium"
           maxLength={600}
           minLength={12}
           name="reason"

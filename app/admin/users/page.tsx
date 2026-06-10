@@ -67,8 +67,8 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
   return (
     <>
       <Header locale={locale} path="/admin/users" />
-      <main>
-        <section className="section bg-qidra-grayLight">
+      <main className="premium-page">
+        <section className="section">
           <div className="container-qidra">
             <Breadcrumbs
               items={[
@@ -78,6 +78,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
               ]}
             />
             <div className="mt-8">
+              <p className="section-kicker">{locale === "ru" ? "Операционный центр" : "Operations center"}</p>
               <h1 className="title-48 text-qidra-dark">{locale === "ru" ? "Пользователи" : "Users"}</h1>
               <p className="mt-4 max-w-3xl text-20 text-qidra-grayBlue">
                 {locale === "ru"
@@ -95,7 +96,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
             <UserSearchForm kycFilter={kycFilter} locale={locale} query={query} resultCount={filteredUsers.length} roleFilter={roleFilter} />
             <UsersFilters kycFilter={kycFilter} locale={locale} query={query} roleFilter={roleFilter} stats={stats} />
             {filteredUsers.length ? (
-              <div className="overflow-x-auto rounded-qidra bg-white p-2 shadow-[0_0_0_1px_rgba(18,20,23,0.08)]">
+              <div className="premium-card overflow-x-auto p-2">
                 <table className="w-full min-w-[1080px] border-collapse text-left">
                   <thead>
                     <tr className="border-b border-qidra-grayLight text-14 font-medium text-qidra-grayBlue">
@@ -211,7 +212,7 @@ function UserStatCard({ label, tone = "neutral", value }: { label: string; tone?
   const valueClass = tone === "success" ? "text-qidra-green" : tone === "accent" ? "text-qidra-accent" : "text-qidra-dark";
 
   return (
-    <article className="rounded-qidra bg-white p-5 shadow-[0_0_0_1px_rgba(18,20,23,0.08)]">
+    <article className="premium-card p-5">
       <p className="text-14 font-medium text-qidra-grayBlue">{label}</p>
       <p className={`mt-3 text-[32px] font-medium leading-tight tracking-[0] ${valueClass}`}>{formatCount(value)}</p>
     </article>
@@ -232,14 +233,14 @@ function UserSearchForm({
   roleFilter?: Role;
 }) {
   return (
-    <form action="/admin/users" className="grid gap-3 rounded-qidra border border-qidra-grayLight bg-white p-4 md:grid-cols-[1fr_auto] md:items-end">
+    <form action="/admin/users" className="premium-card grid gap-3 p-4 md:grid-cols-[1fr_auto] md:items-end">
       <input name="lang" type="hidden" value={locale} />
       {roleFilter ? <input name="role" type="hidden" value={roleFilter.toLowerCase()} /> : null}
       {kycFilter ? <input name="kyc" type="hidden" value={kycFilter.toLowerCase()} /> : null}
       <label className="grid gap-2 text-14 font-medium text-qidra-dark">
         {locale === "ru" ? "Быстрый поиск клиента" : "Quick client search"}
         <input
-          className="h-12 rounded-qidra border border-transparent bg-qidra-grayLight px-4 text-16 outline-none transition-colors placeholder:text-qidra-grayMedium focus:border-qidra-accent"
+          className="field-shell h-12 px-4 text-16 outline-none placeholder:text-qidra-grayMedium"
           defaultValue={query}
           name="q"
           placeholder={locale === "ru" ? "Email, имя, телефон, страна, город или профессия" : "Email, name, phone, country, city or occupation"}
@@ -274,7 +275,7 @@ function UserSearchForm({
 
 function UsersFilters({ kycFilter, locale, query, roleFilter, stats }: { kycFilter?: KycFilter; locale: "ru" | "en"; query: string; roleFilter?: Role; stats: UserStats }) {
   return (
-    <div className="grid gap-4 rounded-qidra border border-qidra-grayLight bg-white p-4">
+    <div className="premium-card grid gap-4 p-4">
       <div className="grid gap-2">
         <p className="text-14 font-medium text-qidra-grayBlue">{locale === "ru" ? "Роль" : "Role"}</p>
         <div className="flex flex-wrap gap-2">
@@ -326,7 +327,7 @@ function UserFilterPill({ active, children, href }: { active: boolean; children:
   return (
     <Link
       className={`inline-flex h-10 items-center justify-center rounded-qidra border px-4 text-14 font-medium transition-colors ${
-        active ? "border-qidra-dark bg-qidra-dark text-white" : "border-qidra-grayLight bg-white text-qidra-grayBlue hover:border-qidra-accent hover:text-qidra-accent"
+        active ? "border-qidra-dark bg-qidra-dark text-white shadow-[0_8px_18px_rgba(18,20,23,0.12)]" : "border-qidra-line bg-white text-qidra-grayBlue hover:border-qidra-accent hover:text-qidra-accent"
       }`}
       href={href}
     >

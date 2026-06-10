@@ -71,14 +71,14 @@ export default async function InvestorPage({ searchParams }: { searchParams?: Se
   return (
     <>
       <Header locale={locale} path="/investor" />
-      <main>
-        <section className="bg-qidra-grayLight px-5 py-10 sm:px-8 lg:px-11 lg:py-14">
+      <main className="premium-page">
+        <section className="px-5 py-10 sm:px-8 lg:px-11 lg:py-14">
           <div className="mx-auto grid max-w-[1840px] gap-8">
-            <div className="grid gap-7 rounded-[20px] bg-white p-6 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] sm:p-8 lg:grid-cols-[1fr_auto] lg:items-end">
+            <div className="premium-card grid gap-7 p-6 sm:p-8 lg:grid-cols-[1fr_auto] lg:items-end">
               <div className="flex items-start gap-4 sm:gap-5">
                 <UserAvatar name={userName} />
                 <div>
-                  <p className="text-14 font-medium uppercase text-qidra-accent">{isRu ? "Профиль участника" : "Participant profile"}</p>
+                  <p className="eyebrow">{isRu ? "Профиль участника" : "Participant profile"}</p>
                   <h1 className="mt-3 text-[36px] font-medium leading-tight tracking-[0] text-qidra-dark sm:text-[48px]">{userName}</h1>
                   {displayEmail ? <p className="mt-2 text-16 text-qidra-grayBlue">{displayEmail}</p> : null}
                 </div>
@@ -108,7 +108,7 @@ export default async function InvestorPage({ searchParams }: { searchParams?: Se
             </div>
 
             <div className="grid gap-8 lg:grid-cols-[1fr_0.72fr]">
-              <section className="rounded-[20px] bg-qidra-grayLight p-6 sm:p-8">
+              <section className="premium-card p-6 sm:p-8">
                 <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-start">
                   <div>
                     <h2 className="text-[32px] font-medium leading-tight tracking-[0] text-qidra-dark sm:text-[40px]">{nextStep.title}</h2>
@@ -166,7 +166,7 @@ export default async function InvestorPage({ searchParams }: { searchParams?: Se
                   tone={profileNotice.tone}
                 />
                 <NotificationCard title={walletNotice.title} text={walletNotice.text} tone={walletNotice.tone} />
-                <section className="rounded-[20px] bg-white p-6 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] sm:p-8">
+                <section className="premium-card p-6 sm:p-8">
                   <h2 className="text-[26px] font-medium leading-tight tracking-[0] text-qidra-dark">{isRu ? "Финансовый статус" : "Financial status"}</h2>
                   <div className="mt-6 grid gap-4 text-16 text-qidra-grayBlue">
                     <ActivityItem label={isRu ? "Свободно" : "Available"} value={formatUsdt(availableUsdt)} />
@@ -174,7 +174,7 @@ export default async function InvestorPage({ searchParams }: { searchParams?: Se
                     <ActivityItem label={isRu ? "Переводы на проверке" : "Transfers in review"} value={formatUsdt(pendingUsdt)} />
                   </div>
                 </section>
-                <section className="rounded-[20px] bg-white p-6 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] sm:p-8">
+                <section className="premium-card p-6 sm:p-8">
                   <div className="flex flex-wrap items-center justify-between gap-4">
                     <div>
                       <h2 className="text-[26px] font-medium leading-tight tracking-[0] text-qidra-dark">{isRu ? "Активные партнёрские контракты" : "Active partnership contracts"}</h2>
@@ -396,7 +396,7 @@ function MetricCard({ label, value, tone = "neutral" }: { label: string; value: 
   const isWarning = tone === "warning";
 
   return (
-    <article className={`rounded-[20px] p-6 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] ${isWarning ? "bg-[#2418f2] text-white" : "bg-white text-qidra-dark"}`}>
+    <article className={`p-6 ${isWarning ? "premium-dark-panel text-white" : "premium-card text-qidra-dark"}`}>
       <p className={`text-14 font-medium ${isWarning ? "text-white/72" : "text-qidra-grayBlue"}`}>{label}</p>
       <p className="mt-4 text-[30px] font-medium leading-tight tracking-[0]">{value}</p>
     </article>
@@ -428,7 +428,7 @@ function ActivityItem({ label, value }: { label: string; value: string }) {
 
 function ContractSummaryCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-qidra bg-qidra-grayLight p-3">
+    <div className="rounded-qidra border border-qidra-grayLight bg-white p-3">
       <p className="text-13 font-medium text-qidra-grayBlue">{label}</p>
       <p className="mt-2 text-18 font-medium leading-tight tracking-[0] text-qidra-dark">{value}</p>
     </div>
@@ -457,7 +457,7 @@ function ActiveContractItem({
   title: string;
 }) {
   return (
-    <article className="rounded-[18px] border border-qidra-grayMedium/25 bg-white p-4">
+    <article className="rounded-qidra border border-qidra-grayMedium/25 bg-white p-4 shadow-[0_10px_24px_rgba(18,20,23,0.04)]">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-14 text-qidra-grayBlue">{date}</p>

@@ -208,8 +208,8 @@ export default async function AdminUserDetailPage({
   return (
     <>
       <Header locale={locale} path={`/admin/users/${user.id}`} />
-      <main>
-        <section className="section bg-qidra-grayLight">
+      <main className="premium-page">
+        <section className="section">
           <div className="container-qidra">
             <Breadcrumbs
               items={[
@@ -223,7 +223,7 @@ export default async function AdminUserDetailPage({
               <div className="flex min-w-0 flex-col gap-5 sm:flex-row sm:items-center">
                 <UserAvatar name={displayName} />
                 <div className="min-w-0">
-                  <p className="text-14 font-medium uppercase text-qidra-accent">{isRu ? "Карточка клиента" : "Client card"}</p>
+                  <p className="section-kicker">{isRu ? "Карточка клиента" : "Client card"}</p>
                   <h1 className="mt-3 break-words title-48 text-qidra-dark">{displayName}</h1>
                   <p className="mt-3 break-all text-18 text-qidra-grayBlue">{user.email}</p>
                 </div>
@@ -238,13 +238,13 @@ export default async function AdminUserDetailPage({
               </div>
             </div>
             <div className="mt-10 grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
-              <section className="rounded-[28px] border border-qidra-grayLight bg-white p-5 shadow-[0_18px_48px_rgba(18,20,23,0.04)] sm:p-6">
+              <section className="premium-card p-5 sm:p-6">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
                     <p className="text-12 font-semibold uppercase tracking-[0.04em] text-qidra-accent">{isRu ? "Финансовая сводка" : "Financial summary"}</p>
                     <h2 className="mt-2 text-[28px] font-medium leading-tight tracking-[0] text-qidra-dark">{isRu ? "Всего инвестировано" : "Total invested"}</h2>
                   </div>
-                  <p className="rounded-[18px] bg-qidra-dark px-4 py-3 text-[24px] font-medium leading-none text-white">{formatUsdt(confirmedContractUsdt)}</p>
+                  <p className="rounded-qidra bg-qidra-dark px-4 py-3 text-[24px] font-medium leading-none text-white">{formatUsdt(confirmedContractUsdt)}</p>
                 </div>
                 <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                   <MetricCard label={isRu ? "Свободно" : "Available"} value={formatUsdt(wallet?.availableUsdt ?? 0)} tone="accent" />
@@ -254,7 +254,7 @@ export default async function AdminUserDetailPage({
                 </div>
               </section>
 
-              <section className="rounded-[28px] border border-qidra-grayLight bg-white p-5 shadow-[0_18px_48px_rgba(18,20,23,0.04)] sm:p-6">
+              <section className="premium-card p-5 sm:p-6">
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <p className="text-12 font-semibold uppercase tracking-[0.04em] text-qidra-accent">{isRu ? "Контракты" : "Contracts"}</p>
@@ -376,7 +376,7 @@ export default async function AdminUserDetailPage({
                       <InfoBlock label={isRu ? "Активные сессии" : "Active sessions"} value={formatCount(user._count.sessions)} locale={locale} />
                     </div>
                     {canManageRoles && user.id !== session.user?.id ? (
-                      <div className="rounded-[18px] bg-qidra-grayLight p-5">
+                      <div className="premium-panel p-5">
                         <RoleManagementForm currentRole={user.role} endpoint={roleEndpoint} locale={locale} />
                       </div>
                     ) : (
@@ -394,11 +394,11 @@ export default async function AdminUserDetailPage({
                       />
                     )}
                     {canSendAccessRecovery ? (
-                      <div className="rounded-[18px] bg-qidra-grayLight p-5">
+                      <div className="premium-panel p-5">
                         <AccessRecoveryForm endpoint={accessRecoveryEndpoint} hasApprovedKyc={hasApprovedKyc} kycDocumentLinks={accessRecoveryDocumentLinks} locale={locale} />
                       </div>
                     ) : null}
-                    <div className="rounded-[18px] bg-qidra-grayLight p-5">
+                    <div className="premium-panel p-5">
                       <UserBlockForm canManageBlock={canManageBlock} endpoint={blockEndpoint} isOwnAccount={user.id === session.user?.id} locale={locale} user={user} />
                     </div>
                   </Panel>
@@ -621,7 +621,7 @@ function SafeAdjustmentsPanel({
       }
     >
       <div className="grid items-start gap-6 xl:grid-cols-3">
-        <div className="grid content-start gap-5 rounded-[18px] border border-qidra-grayLight bg-qidra-grayLight p-5">
+        <div className="premium-panel grid content-start gap-5 p-5">
           <div>
             <p className="text-18 font-semibold text-qidra-dark">{isRu ? "Корректировка баланса" : "Balance adjustment"}</p>
             <p className="mt-2 text-14 text-qidra-grayBlue">
@@ -674,7 +674,7 @@ function SafeAdjustmentsPanel({
           )}
         </div>
 
-        <div className="grid content-start gap-5 rounded-[18px] border border-qidra-grayLight bg-qidra-grayLight p-5">
+        <div className="premium-panel grid content-start gap-5 p-5">
           <div>
             <p className="text-18 font-semibold text-qidra-dark">{isRu ? "Статус KYC" : "KYC status"}</p>
             <p className="mt-2 text-14 text-qidra-grayBlue">
@@ -765,7 +765,7 @@ function SafeAdjustmentsPanel({
           )}
         </div>
 
-        <div className="grid content-start gap-5 rounded-[18px] border border-qidra-grayLight bg-qidra-grayLight p-5">
+        <div className="premium-panel grid content-start gap-5 p-5">
           <div>
             <p className="text-18 font-semibold text-qidra-dark">{isRu ? "Отклонение спорной операции" : "Reject disputed operation"}</p>
             <p className="mt-2 text-14 text-qidra-grayBlue">
@@ -1303,12 +1303,12 @@ function DossierTabs({ activeView, locale, userId }: { activeView: DossierView; 
   ];
 
   return (
-    <nav className="flex flex-wrap gap-2 rounded-qidra border border-qidra-grayLight bg-white p-2">
+    <nav className="premium-card flex flex-wrap gap-2 p-2">
       {tabs.map((tab) => (
         <Link
           key={tab.view}
           className={`inline-flex h-11 items-center rounded-qidra px-4 text-14 font-medium transition-colors ${
-            activeView === tab.view ? "bg-qidra-dark text-white" : "text-qidra-grayBlue hover:bg-qidra-grayLight hover:text-qidra-dark"
+            activeView === tab.view ? "bg-qidra-dark text-white shadow-[0_10px_24px_rgba(18,20,23,0.14)]" : "text-qidra-grayBlue hover:bg-qidra-grayLight hover:text-qidra-dark"
           }`}
           href={withLocale(`/admin/users/${userId}${tab.view === "overview" ? "" : `?view=${tab.view}`}`, locale)}
         >
@@ -1336,9 +1336,9 @@ function kycDocumentLinkItems(applicationId: string, documents: ReturnType<typeo
 
 function Panel({ children, description, title }: { children: React.ReactNode; description?: string; title: string }) {
   return (
-    <section className="grid content-start gap-6 rounded-[24px] border border-qidra-grayLight bg-white p-6 shadow-[0_18px_48px_rgba(18,20,23,0.04)] sm:p-8">
+    <section className="premium-card grid content-start gap-6 p-6 sm:p-8">
       <div>
-        <h2 className="text-[28px] font-medium leading-tight tracking-[0] text-qidra-dark md:text-[32px]">{title}</h2>
+        <h2 className="text-[28px] font-medium leading-tight tracking-[0] text-qidra-dark">{title}</h2>
         {description ? <p className="mt-2 max-w-[760px] text-16 leading-relaxed text-qidra-grayBlue">{description}</p> : null}
       </div>
       {children}
@@ -1352,7 +1352,7 @@ function ContractPositionCard({ application, locale }: { application: ContractAp
   const entryDate = application.contractAcceptedAt ?? application.termsAcceptedAt ?? application.createdAt;
 
   return (
-    <article className="rounded-[18px] border border-qidra-grayLight bg-qidra-grayLight p-4">
+    <article className="rounded-qidra border border-qidra-grayLight bg-qidra-grayLight p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="break-words text-15 font-semibold leading-snug text-qidra-dark">{projectTitle}</p>
@@ -1387,18 +1387,18 @@ function MetricCard({ label, tone = "neutral", value }: { label: string; tone?: 
   const valueClass = toneClass(tone);
 
   return (
-    <article className="min-h-[104px] rounded-[18px] border border-qidra-grayLight bg-white p-4 shadow-[0_10px_26px_rgba(18,20,23,0.04)]">
+    <article className="premium-card min-h-[104px] p-4 shadow-[0_10px_26px_rgba(18,20,23,0.04)]">
       <p className="text-12 font-semibold uppercase leading-tight tracking-[0.02em] text-qidra-grayBlue">{label}</p>
-      <p className={`mt-3 break-words text-[18px] font-semibold leading-tight tracking-[0] md:text-[20px] ${valueClass}`}>{value}</p>
+      <p className={`mt-3 break-words text-[18px] font-semibold leading-tight tracking-[0] ${valueClass}`}>{value}</p>
     </article>
   );
 }
 
 function InfoBlock({ compact = false, label, locale, value }: { compact?: boolean; label: string; locale: Locale; value: string | number | null | undefined }) {
   return (
-    <div className="min-h-[96px] rounded-[16px] border border-transparent bg-qidra-grayLight p-4">
+    <div className="min-h-[96px] rounded-qidra border border-qidra-grayLight bg-qidra-grayLight p-4">
       <p className="text-13 font-medium text-qidra-grayBlue">{label}</p>
-      <p className={`mt-2 break-words font-medium leading-snug text-qidra-dark ${compact ? "text-13" : "text-15 md:text-16"}`}>
+      <p className={`mt-2 break-words font-medium leading-snug text-qidra-dark ${compact ? "text-13" : "text-15"}`}>
         {value || (locale === "ru" ? "Не указано" : "Not provided")}
       </p>
     </div>
@@ -1407,7 +1407,7 @@ function InfoBlock({ compact = false, label, locale, value }: { compact?: boolea
 
 function TimelineItem({ children, meta, title, tone = "neutral" }: { children?: React.ReactNode; meta?: string; title: string; tone?: Tone }) {
   return (
-    <article className="rounded-[16px] border border-qidra-grayLight bg-qidra-grayLight p-4">
+    <article className="rounded-qidra border border-qidra-grayLight bg-qidra-grayLight p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className={`text-16 font-medium ${toneClass(tone)}`}>{title}</p>

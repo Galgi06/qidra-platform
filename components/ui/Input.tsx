@@ -8,11 +8,11 @@ type InputProps = InputHTMLAttributes<HTMLInputElement> & {
 
 export function Input({ label, error, hint, className = "", ...props }: InputProps) {
   return (
-    <label className="grid gap-2 text-14 font-medium text-qidra-dark">
-      {label}
+    <label className="grid gap-2 text-14 font-semibold text-qidra-dark">
+      <span>{label}</span>
       <input
-        className={`h-12 rounded-qidra border bg-qidra-grayLight px-4 text-16 outline-none transition-colors placeholder:text-qidra-grayMedium focus:border-qidra-accent ${
-          error ? "border-qidra-red" : "border-transparent"
+        className={`field-shell h-12 rounded-qidra px-4 text-16 outline-none placeholder:text-qidra-grayMedium ${
+          error ? "border-qidra-red bg-red-50/30" : ""
         } ${className}`}
         {...props}
       />

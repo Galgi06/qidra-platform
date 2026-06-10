@@ -22,7 +22,7 @@ export function AdminTabs({ activePath, locale, role }: { activePath: string; lo
       : adminSections;
 
   return (
-    <nav className="grid gap-3 rounded-[20px] bg-white p-4 shadow-[0_0_0_1px_rgba(18,20,23,0.08)]">
+    <nav className="premium-card grid gap-3 p-4">
       <div className="px-1">
         <p className="text-12 font-medium uppercase text-qidra-accent">{locale === "ru" ? "Операционный центр" : "Operations center"}</p>
         <p className="mt-1 text-14 text-qidra-grayBlue">
@@ -36,8 +36,8 @@ export function AdminTabs({ activePath, locale, role }: { activePath: string; lo
           return (
             <Link
               key={section.path}
-              className={`grid min-h-[92px] content-start gap-1 rounded-[14px] px-4 py-3 transition-colors ${
-                active ? "bg-qidra-dark text-white" : "bg-qidra-grayLight text-qidra-dark hover:bg-white hover:shadow-[0_0_0_1px_rgba(18,20,23,0.08)]"
+              className={`grid min-h-[92px] content-start gap-1 rounded-qidra px-4 py-3 transition-[background-color,color,box-shadow] ${
+                active ? "bg-qidra-dark text-white shadow-[0_14px_30px_rgba(18,20,23,0.18)]" : "bg-qidra-grayLight text-qidra-dark hover:bg-white hover:shadow-[0_12px_28px_rgba(18,20,23,0.08)]"
               }`}
               href={withLocale(section.path, locale)}
             >

@@ -85,14 +85,17 @@ export function FileUpload({
   }
 
   return (
-    <div className="surface grid gap-3 border-dashed p-5 text-14 text-qidra-grayBlue transition-colors hover:border-qidra-accent" data-field-wrapper={props.name}>
+    <div
+      className="grid gap-3 rounded-qidra border border-dashed border-qidra-line bg-qidra-panel p-5 text-14 text-qidra-grayBlue shadow-[inset_0_1px_0_rgba(255,255,255,0.86)] transition-colors hover:border-qidra-accent"
+      data-field-wrapper={props.name}
+    >
       <span className="flex items-center justify-between gap-3">
         <span className="font-medium text-qidra-dark">{label}</span>
         {activeText ? <CheckIcon /> : null}
       </span>
       <span>{hint}</span>
       {activeText ? (
-        <span className="grid gap-2 rounded-[10px] bg-white px-3 py-2 text-13 font-medium text-qidra-green shadow-[0_0_0_1px_rgba(58,148,97,0.18)]">
+        <span className="grid gap-2 rounded-qidra bg-white px-3 py-2 text-13 font-medium text-qidra-green shadow-[0_0_0_1px_rgba(58,148,97,0.18)]">
           <span>
             {statusLabel}: <span className="text-qidra-dark">{activeText}</span>
           </span>
@@ -107,7 +110,10 @@ export function FileUpload({
           ) : null}
         </span>
       ) : null}
-      <label className="inline-flex w-fit cursor-pointer items-center gap-2 rounded-[10px] bg-qidra-dark px-3 py-2 text-13 font-medium text-white" htmlFor={isMultiple ? `${inputId}-${activeSlot.id}` : inputId}>
+      <label
+        className="inline-flex w-fit cursor-pointer items-center gap-2 rounded-qidra bg-qidra-dark px-3 py-2 text-13 font-semibold text-white shadow-[0_10px_24px_rgba(18,20,23,0.16)] transition-colors hover:bg-qidra-accent"
+        htmlFor={isMultiple ? `${inputId}-${activeSlot.id}` : inputId}
+      >
         {isMultiple ? (
           <span aria-hidden="true" className="text-18 leading-none">
             +

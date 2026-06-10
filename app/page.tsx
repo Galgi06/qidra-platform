@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { getServerSession } from "next-auth";
 import { Footer } from "@/components/Footer";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ProjectCard } from "@/components/ProjectCard";
 import { SignOutButton } from "@/components/auth/SignOutButton";
 import { ButtonLink } from "@/components/ui/Button";
@@ -29,8 +30,8 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
 
   return (
     <>
-      <main className="bg-white">
-        <section className="relative mx-3 mt-3 overflow-hidden rounded-b-[24px] bg-[#1f14ef] text-white sm:mx-4 lg:mx-6">
+      <main className="premium-page">
+        <section className="relative mx-3 mt-3 overflow-hidden rounded-b-[24px] bg-qidra-dark text-white sm:mx-4 lg:mx-6">
           <Image
             src="/assets/hero/qidra-hero-blue.png"
             alt={isRu ? "Визуал Qidra для международных халяльных проектов" : "Qidra visual for international halal projects"}
@@ -39,13 +40,14 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
             sizes="100vw"
             className="object-cover object-[58%_center]"
           />
-          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(21,14,205,0.98)_0%,rgba(31,20,239,0.9)_43%,rgba(31,20,239,0.42)_66%,rgba(31,20,239,0.08)_100%)]" />
+          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(18,20,23,0.98)_0%,rgba(6,63,55,0.88)_42%,rgba(79,70,229,0.44)_70%,rgba(18,20,23,0.12)_100%)]" />
           <div className="relative z-10 mx-auto max-w-[1840px] px-5 py-6 sm:px-8 lg:px-11">
             <div className="flex items-center justify-between gap-4 border-b border-white/60 pb-5">
               <Link href={withLocale("/", locale)} className="text-[30px] font-semibold leading-none text-white sm:text-[34px]" aria-label="Qidra">
                 Qidra
               </Link>
               <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+                <LanguageSwitcher locale={locale} path="/" tone="dark" />
                 {signedIn ? (
                   <>
                     <ButtonLink href={withLocale(accountHref, locale)} variant="white" size="sm" className="h-11 px-4 sm:min-w-44 sm:px-6">
@@ -68,6 +70,7 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
 
             <div className="grid min-h-[620px] items-center py-12 sm:min-h-[680px] lg:min-h-[720px] lg:py-14">
               <div className="grid max-w-[980px] gap-7">
+                <span className="section-kicker border-white/18 bg-white/10 text-white">{isRu ? "Проверенные проекты · защищённая инфраструктура" : "Reviewed projects · protected infrastructure"}</span>
                 <h1 className="whitespace-pre-line text-[40px] font-medium leading-[1.08] tracking-[0] text-white sm:text-[54px] lg:text-[66px] xl:text-[72px]">
                   {t.hero.title}
                 </h1>
@@ -90,14 +93,18 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
                 {isRu ? "Платформа объединяет предпринимателей и партнёров из разных стран" : "The platform connects entrepreneurs and partners from different countries"}
               </p>
             </div>
-            <div className="relative min-h-[360px] overflow-hidden rounded-[20px] bg-[#2418f2] lg:min-h-[430px]">
-              <Image
-                src="/assets/hero/qidra-hero-blue.png"
-                alt={isRu ? "Международные халяльные проекты Qidra" : "Qidra international halal projects"}
-                fill
-                sizes="(min-width: 992px) 46vw, 100vw"
-                className="object-cover object-[78%_center]"
-              />
+            <div className="premium-card grid min-h-[360px] content-between overflow-hidden p-7 sm:p-10 lg:min-h-[430px] lg:p-12">
+              <div>
+                <span className="section-kicker">{isRu ? "Как устроена платформа" : "How the platform works"}</span>
+                <h3 className="mt-8 max-w-2xl text-[32px] font-medium leading-[1.14] tracking-[0] text-qidra-dark sm:text-[42px]">
+                  {isRu ? "От заявки до сопровождения в одном рабочем контуре" : "From application to support in one operating flow"}
+                </h3>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <InsightTile title={isRu ? "Отбор" : "Review"} text={isRu ? "Проект проходит первичную проверку" : "Projects pass an initial review"} />
+                <InsightTile title={isRu ? "Документы" : "Documents"} text={isRu ? "Условия и материалы доступны участникам" : "Terms and materials are available to participants"} />
+                <InsightTile title={isRu ? "Кабинет" : "Workspace"} text={isRu ? "Заявки, статусы и связь в профиле" : "Applications, statuses and support in profile"} />
+              </div>
             </div>
           </div>
           <div className="mx-auto mt-8 grid max-w-[1840px] gap-8 lg:grid-cols-2">
@@ -157,7 +164,7 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
                     : "The Qidra Sharia board oversees project selection, condition disclosure, and ongoing support."
                 }
               />
-              <div className="rounded-[20px] bg-white p-7 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] sm:p-10">
+              <div className="premium-card p-7 sm:p-10">
                 <PrincipleItem title={isRu ? "Риба" : "Riba"} text={isRu ? "Исключение фиксированных обязательных начислений" : "Exclusion of fixed mandatory accruals"} />
                 <PrincipleItem
                   title={isRu ? "Гарар" : "Gharar"}
@@ -258,7 +265,7 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
         </section>
 
         <section className="px-5 pb-20 sm:px-8 lg:px-11 lg:pb-28">
-          <div className="mx-auto grid max-w-[1840px] gap-8 rounded-[20px] bg-[#2418f2] p-7 text-white sm:p-10 lg:grid-cols-[1fr_auto] lg:items-center lg:p-14">
+          <div className="premium-dark-panel mx-auto grid max-w-[1840px] gap-8 p-7 text-white sm:p-10 lg:grid-cols-[1fr_auto] lg:items-center lg:p-14">
             <div>
               <h2 className="text-[34px] font-medium leading-[1.15] tracking-[0] sm:text-[44px]">
                 {isRu ? "Откройте каталог проектов Qidra" : "Open the Qidra project catalog"}
@@ -284,7 +291,7 @@ function FeaturePanel({ title, text, tone = "light" }: { title: string; text: st
   const isBlue = tone === "blue";
 
   return (
-    <article className={`min-h-[330px] overflow-hidden rounded-[20px] p-7 sm:p-10 lg:p-12 ${isBlue ? "bg-[#2418f2] text-white" : "bg-qidra-grayLight text-qidra-dark"}`}>
+    <article className={`min-h-[330px] overflow-hidden p-7 sm:p-10 lg:p-12 ${isBlue ? "premium-dark-panel text-white" : "premium-card text-qidra-dark"}`}>
       <h3 className="max-w-3xl text-[30px] font-medium leading-[1.15] tracking-[0] sm:text-[38px]">{title}</h3>
       <p className={`mt-7 max-w-3xl text-20 sm:text-[24px] ${isBlue ? "text-white/84" : "text-qidra-grayBlue"}`}>{text}</p>
     </article>
@@ -293,13 +300,22 @@ function FeaturePanel({ title, text, tone = "light" }: { title: string; text: st
 
 function HomeSectorCard({ href, text, title }: { href: string; text: string; title: string }) {
   return (
-    <Link className="grid min-h-[190px] content-between rounded-[20px] bg-qidra-grayLight p-6 transition-colors hover:bg-white hover:shadow-[0_0_0_1px_rgba(18,20,23,0.08)]" href={href}>
+    <Link className="premium-card grid min-h-[190px] content-between p-6 transition-transform duration-150 hover:-translate-y-0.5" href={href}>
       <div>
         <h3 className="text-[26px] font-medium leading-tight text-qidra-dark">{title}</h3>
         <p className="mt-3 text-16 text-qidra-grayBlue">{text}</p>
       </div>
       <span className="mt-6 text-15 font-medium text-qidra-accent">Qidra →</span>
     </Link>
+  );
+}
+
+function InsightTile({ title, text }: { title: string; text: string }) {
+  return (
+    <div className="rounded-qidra bg-qidra-grayLight p-4 shadow-[inset_0_0_0_1px_rgba(18,20,23,0.06)]">
+      <p className="text-13 font-semibold uppercase text-qidra-accent">{title}</p>
+      <p className="mt-3 text-15 leading-snug text-qidra-grayBlue">{text}</p>
+    </div>
   );
 }
 
@@ -319,8 +335,8 @@ function PrincipleItem({ title, text, last = false }: { title: string; text: str
 
 function StepCard({ title, items, action, href }: { title: string; items: string[]; action?: string; href?: string }) {
   return (
-    <article className="relative grid min-h-[480px] content-start rounded-[20px] bg-qidra-grayLight p-7 sm:p-10">
-      <div className="absolute right-[-28px] top-12 hidden h-24 w-24 items-center justify-center rounded-full bg-white text-[62px] leading-none text-[#2418f2] shadow-qidra lg:flex">
+    <article className="premium-card relative grid min-h-[480px] content-start p-7 sm:p-10">
+      <div className="absolute right-[-28px] top-12 hidden h-24 w-24 items-center justify-center rounded-full bg-white text-[62px] leading-none text-qidra-accent shadow-qidra lg:flex">
         <ArrowIcon />
       </div>
       <h3 className="max-w-md text-[30px] font-medium leading-[1.15] tracking-[0] text-qidra-dark sm:text-[36px]">{title}</h3>

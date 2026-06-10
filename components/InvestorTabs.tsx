@@ -60,13 +60,13 @@ function InvestorMenuDisclosure({ activePath, locale }: { activePath: string; lo
   const isRu = locale === "ru";
 
   return (
-    <details className="group rounded-[20px] bg-white shadow-[0_0_0_1px_rgba(18,20,23,0.08)]">
+    <details className="group premium-card">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 [&::-webkit-details-marker]:hidden">
         <div>
           <p className="text-12 font-semibold uppercase text-qidra-accent">{isRu ? "Рабочий кабинет" : "Workspace"}</p>
           <h2 className="mt-1 text-22 font-medium leading-tight text-qidra-dark">{isRu ? "Меню участника" : "Participant menu"}</h2>
         </div>
-        <span className="grid size-11 place-items-center rounded-[12px] border border-qidra-grayLight bg-qidra-grayLight" aria-hidden="true">
+        <span className="grid size-11 place-items-center rounded-qidra border border-qidra-grayLight bg-qidra-grayLight" aria-hidden="true">
           <span className="grid w-5 gap-1">
             <span className="h-0.5 rounded-full bg-qidra-dark" />
             <span className="h-0.5 rounded-full bg-qidra-dark" />
@@ -85,7 +85,7 @@ function InvestorNavigationPanel({ activePath, locale }: { activePath: string; l
   const isRu = locale === "ru";
 
   return (
-    <nav className="rounded-[20px] bg-white p-4 shadow-[0_0_0_1px_rgba(18,20,23,0.08)]">
+    <nav className="premium-card p-4">
       <div className="border-b border-qidra-grayLight px-2 pb-4">
         <p className="text-12 font-medium uppercase text-qidra-accent">{isRu ? "Рабочий кабинет" : "Workspace"}</p>
         <h2 className="mt-2 text-22 font-medium leading-tight text-qidra-dark">{isRu ? "Навигация участника" : "Participant navigation"}</h2>
@@ -116,8 +116,8 @@ function InvestorNavigationContent({ activePath, compact = false, locale }: { ac
                 return (
                   <Link
                     key={section.path}
-                    className={`grid gap-1 rounded-[12px] px-4 py-3 text-left transition-colors ${
-                      active ? "bg-qidra-dark text-white" : "text-qidra-dark hover:bg-qidra-grayLight"
+                    className={`grid gap-1 rounded-qidra px-4 py-3 text-left transition-[background-color,color,box-shadow] ${
+                      active ? "bg-qidra-dark text-white shadow-[0_12px_28px_rgba(18,20,23,0.18)]" : "text-qidra-dark hover:bg-qidra-grayLight hover:shadow-[inset_3px_0_0_var(--qidra-accent)]"
                     }`}
                     href={withLocale(section.path, locale)}
                   >

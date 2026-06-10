@@ -26,11 +26,11 @@ export default async function NewProjectSubmissionPage({ searchParams }: { searc
   return (
     <>
       <Header locale={locale} path="/investor/projects/new" />
-      <main>
-        <section className="bg-qidra-grayLight px-5 py-10 sm:px-8 lg:px-11 lg:py-14">
+      <main className="premium-page">
+        <section className="px-5 py-10 sm:px-8 lg:px-11 lg:py-14">
           <div className="mx-auto grid max-w-[1840px] gap-8">
             <div>
-              <p className="text-14 font-medium uppercase text-qidra-accent">{isRu ? "Профиль участника" : "Participant profile"}</p>
+              <p className="section-kicker">{isRu ? "Профиль участника" : "Participant profile"}</p>
               <h1 className="mt-3 max-w-4xl text-[42px] font-medium leading-tight tracking-[0] text-qidra-dark sm:text-[56px]">
                 {isRu ? "Разместить свой проект" : "List your project"}
               </h1>
@@ -47,7 +47,7 @@ export default async function NewProjectSubmissionPage({ searchParams }: { searc
           <InvestorWorkspace activePath="/investor/projects/new" locale={locale}>
           <div className="grid gap-8 xl:grid-cols-[1fr_0.48fr]">
             <FeedbackForm
-              className="grid gap-6 rounded-[20px] bg-white p-6 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] sm:p-8"
+              className="premium-card grid gap-6 p-6 sm:p-8"
               endpoint={`/api/investor/project-submissions?lang=${locale}`}
               feedback={{
                 title: isRu ? "Проект отправлен" : "Project submitted",
@@ -123,7 +123,7 @@ export default async function NewProjectSubmissionPage({ searchParams }: { searc
                 <label className="grid gap-2 text-14 font-medium text-qidra-dark">
                   {isRu ? "Что уже сделано" : "Current progress"}
                   <textarea
-                    className="min-h-[140px] rounded-qidra border border-transparent bg-qidra-grayLight px-4 py-3 text-16 outline-none transition-colors placeholder:text-qidra-grayMedium focus:border-qidra-accent"
+                    className="field-shell min-h-[140px] rounded-qidra px-4 py-3 text-16 outline-none placeholder:text-qidra-grayMedium"
                     maxLength={2500}
                     minLength={30}
                     name="currentProgress"
@@ -138,7 +138,7 @@ export default async function NewProjectSubmissionPage({ searchParams }: { searc
                 <label className="grid gap-2 text-14 font-medium text-qidra-dark">
                   {isRu ? "План и этапы сбора" : "Raise plan and phases"}
                   <textarea
-                    className="min-h-[120px] rounded-qidra border border-transparent bg-qidra-grayLight px-4 py-3 text-16 outline-none transition-colors placeholder:text-qidra-grayMedium focus:border-qidra-accent"
+                    className="field-shell min-h-[120px] rounded-qidra px-4 py-3 text-16 outline-none placeholder:text-qidra-grayMedium"
                     maxLength={2500}
                     minLength={20}
                     name="raisePlan"
@@ -152,7 +152,7 @@ export default async function NewProjectSubmissionPage({ searchParams }: { searc
                 <label className="grid gap-2 text-14 font-medium text-qidra-dark">
                   {isRu ? "Подробное описание проекта" : "Detailed project description"}
                   <textarea
-                    className="min-h-[220px] rounded-qidra border border-transparent bg-qidra-grayLight px-4 py-3 text-16 outline-none transition-colors placeholder:text-qidra-grayMedium focus:border-qidra-accent"
+                    className="field-shell min-h-[220px] rounded-qidra px-4 py-3 text-16 outline-none placeholder:text-qidra-grayMedium"
                     maxLength={5000}
                     minLength={120}
                     name="summary"
@@ -196,11 +196,11 @@ export default async function NewProjectSubmissionPage({ searchParams }: { searc
                 />
               ) : null}
               {recentSubmissions.length ? (
-                <section className="rounded-[20px] bg-white p-6 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] sm:p-8">
+                <section className="premium-card p-6 sm:p-8">
                   <h2 className="text-[26px] font-medium leading-tight tracking-[0] text-qidra-dark">{isRu ? "Мои проекты" : "My projects"}</h2>
                   <div className="mt-5 grid gap-3">
                     {recentSubmissions.map((submission) => (
-                      <div key={submission.id} className="rounded-[14px] bg-qidra-grayLight p-4">
+                      <div key={submission.id} className="rounded-qidra bg-qidra-grayLight p-4">
                         <p className="font-medium text-qidra-dark">{submission.title}</p>
                         <p className="mt-1 text-14 text-qidra-grayBlue">{submissionStatusLabel(submission.status, locale)}</p>
                       </div>
@@ -208,7 +208,7 @@ export default async function NewProjectSubmissionPage({ searchParams }: { searc
                   </div>
                 </section>
               ) : null}
-              <section className="rounded-[20px] bg-qidra-grayLight p-6 sm:p-8">
+              <section className="premium-card p-6 sm:p-8">
                 <h2 className="text-[26px] font-medium leading-tight tracking-[0] text-qidra-dark">{isRu ? "Что подготовить" : "What to prepare"}</h2>
                 <div className="mt-5 grid gap-4 text-16 text-qidra-grayBlue">
                   <CheckItem text={isRu ? "Описание бизнес-модели и этапа проекта" : "Business model and project stage description"} />
