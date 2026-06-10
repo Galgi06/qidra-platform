@@ -109,12 +109,10 @@ export default async function AdminUserDetailPage({
                 }
               }
             },
-            orderBy: { createdAt: "desc" },
-            take: 4
+            orderBy: { createdAt: "desc" }
           }
         },
-        orderBy: { updatedAt: "desc" },
-        take: 6
+        orderBy: { updatedAt: "desc" }
       },
       wallet: {
         include: {

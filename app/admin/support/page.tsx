@@ -24,6 +24,7 @@ export default async function AdminSupportPage({ searchParams }: { searchParams:
   const ownerFilter = parseOwnerFilter(searchParamString(params.owner));
   const query = searchParamString(params.q)?.trim() ?? "";
   const isRu = locale === "ru";
+  const canOverseeAllSupport = session.user?.role === Role.ADMIN || session.user?.role === Role.SUPER_ADMIN;
   const supportWhere = buildSupportWhere({
     ownerFilter,
     query,
@@ -55,8 +56,7 @@ export default async function AdminSupportPage({ searchParams }: { searchParams:
               }
             }
           },
-          orderBy: { createdAt: "desc" },
-          take: 6
+          orderBy: { createdAt: "desc" }
         },
         user: {
           select: {
@@ -107,8 +107,8 @@ export default async function AdminSupportPage({ searchParams }: { searchParams:
               <h1 className="title-48 text-qidra-dark">{isRu ? "Коммуникации с участниками" : "Participant communications"}</h1>
               <p className="mt-4 max-w-3xl text-20 text-qidra-grayBlue">
                 {isRu
-                  ? "Личные обращения участников по профилю, платежам, проектам и документам. Менеджеры могут отвечать и брать диалог в работу."
-                  : "Personal participant requests about profile, payments, projects and documents. Managers can reply and take ownership of a thread."}
+                  ? "Личные обращения участников по профилю, платежам, проектам и документам. Менеджеры могут отвечать и брать диалог в работу, а администратор видит весь поток обращений."
+                  : "Personal participant requests about profile, payments, projects and documents. Managers can reply and take ownership of a thread, while administrators oversee the full support queue."}
               </p>
             </div>
           </div>
@@ -117,6 +117,17 @@ export default async function AdminSupportPage({ searchParams }: { searchParams:
         <section className="section">
           <div className="container-qidra grid gap-8">
             <AdminTabs activePath="/admin/support" locale={locale} role={session.user?.role} />
+            {canOverseeAllSupport ? (
+              <NotificationCard
+                title={isRu ? "Полный доступ администратора" : "Full administrator access"}
+                text={
+                  isRu
+                    ? "Главный админ и админ видят все обращения участников, всю историю сообщений, ответственного менеджера, статус диалога и могут подключаться к переписке в любой момент."
+                    : "Super admins and admins can see every participant request, the full message history, assigned owner, thread status and can join any conversation at any time."
+                }
+                tone="success"
+              />
+            ) : null}
             <SupportSearchForm locale={locale} ownerFilter={ownerFilter} query={query} queueFilter={queueFilter} statusFilter={statusFilter} />
             <div className="grid gap-4 md:grid-cols-4">
               <StatCard label={isRu ? "Открытые" : "Open"} value={stats.openCount} tone="accent" />

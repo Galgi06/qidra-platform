@@ -123,10 +123,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           entityType: "SupportThread",
           entityId: threadId,
           payload: {
-          assignedToId,
-          queue: data.queue,
-          status: data.status
-        }
+            assignedToId,
+            queue: data.queue,
+            status: data.status
+          }
         }
       });
     });
