@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/Input";
 import { requireAdmin } from "@/lib/access";
 import { getLocale, t, type SearchParams, withLocale } from "@/lib/i18n";
 import { prisma } from "@/lib/prisma";
+import { getPublicTronPaymentConfig } from "@/lib/trongrid";
 
 export default async function AdminPaymentsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const params = await searchParams;
@@ -22,6 +23,8 @@ export default async function AdminPaymentsPage({ searchParams }: { searchParams
   const typeFilter = parseTransactionType(searchParamString(params.type));
   const query = searchParamString(params.q)?.trim() ?? "";
   const userIdFilter = searchParamString(params.userId)?.trim() ?? "";
+  const tronPayment = getPublicTronPaymentConfig();
+  const sharedDepositMode = tronPayment.usesSharedDepositAddress;
   const realPaymentsWhere = realClientPaymentWhere();
   const paymentWhere: Prisma.WalletTransactionWhereInput = {
     AND: [
@@ -120,9 +123,11 @@ export default async function AdminPaymentsPage({ searchParams }: { searchParams
                       </div>
                       {payment.type === "DEPOSIT" ? (
                         <div className="rounded-qidra border border-qidra-grayLight bg-qidra-grayLight p-4">
-                          <p className="text-14 text-qidra-grayBlue">{locale === "ru" ? "Личный адрес участника" : "Participant personal address"}</p>
+                          <p className="text-14 text-qidra-grayBlue">
+                            {sharedDepositMode ? (locale === "ru" ? "Основной адрес приёма Qidra" : "Main Qidra receiving address") : locale === "ru" ? "Личный адрес участника" : "Participant personal address"}
+                          </p>
                           <code className="mt-2 block break-all rounded-qidra bg-white px-3 py-2 text-12 text-qidra-dark">
-                            {payment.wallet.trc20Address || (locale === "ru" ? "Адрес ещё не выдан" : "Address not issued yet")}
+                            {(sharedDepositMode ? tronPayment.walletAddress : payment.wallet.trc20Address) || (locale === "ru" ? "Адрес ещё не выдан" : "Address not issued yet")}
                           </code>
                         </div>
                       ) : null}
@@ -195,11 +200,15 @@ export default async function AdminPaymentsPage({ searchParams }: { searchParams
                     <p className="text-16 font-medium text-qidra-dark">{locale === "ru" ? "Автосверка входящих" : "Incoming auto-reconciliation"}</p>
                     <p className="mt-2 text-14 text-qidra-grayBlue">
                       {locale === "ru"
-                        ? "Проверяет подтверждённые USDT TRC20-переводы на личные адреса участников и зачисляет только новые операции."
-                        : "Scans confirmed USDT TRC20 transfers to participant personal addresses and credits only new operations."}
+                        ? sharedDepositMode
+                          ? "Включён режим единого адреса приёма. Автоскан личных адресов участников в этом режиме не используется; пополнения подтверждаются по hash на основной адрес."
+                          : "Проверяет подтверждённые USDT TRC20-переводы на личные адреса участников и зачисляет только новые операции."
+                        : sharedDepositMode
+                          ? "Shared receiving-address mode is enabled. Personal-address auto-scan is not used in this mode; deposits are confirmed by hash against the main address."
+                          : "Scans confirmed USDT TRC20 transfers to participant personal addresses and credits only new operations."}
                     </p>
                   </div>
-                  <Button type="submit">{locale === "ru" ? "Синхронизировать входящие" : "Sync incoming transfers"}</Button>
+                  <Button disabled={sharedDepositMode} type="submit">{locale === "ru" ? "Синхронизировать входящие" : "Sync incoming transfers"}</Button>
                 </FeedbackForm>
                 <NotificationCard
                   title={locale === "ru" ? "Чеклист подтверждения" : "Confirmation checklist"}

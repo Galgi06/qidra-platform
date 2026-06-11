@@ -449,6 +449,16 @@ model AdminAuditLog {
   actor      User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
 }
 
+model SiteContent {
+  key           String   @id
+  homeContent   Json?
+  footerContent Json?
+  legalContent  Json?
+  faqContent    Json?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
 model TwoFactorSetting {
   id         String   @id @default(cuid())
   userId     String   @unique

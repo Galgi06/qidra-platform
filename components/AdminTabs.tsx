@@ -11,6 +11,7 @@ const adminSections = [
   { path: "/admin/investments", label: { ru: "Заявки", en: "Applications" }, description: { ru: "Участие и резервы", en: "Participation and reserves" } },
   { path: "/admin/payments", label: { ru: "Платежи", en: "Payments" }, description: { ru: "Пополнения и выводы", en: "Deposits and withdrawals" } },
   { path: "/admin/support", label: { ru: "Коммуникации", en: "Communications" }, description: { ru: "Чаты и рассылки", en: "Chats and broadcasts" } },
+  { path: "/admin/content", label: { ru: "Контент", en: "Content" }, description: { ru: "Главная, документы, контакты", en: "Home, documents, contacts" } },
   { path: "/admin/security", label: { ru: "Безопасность", en: "Security" }, description: { ru: "Блокировки и 2FA", en: "Blocks and 2FA" } },
   { path: "/admin/audit", label: { ru: "Журнал", en: "Audit" }, description: { ru: "История действий", en: "Action history" } }
 ];

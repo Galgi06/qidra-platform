@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/Input";
 import { requireAuth } from "@/lib/access";
 import { getLocale, type SearchParams, withLocale } from "@/lib/i18n";
 import { prisma } from "@/lib/prisma";
-import { getPublicTronPaymentConfig } from "@/lib/trongrid";
+import { getPublicTronPaymentConfig, preferredDepositAddress } from "@/lib/trongrid";
 import { ensureUserDepositWallet } from "@/lib/wallet-addresses";
 
 export default async function WalletPage({ searchParams }: { searchParams?: SearchParams }) {
@@ -19,9 +19,13 @@ export default async function WalletPage({ searchParams }: { searchParams?: Sear
   const session = await requireAuth(locale, "/investor/wallet");
   const isRu = locale === "ru";
   const userId = session.user?.id ?? "";
-  const issuedWallet = await ensureUserDepositWallet(userId);
-  const wallet = await prisma.wallet.findUnique({
-    where: { id: issuedWallet.id },
+  const tronPayment = getPublicTronPaymentConfig();
+  const sharedDepositMode = tronPayment.usesSharedDepositAddress;
+  const issuedWallet = sharedDepositMode ? null : await ensureUserDepositWallet(userId);
+  const wallet = await prisma.wallet.upsert({
+    where: { userId },
+    update: {},
+    create: { userId },
     include: {
       transactions: {
         orderBy: { createdAt: "desc" },
@@ -29,8 +33,7 @@ export default async function WalletPage({ searchParams }: { searchParams?: Sear
       }
     }
   });
-  const tronPayment = getPublicTronPaymentConfig();
-  const depositAddress = wallet?.trc20Address ?? issuedWallet.trc20Address;
+  const depositAddress = preferredDepositAddress(wallet?.trc20Address ?? issuedWallet?.trc20Address);
   const availableUsdt = wallet?.availableUsdt ?? 0;
   const pendingUsdt = wallet?.pendingUsdt ?? 0;
   const reservedUsdt = wallet?.reservedUsdt ?? 0;
@@ -49,8 +52,8 @@ export default async function WalletPage({ searchParams }: { searchParams?: Sear
               </h1>
               <p className="mt-4 max-w-3xl text-20 text-qidra-grayBlue">
                 {isRu
-                  ? "Отправляйте USDT в сети TRC20 и добавляйте transaction hash. Qidra автоматически проверит перевод перед зачислением."
-                  : "Send USDT on TRC20 and add the transaction hash. Qidra will automatically verify the transfer before crediting it."}
+                  ? "Отправляйте USDT в сети TRC20 на указанный адрес и добавляйте transaction hash. Qidra автоматически проверит перевод перед зачислением."
+                  : "Send USDT on TRC20 to the shown address and add the transaction hash. Qidra will automatically verify the transfer before crediting it."}
               </p>
             </div>
           </div>
@@ -89,12 +92,16 @@ export default async function WalletPage({ searchParams }: { searchParams?: Sear
                     <h2 className="mt-2 text-[32px] font-medium leading-tight tracking-[0] text-qidra-dark">{isRu ? "Создать пополнение" : "Create deposit"}</h2>
                     <p className="mt-2 max-w-2xl text-15 leading-relaxed text-qidra-grayBlue">
                       {isRu
-                        ? "Перевод принимается только на ваш личный адрес. После отправки укажите hash, и система сверит сеть, адрес и сумму."
-                        : "Transfers are accepted only to your personal address. After sending, add the hash so the system can match the network, address and amount."}
+                        ? sharedDepositMode
+                          ? "Перевод принимается только на основной адрес приёма Qidra. После отправки укажите hash, и система сверит сеть, адрес и сумму."
+                          : "Перевод принимается только на ваш личный адрес. После отправки укажите hash, и система сверит сеть, адрес и сумму."
+                        : sharedDepositMode
+                          ? "Transfers are accepted only to the main Qidra receiving address. After sending, add the hash so the system can match the network, address and amount."
+                          : "Transfers are accepted only to your personal address. After sending, add the hash so the system can match the network, address and amount."}
                     </p>
                   </div>
                   {depositAddress ? (
-                    <WalletDepositAddress address={depositAddress} locale={locale} />
+                    <WalletDepositAddress address={depositAddress} locale={locale} shared={sharedDepositMode} />
                   ) : (
                     <NotificationCard
                       title={isRu ? "Адрес приёма скоро будет подключён" : "Receiving address will be connected soon"}
@@ -111,7 +118,15 @@ export default async function WalletPage({ searchParams }: { searchParams?: Sear
                   ) : null}
                   <NotificationCard
                     title={isRu ? "Перед отправкой" : "Before submitting"}
-                    text={isRu ? "Qidra примет только подтверждённый входящий USDT TRC20-перевод на ваш личный адрес и с точно такой же суммой." : "Qidra will accept only a confirmed incoming USDT TRC20 transfer to your personal address with the exact submitted amount."}
+                    text={
+                      isRu
+                        ? sharedDepositMode
+                          ? "Qidra примет только подтверждённый входящий USDT TRC20-перевод на основной адрес приёма и с точно такой же суммой."
+                          : "Qidra примет только подтверждённый входящий USDT TRC20-перевод на ваш личный адрес и с точно такой же суммой."
+                        : sharedDepositMode
+                          ? "Qidra will accept only a confirmed incoming USDT TRC20 transfer to the main receiving address with the exact submitted amount."
+                          : "Qidra will accept only a confirmed incoming USDT TRC20 transfer to your personal address with the exact submitted amount."
+                    }
                   />
                   <Input
                     label={isRu ? "Хэш транзакции" : "Transaction hash"}

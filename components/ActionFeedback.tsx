@@ -16,6 +16,13 @@ export type FeedbackMessage = {
 
 type FeedbackPlacement = "top-right" | "center";
 type FieldErrors = Record<string, string | string[]>;
+type ConfirmMessage = {
+  title: string;
+  text: string;
+  confirmLabel: string;
+  cancelLabel: string;
+  tone?: FeedbackTone;
+};
 
 const storedFeedbackKey = "qidra:feedback";
 
@@ -72,6 +79,59 @@ export function FeedbackPopup({ feedback, onClose, placement = "top-right" }: { 
   );
 }
 
+function ConfirmationPopup({
+  confirmation,
+  onCancel,
+  onConfirm
+}: {
+  confirmation: ConfirmMessage;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const tone = confirmation.tone ?? "warning";
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        onCancel();
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onCancel]);
+
+  return (
+    <div aria-modal="true" className="fixed inset-0 z-50 grid place-items-center bg-qidra-dark/30 px-4" role="alertdialog">
+      <div className="surface w-full max-w-lg border-qidra-grayLight bg-white p-6 shadow-qidra">
+        <div className="flex items-start gap-4">
+          <span aria-hidden="true" className={`mt-2 size-3 shrink-0 rounded-full ${toneDot[tone]}`} />
+          <div className="min-w-0 flex-1">
+            <p className="text-18 font-semibold text-qidra-dark">{confirmation.title}</p>
+            <p className="mt-2 text-14 text-qidra-grayBlue">{confirmation.text}</p>
+          </div>
+          <button
+            aria-label={confirmation.cancelLabel}
+            className="flex size-8 shrink-0 items-center justify-center rounded-qidra border border-qidra-grayLight text-16 text-qidra-grayBlue transition-colors hover:border-qidra-accent hover:text-qidra-accent"
+            onClick={onCancel}
+            type="button"
+          >
+            <CloseIcon />
+          </button>
+        </div>
+        <div className="mt-5 flex flex-wrap justify-end gap-3">
+          <Button onClick={onCancel} size="sm" type="button" variant="outline">
+            {confirmation.cancelLabel}
+          </Button>
+          <Button onClick={onConfirm} size="sm" type="button" variant="dark">
+            {confirmation.confirmLabel}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function CloseIcon() {
   return (
     <svg aria-hidden="true" className="size-4" fill="none" viewBox="0 0 16 16">
@@ -83,6 +143,7 @@ function CloseIcon() {
 type FeedbackFormProps = {
   children: ReactNode;
   className?: string;
+  confirm?: ConfirmMessage;
   endpoint?: string;
   feedback: FeedbackMessage;
   formId?: string;
@@ -96,6 +157,7 @@ type FeedbackFormProps = {
 export function FeedbackForm({
   children,
   className = "",
+  confirm,
   endpoint,
   feedback,
   formId,
@@ -109,7 +171,10 @@ export function FeedbackForm({
   const [storedFeedbackFallback] = useState(feedback);
   const [open, setOpen] = useState(false);
   const [activeFeedback, setActiveFeedback] = useState(feedback);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const pendingFormRef = useState(() => ({ current: null as HTMLFormElement | null }))[0];
+  const pendingSubmitterRef = useState(() => ({ current: null as { name: string; value: string } | null }))[0];
 
   useEffect(() => {
     const storedFeedback = readStoredFeedback(storedFeedbackFallback);
@@ -124,25 +189,15 @@ export function FeedbackForm({
     }
   }, [storedFeedbackFallback]);
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = event.currentTarget;
-
-    if (!form.checkValidity()) {
-      markBrowserInvalidFields(form);
-      form.reportValidity();
-      return;
-    }
-
+  async function submitForm(form: HTMLFormElement, submitter: { name: string; value: string } | null) {
     if (endpoint) {
       setSubmitting(true);
       clearFieldErrors(form);
 
       try {
         const formData = new FormData(form);
-        const submitter = (event.nativeEvent as SubmitEvent).submitter;
 
-        if ((submitter instanceof HTMLButtonElement || submitter instanceof HTMLInputElement) && submitter.name) {
+        if (submitter?.name) {
           formData.set(submitter.name, submitter.value);
         }
 
@@ -233,11 +288,54 @@ export function FeedbackForm({
     }
   }
 
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+
+    if (!form.checkValidity()) {
+      markBrowserInvalidFields(form);
+      form.reportValidity();
+      return;
+    }
+
+    const nativeSubmitter = (event.nativeEvent as SubmitEvent).submitter;
+    const submitter =
+      nativeSubmitter instanceof HTMLButtonElement || nativeSubmitter instanceof HTMLInputElement
+        ? nativeSubmitter.name
+          ? { name: nativeSubmitter.name, value: nativeSubmitter.value }
+          : null
+        : null;
+
+    if (confirm) {
+      pendingFormRef.current = form;
+      pendingSubmitterRef.current = submitter;
+      setConfirmOpen(true);
+      return;
+    }
+
+    await submitForm(form, submitter);
+  }
+
+  async function handleConfirm() {
+    const form = pendingFormRef.current;
+
+    setConfirmOpen(false);
+
+    if (!form) {
+      return;
+    }
+
+    await submitForm(form, pendingSubmitterRef.current);
+    pendingFormRef.current = null;
+    pendingSubmitterRef.current = null;
+  }
+
   return (
     <>
       <form aria-busy={submitting} className={className} id={formId} onSubmit={handleSubmit}>
         {children}
       </form>
+      {confirmOpen && confirm ? <ConfirmationPopup confirmation={confirm} onCancel={() => setConfirmOpen(false)} onConfirm={handleConfirm} /> : null}
       {open ? <FeedbackPopup feedback={activeFeedback} onClose={() => setOpen(false)} placement={popupPlacement} /> : null}
     </>
   );

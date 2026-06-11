@@ -67,12 +67,18 @@ export function getPublicTronPaymentConfig() {
   const config = getTronPaymentConfig();
 
   return {
+    usesSharedDepositAddress: Boolean(config.walletAddress),
     network: "TRC20",
     usdtContractAddress: config.usdtContractAddress,
     verificationConfigured: Boolean(config.apiKey),
     walletAddress: config.walletAddress,
     walletConfigured: config.walletConfigured
   };
+}
+
+export function preferredDepositAddress(personalAddress?: string | null) {
+  const config = getTronPaymentConfig();
+  return config.walletAddress || personalAddress || "";
 }
 
 export async function verifyTrc20Deposit(txHash: string, expectedAmount: Prisma.Decimal, expectedRecipientAddress?: string): Promise<TronVerificationResult> {

@@ -219,7 +219,9 @@ export default async function AdminUserDetailPage({
 
     return typeMatches && statusMatches;
   });
-  const canDeleteParticipant = session.user?.role === Role.SUPER_ADMIN && user.role === Role.INVESTOR && user.id !== session.user?.id;
+  const canDeleteUser =
+    user.id !== session.user?.id &&
+    (session.user?.role === Role.SUPER_ADMIN || (session.user?.role === Role.ADMIN && user.role === Role.INVESTOR));
 
   return (
     <>
@@ -511,11 +513,11 @@ export default async function AdminUserDetailPage({
             ) : null}
 
             {view === "overview" ? (
-              <PermanentUserDeletePanel
-                canDeleteParticipant={canDeleteParticipant}
-                endpoint={permanentDeleteEndpoint}
-                locale={locale}
-                targetEmail={user.email}
+                <PermanentUserDeletePanel
+                  canDeleteUser={canDeleteUser}
+                  endpoint={permanentDeleteEndpoint}
+                  locale={locale}
+                  targetEmail={user.email}
                 targetRole={user.role}
               />
             ) : null}
@@ -858,13 +860,13 @@ function SafeAdjustmentsPanel({
 }
 
 function PermanentUserDeletePanel({
-  canDeleteParticipant,
+  canDeleteUser,
   endpoint,
   locale,
   targetEmail,
   targetRole
 }: {
-  canDeleteParticipant: boolean;
+  canDeleteUser: boolean;
   endpoint: string;
   locale: Locale;
   targetEmail: string;
@@ -874,19 +876,28 @@ function PermanentUserDeletePanel({
 
   return (
     <Panel
-      title={isRu ? "Полное удаление участника" : "Permanent participant deletion"}
+      title={isRu ? "Полное удаление пользователя" : "Permanent user deletion"}
       description={
         isRu
-          ? "Опасное действие для главного администратора: удаляет участника, его историю, кошелёк, заявки, тестовые платежи и пересчитывает суммы проектов."
-          : "Dangerous super-admin action: deletes the participant, history, wallet, applications, test payments and recalculates project totals."
+          ? "Опасное действие администратора: удаляет пользователя, его баланс, историю, заявки, связанные платежи и пересчитывает суммы проектов."
+          : "Dangerous administrator action: deletes the user, balances, history, applications, linked payments and recalculates project totals."
       }
     >
-      {canDeleteParticipant ? (
+      {canDeleteUser ? (
         <FeedbackForm
           className="grid gap-4 rounded-[14px] border border-qidra-red/30 bg-qidra-red/5 p-5"
+          confirm={{
+            cancelLabel: isRu ? "Отмена" : "Cancel",
+            confirmLabel: isRu ? "Да, удалить безвозвратно" : "Yes, delete permanently",
+            text: isRu
+              ? "После этого шага пользователь будет полностью удалён из системы вместе с балансом, историей, заявками и связанными финансовыми записями. Эти данные перестанут участвовать в общей аналитике."
+              : "After this step, the user will be fully removed from the system together with balances, history, applications and linked financial records. Those records will stop affecting aggregate analytics.",
+            title: isRu ? "Последнее предупреждение" : "Final warning",
+            tone: "warning"
+          }}
           endpoint={endpoint}
           feedback={{
-            title: isRu ? "Участник удалён" : "Participant deleted",
+            title: isRu ? "Пользователь удалён" : "User deleted",
             text: isRu ? "Карточка, история и финансовые записи удалены. Суммы проектов пересчитаны." : "The card, history and financial records were removed. Project totals were recalculated.",
             buttonLabel: isRu ? "Понятно" : "Got it",
             dismissLabel: isRu ? "Закрыть уведомление" : "Close notification",
@@ -898,33 +909,37 @@ function PermanentUserDeletePanel({
             title={isRu ? "Это действие нельзя отменить" : "This cannot be undone"}
             text={
               isRu
-                ? "Используйте только для тестовых или ошибочно созданных участников. Для обычной остановки доступа лучше применять блокировку."
-                : "Use only for test or mistakenly created participants. For normal access removal, use blocking instead."
+                ? targetRole === Role.INVESTOR
+                  ? "Используйте только когда аккаунт участника нужно убрать из системы полностью вместе с балансом и историей. Для обычной остановки доступа лучше применять блокировку."
+                  : "Используйте только когда аккаунт нужно убрать из системы полностью вместе с балансом и историей. Для обычной остановки доступа лучше применять блокировку."
+                : targetRole === Role.INVESTOR
+                  ? "Use this only when a participant account must be removed from the system entirely together with balances and history. For normal access removal, use blocking instead."
+                  : "Use this only when the account must be removed from the system entirely together with balances and history. For normal access removal, use blocking instead."
             }
             tone="warning"
           />
           <div className="grid gap-4 md:grid-cols-2">
-            <Input label={isRu ? "Email удаляемого участника" : "Participant email to delete"} name="email" placeholder={targetEmail} required type="email" />
+            <Input label={isRu ? "Email удаляемого пользователя" : "User email to delete"} name="email" placeholder={targetEmail} required type="email" />
             <Input label={isRu ? "Подтверждение" : "Confirmation"} name="confirmation" pattern="DELETE" placeholder="DELETE" required />
           </div>
           <ReasonField
             label={isRu ? "Причина полного удаления" : "Permanent deletion reason"}
             locale={locale}
             name="reason"
-            placeholder={isRu ? "Например: удаление тестового аккаунта и всех тестовых платежей перед запуском" : "For example: removing a test account and all test payments before launch"}
+            placeholder={isRu ? "Например: удаление тестового аккаунта, баланса и всей ошибочной финансовой истории перед запуском" : "For example: removing a test account, balance and incorrect financial history before launch"}
           />
           <Button className="border-qidra-red bg-qidra-red hover:bg-qidra-red/90" type="submit" variant="dark">
-            {isRu ? "Удалить участника полностью" : "Delete participant permanently"}
+            {isRu ? "Удалить пользователя полностью" : "Delete user permanently"}
           </Button>
         </FeedbackForm>
       ) : (
         <NotificationCard
           title={isRu ? "Удаление недоступно" : "Deletion unavailable"}
           text={
-            targetRole !== Role.INVESTOR
+            targetRole === Role.SUPER_ADMIN
               ? isRu
-                ? "Полное удаление разрешено только для участников. Аккаунты сотрудников удаляются отдельной административной процедурой."
-                : "Permanent deletion is only allowed for participants. Staff accounts require a separate administrative procedure."
+                ? "Нельзя использовать полное удаление для собственного аккаунта главного администратора."
+                : "Permanent deletion cannot be used for the current super administrator account."
               : isRu
                 ? "Полное удаление доступно только главному администратору и не применяется к собственному аккаунту."
                 : "Permanent deletion is only available to the super administrator and cannot be used on your own account."

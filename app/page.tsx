@@ -10,6 +10,7 @@ import { canAccessAdmin } from "@/lib/auth";
 import { dictionary, getLocale, type SearchParams, withLocale } from "@/lib/i18n";
 import { authOptions } from "@/lib/next-auth";
 import { getPublicProjects } from "@/lib/project-catalog";
+import { getSiteContent } from "@/lib/site-content";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +24,7 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
   const locale = await getLocale(searchParams);
   const t = dictionary[locale];
   const isRu = locale === "ru";
-  const [session, projects] = await Promise.all([(getServerSession(authOptions) as Promise<SessionWithRole>), getPublicProjects()]);
+  const [session, projects, siteContent] = await Promise.all([(getServerSession(authOptions) as Promise<SessionWithRole>), getPublicProjects(), getSiteContent()]);
   const signedIn = Boolean(session?.user);
   const adminSession = canAccessAdmin(session?.user?.role as "ADMIN" | "SUPER_ADMIN" | "guest" | undefined);
   const accountHref = adminSession ? "/admin" : "/investor";
@@ -77,18 +78,18 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
 
             <div className="grid min-h-[620px] items-center py-12 sm:min-h-[680px] lg:min-h-[720px] lg:py-14">
               <div className="grid max-w-[980px] gap-7">
-                <span className="section-kicker border-white/18 bg-white/10 text-white">{isRu ? "Проверенные проекты · защищённая инфраструктура" : "Reviewed projects · protected infrastructure"}</span>
+                <span className="section-kicker border-white/18 bg-white/10 text-white">{siteContent.home.hero.kicker[locale]}</span>
                 <h1 className="whitespace-pre-line text-[40px] font-medium leading-[1.08] tracking-[0] text-white sm:text-[54px] lg:text-[66px] xl:text-[72px]">
-                  {t.hero.title}
+                  {siteContent.home.hero.title[locale]}
                 </h1>
-                <p className="max-w-[680px] text-[22px] leading-[1.35] text-white/88 sm:text-[28px]">{t.hero.subtitle}</p>
+                <p className="max-w-[680px] text-[22px] leading-[1.35] text-white/88 sm:text-[28px]">{siteContent.home.hero.subtitle[locale]}</p>
                 <ButtonLink href={withLocale("/projects", locale)} variant="white" className="mt-8 h-14 w-full max-w-[520px] text-18 sm:h-[64px] lg:mt-14">
-                  {isRu ? "Перейти к проектам" : "Go to projects"}
+                  {siteContent.home.hero.ctaLabel[locale]}
                 </ButtonLink>
                 <div className="grid max-w-[760px] gap-3 pt-2 sm:grid-cols-3">
-                  <HeroSignalTile label={isRu ? "ПРОВЕРКА" : "REVIEW"} value={isRu ? "Отбор проектов" : "Project screening"} />
-                  <HeroSignalTile label={isRu ? "ДОКУМЕНТЫ" : "DOCUMENTS"} value={isRu ? "Условия открыты" : "Clear terms"} />
-                  <HeroSignalTile label={isRu ? "КАБИНЕТ" : "WORKSPACE"} value={isRu ? "Статусы и связь" : "Status and support"} />
+                  {siteContent.home.hero.signals.map((item) => (
+                    <HeroSignalTile key={item.label.en} label={item.label[locale]} value={item.value[locale]} />
+                  ))}
                 </div>
               </div>
             </div>
@@ -99,43 +100,35 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
           <div className="mx-auto grid max-w-[1840px] gap-8 lg:grid-cols-[1fr_0.92fr] lg:items-start">
             <div className="grid content-start gap-7 pt-2">
               <h2 className="max-w-4xl text-[44px] font-medium leading-[1.14] tracking-[0] text-qidra-dark sm:text-[58px] lg:text-[72px]">
-                {isRu ? "Международные проекты доступны каждому" : "International projects open to every participant"}
+                {siteContent.home.intro.title[locale]}
               </h2>
               <p className="max-w-3xl text-[22px] leading-[1.35] text-qidra-dark sm:text-[28px]">
-                {isRu ? "Платформа объединяет предпринимателей и партнёров из разных стран" : "The platform connects entrepreneurs and partners from different countries"}
+                {siteContent.home.intro.subtitle[locale]}
               </p>
             </div>
             <div className="premium-card grid min-h-[360px] content-between overflow-hidden p-7 sm:p-10 lg:min-h-[430px] lg:p-12">
               <div>
-                <span className="section-kicker">{isRu ? "Как устроена платформа" : "How the platform works"}</span>
+                <span className="section-kicker">{siteContent.home.intro.process.kicker[locale]}</span>
                 <h3 className="mt-8 max-w-2xl text-[32px] font-medium leading-[1.14] tracking-[0] text-qidra-dark sm:text-[42px]">
-                  {isRu ? "От заявки до сопровождения в одном рабочем контуре" : "From application to support in one operating flow"}
+                  {siteContent.home.intro.process.title[locale]}
                 </h3>
               </div>
               <div className="grid gap-3 sm:grid-cols-3">
-                <InsightTile title={isRu ? "Отбор" : "Review"} text={isRu ? "Проект проходит первичную проверку" : "Projects pass an initial review"} />
-                <InsightTile title={isRu ? "Документы" : "Documents"} text={isRu ? "Условия и материалы доступны участникам" : "Terms and materials are available to participants"} />
-                <InsightTile title={isRu ? "Кабинет" : "Workspace"} text={isRu ? "Заявки, статусы и связь в профиле" : "Applications, statuses and support in profile"} />
+                {siteContent.home.intro.process.insights.map((item) => (
+                  <InsightTile key={item.title.en} title={item.title[locale]} text={item.text[locale]} />
+                ))}
               </div>
             </div>
           </div>
           <div className="mx-auto mt-8 grid max-w-[1840px] gap-8 lg:grid-cols-2">
             <FeaturePanel
               tone="blue"
-              title={isRu ? "Разные направления для партнёрских проектов" : "Different sectors for partnership projects"}
-              text={
-                isRu
-                  ? "Выбирайте инициативы по направлению и масштабу: от локальных компаний до международного сотрудничества."
-                  : "Choose initiatives by sector and scale, from local companies to international cooperation."
-              }
+              title={siteContent.home.intro.featurePanels[0]?.title[locale] ?? ""}
+              text={siteContent.home.intro.featurePanels[0]?.text[locale] ?? ""}
             />
             <FeaturePanel
-              title={isRu ? "Комплексная экспертиза каждого проекта" : "Comprehensive review for every project"}
-              text={
-                isRu
-                  ? "Юридическая, экономическая и шариатская экспертиза помогает участникам понимать правила и структуру сотрудничества."
-                  : "Legal, economic, and Sharia review helps participants understand the rules and cooperation structure."
-              }
+              title={siteContent.home.intro.featurePanels[1]?.title[locale] ?? ""}
+              text={siteContent.home.intro.featurePanels[1]?.text[locale] ?? ""}
             />
           </div>
         </section>
@@ -144,45 +137,32 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
           <div className="mx-auto grid max-w-[1840px] gap-8">
             <div>
               <h2 className="text-[44px] font-medium leading-[1.12] tracking-[0] text-qidra-dark sm:text-[58px] lg:text-[72px]">
-                {isRu ? "Халяльность и безопасность" : "Halal principles and safety"}
+                {siteContent.home.safety.title[locale]}
               </h2>
               <p className="mt-6 max-w-5xl text-[22px] leading-[1.35] text-qidra-dark sm:text-[28px]">
-                {isRu
-                  ? "Каждый проект проходит экспертную проверку и сопровождается на всех этапах реализации"
-                  : "Every project goes through expert review and is supported throughout implementation"}
+                {siteContent.home.safety.subtitle[locale]}
               </p>
             </div>
             <div className="grid gap-8 lg:grid-cols-2">
               <FeaturePanel
-                title={isRu ? "Юридическая экспертиза" : "Legal review"}
-                text={isRu ? "Анализ документов и договорных условий для соблюдения правовых требований." : "Analysis of documents and contract terms for legal compliance."}
+                title={siteContent.home.safety.panels[0]?.title[locale] ?? ""}
+                text={siteContent.home.safety.panels[0]?.text[locale] ?? ""}
               />
               <FeaturePanel
-                title={isRu ? "Экономическая оценка проекта" : "Economic project assessment"}
-                text={
-                  isRu
-                    ? "Проверка модели реализации, прозрачности отчётности и согласованных условий взаимодействия."
-                    : "Review of the operating model, reporting transparency, and agreed cooperation terms."
-                }
+                title={siteContent.home.safety.panels[1]?.title[locale] ?? ""}
+                text={siteContent.home.safety.panels[1]?.text[locale] ?? ""}
               />
             </div>
             <div className="grid gap-8 lg:grid-cols-[0.98fr_1fr]">
               <FeaturePanel
                 tone="blue"
-                title={isRu ? "Соответствие шариату" : "Sharia compliance"}
-                text={
-                  isRu
-                    ? "Шариатский совет Qidra контролирует проекты на этапах отбора, раскрытия условий и сопровождения."
-                    : "The Qidra Sharia board oversees project selection, condition disclosure, and ongoing support."
-                }
+                title={siteContent.home.safety.panels[2]?.title[locale] ?? ""}
+                text={siteContent.home.safety.panels[2]?.text[locale] ?? ""}
               />
               <div className="premium-card p-7 sm:p-10">
-                <PrincipleItem title={isRu ? "Риба" : "Riba"} text={isRu ? "Исключение фиксированных обязательных начислений" : "Exclusion of fixed mandatory accruals"} />
-                <PrincipleItem
-                  title={isRu ? "Гарар" : "Gharar"}
-                  text={isRu ? "Недопустимы неопределённость, скрытая информация или неясные условия сотрудничества" : "Uncertainty, hidden information, and unclear cooperation terms are not accepted"}
-                />
-                <PrincipleItem title={isRu ? "Мейсир" : "Maysir"} text={isRu ? "Исключаются азартные и спекулятивные механизмы" : "Gambling and speculative mechanisms are excluded"} last />
+                {siteContent.home.safety.principles.map((item, index) => (
+                  <PrincipleItem key={item.title.en} title={item.title[locale]} text={item.text[locale]} last={index === siteContent.home.safety.principles.length - 1} />
+                ))}
               </div>
             </div>
           </div>
@@ -193,44 +173,25 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
             <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
               <div>
                 <h2 className="text-[44px] font-medium leading-[1.12] tracking-[0] text-qidra-dark sm:text-[58px] lg:text-[72px]">
-                  {isRu ? "Открытые проекты" : "Open projects"}
+                  {siteContent.home.openProjects.title[locale]}
                 </h2>
                 <p className="mt-5 max-w-4xl text-[22px] leading-[1.35] text-qidra-grayBlue sm:text-[26px]">
-                  {isRu
-                    ? "На главной доступны те же опубликованные проекты, документы и описания, которые участник видит в каталоге."
-                    : "The home page shows the same published projects, documents and descriptions available in the participant catalog."}
+                  {siteContent.home.openProjects.subtitle[locale]}
                 </p>
               </div>
               <div className="flex flex-wrap gap-3">
                 <ButtonLink href={withLocale("/projects", locale)} variant="outline" className="h-12">
-                  {isRu ? "Весь каталог" : "Full catalog"}
+                  {siteContent.home.openProjects.buttonLabels.catalog[locale]}
                 </ButtonLink>
                 <ButtonLink href={withLocale("/investor/projects/new", locale)} className="h-12">
-                  {isRu ? "Разместить проект" : "List project"}
+                  {siteContent.home.openProjects.buttonLabels.listProject[locale]}
                 </ButtonLink>
               </div>
             </div>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <HomeSectorCard
-                title={isRu ? "Недвижимость" : "Real estate"}
-                text={isRu ? "Девелопмент, доходные объекты и партнёрские сделки с недвижимостью." : "Development, income assets and real-estate partnership deals."}
-                href={withLocale("/projects?sector=real-estate", locale)}
-              />
-              <HomeSectorCard
-                title={isRu ? "Торговля" : "Trade"}
-                text={isRu ? "Закупки, поставки, международная торговля и оборотные контракты." : "Procurement, supply, international trade and working-capital contracts."}
-                href={withLocale("/projects?sector=trade", locale)}
-              />
-              <HomeSectorCard
-                title={isRu ? "Металлургия и сырьё" : "Metallurgy and resources"}
-                text={isRu ? "Проекты добычи, переработки, производства и поставок сырья." : "Mining, processing, production and resource supply projects."}
-                href={withLocale("/projects?sector=metallurgy", locale)}
-              />
-              <HomeSectorCard
-                title={isRu ? "Медицина и технологии" : "Healthcare and technology"}
-                text={isRu ? "Медицинские, цифровые и технологические инициативы." : "Healthcare, digital and technology initiatives."}
-                href={withLocale("/projects?sector=healthcare", locale)}
-              />
+              {siteContent.home.openProjects.sectors.map((sector) => (
+                <HomeSectorCard key={sector.href} title={sector.title[locale]} text={sector.text[locale]} href={withLocale(sector.href, locale)} />
+              ))}
             </div>
             <div className="grid gap-5 lg:grid-cols-2">
               {projects.slice(0, 2).map((project) => (
@@ -243,35 +204,18 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
         <section className="px-5 pb-20 sm:px-8 lg:px-11 lg:pb-28">
           <div className="mx-auto max-w-[1840px]">
             <h2 className="text-[44px] font-medium leading-[1.12] tracking-[0] text-qidra-dark sm:text-[58px] lg:text-[72px]">
-              {isRu ? "Быстрый старт для бизнеса" : "Fast start for business"}
+              {siteContent.home.business.title[locale]}
             </h2>
             <div className="mt-10 grid gap-8 lg:grid-cols-3">
-              <StepCard
-                title={isRu ? "Оставьте заявку с описанием идеи" : "Submit an application with your idea"}
-                items={
-                  isRu
-                    ? ["Экспертная оценка проекта", "Поддержка команды Qidra при подготовке проекта к размещению"]
-                    : ["Expert project assessment", "Qidra team support while preparing the project for publication"]
-                }
-                action={isRu ? "Создать проект" : "Create project"}
-                href={withLocale(signedIn ? "/investor/projects/new" : "/auth/sign-up", locale)}
-              />
-              <StepCard
-                title={isRu ? "Получите поддержку международного сообщества" : "Get support from an international community"}
-                items={
-                  isRu
-                    ? ["Проект становится доступным широкой аудитории участников", "Платформа обеспечивает структурированное и прозрачное взаимодействие сторон"]
-                    : ["The project becomes available to a wide participant audience", "The platform provides structured and transparent cooperation"]
-                }
-              />
-              <StepCard
-                title={isRu ? "Реализуйте цели своего бизнеса" : "Reach your business goals"}
-                items={
-                  isRu
-                    ? ["Привлечение партнёров для реализации бизнес-задач", "Прямое взаимодействие с участниками проекта через платформу"]
-                    : ["Attract partners to carry out business goals", "Direct interaction with project participants through the platform"]
-                }
-              />
+              {siteContent.home.business.steps.map((step, index) => (
+                <StepCard
+                  key={step.title.en}
+                  title={step.title[locale]}
+                  items={step.items.map((item) => item[locale])}
+                  action={index === 0 ? step.actionLabel?.[locale] : undefined}
+                  href={index === 0 ? withLocale(signedIn ? "/investor/projects/new" : "/auth/sign-up", locale) : undefined}
+                />
+              ))}
             </div>
           </div>
         </section>
@@ -280,16 +224,14 @@ export default async function Home({ searchParams }: { searchParams?: SearchPara
           <div className="premium-dark-panel mx-auto grid max-w-[1840px] gap-8 p-7 text-white sm:p-10 lg:grid-cols-[1fr_auto] lg:items-center lg:p-14">
             <div>
               <h2 className="text-[34px] font-medium leading-[1.15] tracking-[0] sm:text-[44px]">
-                {isRu ? "Откройте каталог проектов Qidra" : "Open the Qidra project catalog"}
+                {siteContent.home.finalCta.title[locale]}
               </h2>
               <p className="mt-4 max-w-3xl text-20 text-white/82">
-                {isRu
-                  ? "Выберите подходящее направление, изучите условия и перейдите к заявке через страницу проекта."
-                  : "Choose a suitable sector, review the terms, and proceed to the application from the project page."}
+                {siteContent.home.finalCta.text[locale]}
               </p>
             </div>
             <ButtonLink href={withLocale("/projects", locale)} variant="white" className="h-14 min-w-56">
-              {isRu ? "Перейти к проектам" : "Go to projects"}
+              {siteContent.home.finalCta.buttonLabel[locale]}
             </ButtonLink>
           </div>
         </section>

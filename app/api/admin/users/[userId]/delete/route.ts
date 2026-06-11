@@ -25,12 +25,13 @@ function isRu(request: NextRequest) {
 export async function POST(request: NextRequest, { params }: { params: Promise<{ userId: string }> }) {
   const localeRu = isRu(request);
   const session = (await getServerSession(authOptions)) as SessionUser | null;
+  const actorRole = session?.user?.role as Role | undefined;
 
-  if (session?.user?.role !== Role.SUPER_ADMIN || !session.user.id) {
+  if (!session?.user?.id || (actorRole !== Role.ADMIN && actorRole !== Role.SUPER_ADMIN)) {
     return NextResponse.json(
       {
-        title: localeRu ? "Нужен главный администратор" : "Super administrator required",
-        message: localeRu ? "Полное удаление участника доступно только главному администратору." : "Permanent participant deletion is only available to a super administrator."
+        title: localeRu ? "Нужен администратор" : "Administrator required",
+        message: localeRu ? "Полное удаление пользователя доступно только администратору." : "Permanent user deletion is only available to an administrator."
       },
       { status: 403 }
     );
@@ -57,8 +58,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         title: localeRu ? "Проверьте форму" : "Check the form",
         message:
           localeRu
-            ? "Введите email участника, причину не короче 12 символов и подтверждение DELETE."
-            : "Enter the participant email, a reason of at least 12 characters and DELETE confirmation."
+            ? "Введите email пользователя, причину не короче 12 символов и подтверждение DELETE."
+            : "Enter the user email, a reason of at least 12 characters and DELETE confirmation."
       },
       { status: 400 }
     );
@@ -119,10 +120,25 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (!targetUser) {
     return NextResponse.json(
       {
-        title: localeRu ? "Участник не найден" : "Participant not found",
-        message: localeRu ? "Обновите страницу и выберите участника из списка." : "Refresh the page and choose a participant from the list."
+        title: localeRu ? "Пользователь не найден" : "User not found",
+        message: localeRu ? "Обновите страницу и выберите пользователя из списка." : "Refresh the page and choose a user from the list."
       },
       { status: 404 }
+    );
+  }
+
+  const canDeleteTarget = actorRole === Role.SUPER_ADMIN ? targetUser.id !== session.user.id : targetUser.role === Role.INVESTOR && targetUser.id !== session.user.id;
+
+  if (!canDeleteTarget) {
+    return NextResponse.json(
+      {
+        title: localeRu ? "Удаление запрещено" : "Deletion is not allowed",
+        message:
+          localeRu
+            ? "Администратор может удалять только участников. Для удаления менеджеров и администраторов нужен главный администратор."
+            : "An administrator can delete participants only. Removing managers and administrators requires a super administrator."
+      },
+      { status: 403 }
     );
   }
 
@@ -130,25 +146,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json(
       {
         fieldErrors: {
-          email: localeRu ? "Email должен совпадать с удаляемым участником." : "The email must match the participant being deleted."
+          email: localeRu ? "Email должен совпадать с удаляемым пользователем." : "The email must match the user being deleted."
         },
         title: localeRu ? "Email не совпадает" : "Email does not match",
-        message: localeRu ? "Введите email именно этой карточки участника." : "Enter the email from this participant card."
+        message: localeRu ? "Введите email именно этой карточки пользователя." : "Enter the email from this user card."
       },
       { status: 400 }
-    );
-  }
-
-  if (targetUser.role !== Role.INVESTOR) {
-    return NextResponse.json(
-      {
-        title: localeRu ? "Можно удалить только участника" : "Participants only",
-        message:
-          localeRu
-            ? "Аккаунты сотрудников не удаляются этой формой. Сначала используйте отдельную административную процедуру."
-            : "Staff accounts are not deleted by this form. Use a separate administrative procedure first."
-      },
-      { status: 409 }
     );
   }
 
@@ -204,11 +207,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   return NextResponse.json({
     redirectTo: `/admin/users?lang=${localeRu ? "ru" : "en"}`,
-    title: localeRu ? "Участник удалён полностью" : "Participant permanently deleted",
+    title: localeRu ? "Пользователь удалён полностью" : "User permanently deleted",
     message:
       localeRu
-        ? "Участник, его история, кошелёк, заявки и платежи удалены. Суммы проектов пересчитаны."
-        : "The participant, history, wallet, applications and payments were removed. Project totals were recalculated.",
+        ? "Пользователь, его баланс, история, заявки и связанные платежи удалены. Суммы проектов пересчитаны там, где это требовалось."
+        : "The user, balances, history, applications and linked payments were removed. Project totals were recalculated where needed.",
     tone: "warning"
   });
 }

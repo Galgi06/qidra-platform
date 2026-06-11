@@ -47,6 +47,11 @@ const sections = [
     text: { ru: "Личные диалоги с участниками, поддержкой и продажами.", en: "Personal participant threads for support and sales." }
   },
   {
+    href: "/admin/content",
+    label: { ru: "Контент сайта", en: "Site content" },
+    text: { ru: "Главная страница, футер, FAQ и юридические документы.", en: "Home page, footer, FAQ, and legal documents." }
+  },
+  {
     href: "/admin/security",
     label: { ru: "Безопасность", en: "Security" },
     text: {

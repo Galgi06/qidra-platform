@@ -4,7 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { canAccessAdmin } from "@/lib/auth";
 import { authOptions } from "@/lib/next-auth";
 import { prisma } from "@/lib/prisma";
-import { verifyTrc20Deposit } from "@/lib/trongrid";
+import { preferredDepositAddress, verifyTrc20Deposit } from "@/lib/trongrid";
 
 type SessionUser = {
   user?: {
@@ -67,20 +67,22 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     );
   }
 
-  if (!transaction.wallet.trc20Address) {
+  const expectedDepositAddress = preferredDepositAddress(transaction.wallet.trc20Address);
+
+  if (!expectedDepositAddress) {
     return NextResponse.json(
       {
-        title: localeRu ? "Адрес участника не выдан" : "Participant address was not issued",
+        title: localeRu ? "Адрес приёма не настроен" : "Receiving address is not configured",
         message:
           localeRu
-            ? "Нельзя проверить депозит без личного TRC20-адреса участника. Отклоните старую заявку и попросите участника создать пополнение заново."
-            : "A deposit cannot be verified without the participant's personal TRC20 address. Reject the old request and ask the participant to create a new deposit."
+            ? "Нельзя проверить депозит без настроенного TRC20-адреса приёма."
+            : "A deposit cannot be verified without a configured TRC20 receiving address."
       },
       { status: 400 }
     );
   }
 
-  const verification = await verifyTrc20Deposit(transaction.txHash, transaction.amountUsdt, transaction.wallet.trc20Address);
+  const verification = await verifyTrc20Deposit(transaction.txHash, transaction.amountUsdt, expectedDepositAddress);
 
   if (verification.status === "unconfigured") {
     return NextResponse.json(
@@ -123,8 +125,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
               : "The on-chain amount differs from the submitted amount."
             : verification.reason === "recipient"
               ? localeRu
-                ? "Перевод отправлен не на личный адрес участника."
-                : "The transfer was not sent to the participant personal address."
+                ? "Перевод отправлен не на настроенный адрес приёма."
+                : "The transfer was not sent to the configured receiving address."
               : localeRu
                 ? "Hash относится не к USDT TRC20."
                 : "The hash does not belong to USDT TRC20."

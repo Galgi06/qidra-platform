@@ -5,7 +5,7 @@ import { z } from "zod";
 import { authOptions } from "@/lib/next-auth";
 import { prisma } from "@/lib/prisma";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
-import { verifyTrc20Deposit } from "@/lib/trongrid";
+import { preferredDepositAddress, verifyTrc20Deposit } from "@/lib/trongrid";
 import { ensureUserDepositWallet } from "@/lib/wallet-addresses";
 
 const depositSchema = z.object({
@@ -78,10 +78,16 @@ export async function POST(request: NextRequest) {
     return duplicateHashResponse(localeRu);
   }
 
-  const wallet = await ensureUserDepositWallet(userId);
-  const personalDepositAddress = wallet.trc20Address;
+  const walletRecord = await prisma.wallet.upsert({
+    where: { userId },
+    update: {},
+    create: { userId }
+  });
+  const configuredAddress = preferredDepositAddress(walletRecord.trc20Address);
+  const personalWallet = configuredAddress ? walletRecord : walletRecord.trc20Address ? walletRecord : await ensureUserDepositWallet(userId);
+  const depositAddress = configuredAddress || personalWallet.trc20Address || "";
 
-  if (!personalDepositAddress) {
+  if (!depositAddress) {
     return NextResponse.json(
       {
         title: localeRu ? "Адрес не выдан" : "Address was not issued",
@@ -94,7 +100,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const verification = await verifyTrc20Deposit(txHash, amountUsdt, personalDepositAddress);
+  const verification = await verifyTrc20Deposit(txHash, amountUsdt, depositAddress);
 
   if (verification.status === "unconfigured") {
     return NextResponse.json(
@@ -128,8 +134,8 @@ export async function POST(request: NextRequest) {
         title: localeRu ? "Платеж не найден" : "Payment not found",
         message:
           localeRu
-            ? "Система не нашла подтверждённый входящий USDT TRC20-перевод с этим hash на ваш личный адрес. Проверьте hash или повторите позже, если перевод только что отправлен."
-            : "The system did not find a confirmed incoming USDT TRC20 transfer with this hash to your personal address. Check the hash or retry later if the transfer was just sent."
+            ? "Система не нашла подтверждённый входящий USDT TRC20-перевод с этим hash на настроенный адрес приёма. Проверьте hash или повторите позже, если перевод только что отправлен."
+            : "The system did not find a confirmed incoming USDT TRC20 transfer with this hash to the configured deposit address. Check the hash or retry later if the transfer was just sent."
       },
       { status: 404 }
     );
@@ -148,7 +154,7 @@ export async function POST(request: NextRequest) {
   try {
     await prisma.$transaction(async (tx) => {
       const updatedWallet = await tx.wallet.update({
-        where: { id: wallet.id },
+        where: { id: personalWallet.id },
         data: { availableUsdt: { increment: amountUsdt } }
       });
 
@@ -181,7 +187,7 @@ export async function POST(request: NextRequest) {
           payload: {
             amountUsdt: amountUsdt.toString(),
             txHash,
-            toAddress: personalDepositAddress
+            toAddress: depositAddress
           }
         }
       });
@@ -225,7 +231,7 @@ function mismatchReason(reason: "amount" | "contract" | "recipient" | "source", 
   }
 
   if (reason === "recipient") {
-    return localeRu ? "Перевод отправлен не на ваш личный адрес Qidra." : "The transfer was not sent to your personal Qidra address.";
+    return localeRu ? "Перевод отправлен не на настроенный адрес приёма Qidra." : "The transfer was not sent to the configured Qidra receiving address.";
   }
 
   if (reason === "source") {

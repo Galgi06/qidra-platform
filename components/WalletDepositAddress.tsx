@@ -6,7 +6,7 @@ import QRCode from "qrcode";
 import { Button } from "@/components/ui/Button";
 import type { Locale } from "@/lib/i18n";
 
-export function WalletDepositAddress({ address, locale }: { address: string; locale: Locale }) {
+export function WalletDepositAddress({ address, locale, shared = false }: { address: string; locale: Locale; shared?: boolean }) {
   const isRu = locale === "ru";
   const [copied, setCopied] = useState(false);
   const [qrCode, setQrCode] = useState("");
@@ -55,7 +55,9 @@ export function WalletDepositAddress({ address, locale }: { address: string; loc
         )}
       </div>
       <div className="min-w-0">
-        <p className="text-14 font-semibold text-qidra-dark">{isRu ? "Личный адрес для USDT TRC20" : "Personal USDT TRC20 address"}</p>
+        <p className="text-14 font-semibold text-qidra-dark">
+          {shared ? (isRu ? "Основной адрес приёма USDT TRC20" : "Main USDT TRC20 receiving address") : isRu ? "Личный адрес для USDT TRC20" : "Personal USDT TRC20 address"}
+        </p>
         <div className="mt-3 grid gap-2 rounded-[12px] bg-white p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
           <code className="block max-w-full select-all overflow-hidden break-all px-1 font-mono text-14 leading-relaxed text-qidra-dark">{address}</code>
           <Button aria-label={isRu ? "Скопировать адрес USDT TRC20" : "Copy USDT TRC20 address"} className="w-full sm:w-auto" onClick={handleCopy} size="sm" type="button" variant="outline">
@@ -66,7 +68,15 @@ export function WalletDepositAddress({ address, locale }: { address: string; loc
           <Button className="w-full sm:w-auto" onClick={handleCopy} size="sm" type="button" variant="dark">
             {copied ? (isRu ? "Скопировано" : "Copied") : isRu ? "Скопировать" : "Copy"}
           </Button>
-          <p className="text-12 leading-relaxed text-qidra-grayBlue">{isRu ? "Отправляйте только USDT в сети TRC20. Адрес закреплён за вашим кабинетом." : "Send only USDT on the TRC20 network. This address is assigned to your account."}</p>
+          <p className="text-12 leading-relaxed text-qidra-grayBlue">
+            {shared
+              ? isRu
+                ? "Отправляйте только USDT в сети TRC20. Это основной адрес приёма Qidra для пополнений."
+                : "Send only USDT on the TRC20 network. This is Qidra's main receiving address for deposits."
+              : isRu
+                ? "Отправляйте только USDT в сети TRC20. Адрес закреплён за вашим кабинетом."
+                : "Send only USDT on the TRC20 network. This address is assigned to your account."}
+          </p>
         </div>
       </div>
     </div>
