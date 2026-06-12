@@ -122,6 +122,7 @@ model User {
   twoFactorSetting       TwoFactorSetting?
   supportThreads         SupportThread[]         @relation("SupportThreadUser")
   assignedSupportThreads SupportThread[]         @relation("SupportThreadAssignee")
+  assignedGuestSupportThreads GuestSupportThread[] @relation("GuestSupportThreadAssignee")
   supportMessages        SupportMessage[]        @relation("SupportMessageSender")
   notifications          Notification[]          @relation("NotificationRecipient")
   authoredNotifications  Notification[]          @relation("NotificationActor")
@@ -414,6 +415,43 @@ model SupportMessage {
   sender    User?         @relation("SupportMessageSender", fields: [senderId], references: [id], onDelete: SetNull)
 
   @@index([senderId])
+  @@index([threadId])
+}
+
+model GuestSupportThread {
+  id                    String              @id @default(cuid())
+  publicToken           String              @unique
+  name                  String
+  email                 String
+  contact               String?
+  subject               String?
+  status                SupportThreadStatus @default(OPEN)
+  queue                 SupportQueue        @default(TECH_SUPPORT)
+  assignedToId          String?
+  lastGuestMessageAt    DateTime?
+  lastManagerMessageAt  DateTime?
+  closedAt              DateTime?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  assignedTo            User?               @relation("GuestSupportThreadAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  messages              GuestSupportMessage[]
+
+  @@index([assignedToId])
+  @@index([email])
+  @@index([queue])
+  @@index([status])
+}
+
+model GuestSupportMessage {
+  id         String             @id @default(cuid())
+  threadId    String
+  senderKind  String
+  senderName  String?
+  body        String             @db.Text
+  createdAt   DateTime           @default(now())
+  thread      GuestSupportThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
   @@index([threadId])
 }
 

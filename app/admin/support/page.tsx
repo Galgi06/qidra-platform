@@ -33,7 +33,7 @@ export default async function AdminSupportPage({ searchParams }: { searchParams:
     sessionUserId: session.user?.id,
     statusFilter
   });
-  const [threads, managers, stats] = await Promise.all([
+  const [threads, guestThreads, managers, stats] = await Promise.all([
     prisma.supportThread.findMany({
       where: supportWhere,
       include: {
@@ -70,6 +70,31 @@ export default async function AdminSupportPage({ searchParams }: { searchParams:
               take: 5
             }
           }
+        }
+      },
+      orderBy: { updatedAt: "desc" },
+      take: 100
+    }),
+    prisma.guestSupportThread.findMany({
+      where: buildGuestSupportWhere({
+        ownerFilter,
+        query,
+        queueFilter,
+        sessionRole: session.user?.role,
+        sessionUserId: session.user?.id,
+        statusFilter
+      }),
+      include: {
+        assignedTo: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true
+          }
+        },
+        messages: {
+          orderBy: { createdAt: "desc" }
         }
       },
       orderBy: { updatedAt: "desc" },
@@ -134,6 +159,11 @@ export default async function AdminSupportPage({ searchParams }: { searchParams:
               <StatCard label={isRu ? "Ожидают участника" : "Waiting participant"} value={stats.pendingCount} />
               <StatCard label={isRu ? "Закрытые" : "Closed"} value={stats.closedCount} tone="success" />
               <StatCard label={isRu ? "Средняя оценка" : "Average rating"} value={stats.averageRatingLabel} />
+            </div>
+            <div className="grid gap-4 md:grid-cols-3">
+              <StatCard label={isRu ? "Гостевые открытые" : "Guest open"} value={stats.guestOpenCount} tone="accent" />
+              <StatCard label={isRu ? "Гостевые ожидают" : "Guest pending"} value={stats.guestPendingCount} />
+              <StatCard label={isRu ? "Гостевые закрытые" : "Guest closed"} value={stats.guestClosedCount} tone="success" />
             </div>
             <section className="rounded-[20px] bg-white p-6 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] sm:p-8">
               <div className="flex flex-wrap items-end justify-between gap-4">
@@ -228,6 +258,148 @@ export default async function AdminSupportPage({ searchParams }: { searchParams:
                 {isRu ? "Мои обращения" : "My threads"}
               </FilterPill>
             </div>
+
+            {guestThreads.length ? (
+              <section className="grid gap-5">
+                <div>
+                  <h2 className="text-[28px] font-medium leading-tight tracking-[0] text-qidra-dark">{isRu ? "Гостевые обращения" : "Guest support requests"}</h2>
+                  <p className="mt-2 text-16 text-qidra-grayBlue">
+                    {isRu
+                      ? "Сообщения от посетителей, которые пишут с главной страницы без входа в кабинет."
+                      : "Messages from visitors who contact support from the public site without signing in."}
+                  </p>
+                </div>
+                {guestThreads.map((thread) => {
+                  const messages = [...thread.messages].reverse();
+
+                  return (
+                    <article key={thread.id} className="grid gap-5 rounded-[20px] bg-white p-6 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] sm:p-8">
+                      <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-start">
+                        <div>
+                          <p className="text-14 font-medium uppercase text-qidra-accent">{thread.subject || (isRu ? "Гостевое обращение" : "Guest support request")}</p>
+                          <h2 className="mt-2 text-[28px] font-medium leading-tight tracking-[0] text-qidra-dark">{thread.name}</h2>
+                          <p className="mt-1 text-14 text-qidra-grayBlue">{thread.email}</p>
+                          {thread.contact ? <p className="mt-1 text-14 text-qidra-grayBlue">{thread.contact}</p> : null}
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <a href={`mailto:${thread.email}`} className="inline-flex h-10 items-center justify-center rounded-qidra border border-qidra-grayMedium/70 bg-white px-4 text-14 font-medium text-qidra-dark transition-colors hover:border-qidra-accent hover:text-qidra-accent">
+                              {isRu ? "Написать на email" : "Email guest"}
+                            </a>
+                          </div>
+                          <p className="mt-3 text-14 text-qidra-grayBlue">
+                            {isRu ? "Статус" : "Status"}: {supportStatusLabel(thread.status, locale)} · {isRu ? "Ответственный" : "Owner"}:{" "}
+                            {thread.assignedTo ? thread.assignedTo.name || thread.assignedTo.email : isRu ? "не назначен" : "unassigned"}
+                          </p>
+                          <p className="mt-2 text-14 font-medium text-qidra-dark">
+                            {isRu ? "Направление" : "Department"}: {supportQueueLabel(thread.queue, locale)}
+                          </p>
+                        </div>
+                        <span className={`rounded-full px-3 py-1 text-12 font-medium text-white ${thread.status === SupportThreadStatus.CLOSED ? "bg-qidra-green" : thread.status === SupportThreadStatus.PENDING ? "bg-qidra-dark" : "bg-qidra-accent"}`}>
+                          {supportStatusLabel(thread.status, locale)}
+                        </span>
+                      </div>
+
+                      <div className="grid gap-3">
+                        {messages.map((message) => (
+                          <div key={message.id} className="rounded-qidra bg-qidra-grayLight p-4">
+                            <div className="flex flex-wrap items-center gap-2 text-12 font-medium text-qidra-grayBlue">
+                              <span className="text-qidra-dark">{message.senderName || (message.senderKind === "guest" ? thread.name : "Qidra")}</span>
+                              <span>{message.senderKind === "guest" ? (isRu ? "Гость" : "Guest") : isRu ? "Менеджер" : "Manager"}</span>
+                              <span>{formatDateTime(message.createdAt, locale)}</span>
+                            </div>
+                            <p className="mt-2 whitespace-pre-wrap text-15 text-qidra-grayBlue">{message.body}</p>
+                          </div>
+                        ))}
+                      </div>
+
+                      <FeedbackForm
+                        className="grid gap-4 rounded-qidra border border-qidra-grayLight bg-white p-4 lg:grid-cols-[1fr_1fr_1fr_auto] lg:items-end"
+                        endpoint={`/api/admin/support/guest/${thread.id}/messages?lang=${locale}`}
+                        feedback={{
+                          title: isRu ? "Диалог обновлён" : "Thread updated",
+                          text: isRu ? "Ответственный и статус сохранены." : "Owner and status were saved.",
+                          buttonLabel: isRu ? "Понятно" : "Got it",
+                          dismissLabel: isRu ? "Закрыть уведомление" : "Close notification",
+                          tone: "success"
+                        }}
+                        reloadOnSuccess
+                      >
+                        <input name="action" type="hidden" value="update" />
+                        <Select
+                          label={isRu ? "Ответственный менеджер" : "Responsible manager"}
+                          name="assignedToId"
+                          defaultValue={thread.assignedToId ?? ""}
+                          options={[
+                            { value: "", label: isRu ? "Не назначен" : "Unassigned" },
+                            ...managers.map((manager) => ({
+                              value: manager.id,
+                              label: `${manager.name || manager.email} · ${roleLabel(manager.role, locale)}`
+                            }))
+                          ]}
+                        />
+                        <Select
+                          label={isRu ? "Направление" : "Department"}
+                          name="queue"
+                          defaultValue={thread.queue}
+                          options={[
+                            { value: SupportQueue.TECH_SUPPORT, label: isRu ? "Техподдержка" : "Technical support" },
+                            { value: SupportQueue.SALES, label: isRu ? "Отдел продаж / проекты" : "Sales / projects" }
+                          ]}
+                        />
+                        <Select
+                          label={isRu ? "Статус диалога" : "Thread status"}
+                          name="status"
+                          defaultValue={thread.status}
+                          options={[
+                            { value: SupportThreadStatus.OPEN, label: isRu ? "В работе" : "In progress" },
+                            { value: SupportThreadStatus.PENDING, label: isRu ? "Ожидает гостя" : "Waiting guest" },
+                            { value: SupportThreadStatus.CLOSED, label: isRu ? "Вопрос решён" : "Resolved" }
+                          ]}
+                        />
+                        <Button type="submit">{isRu ? "Сохранить" : "Save"}</Button>
+                      </FeedbackForm>
+
+                      <FeedbackForm
+                        className="grid gap-5 border-t border-qidra-grayLight pt-6"
+                        endpoint={`/api/admin/support/guest/${thread.id}/messages?lang=${locale}`}
+                        feedback={{
+                          title: isRu ? "Ответ отправлен" : "Reply sent",
+                          text: isRu ? "Ответ добавлен в чат и отправлен гостю на email." : "The reply was added to the chat and emailed to the guest.",
+                          buttonLabel: isRu ? "Понятно" : "Got it",
+                          dismissLabel: isRu ? "Закрыть уведомление" : "Close notification",
+                          tone: "success"
+                        }}
+                        reloadOnSuccess
+                        resetOnSubmit
+                      >
+                        <input name="action" type="hidden" value="reply" />
+                        <QuickReplyTemplates locale={locale} textareaId={`guest-support-reply-${thread.id}`} />
+                        <label className="grid gap-2 text-14 font-medium text-qidra-dark">
+                          {isRu ? "Ответ гостю" : "Reply to guest"}
+                          <textarea
+                            id={`guest-support-reply-${thread.id}`}
+                            className="min-h-56 w-full resize-y rounded-qidra border border-transparent bg-qidra-grayLight px-5 py-4 text-16 leading-relaxed outline-none transition-colors placeholder:text-qidra-grayMedium focus:border-qidra-accent"
+                            maxLength={3000}
+                            name="body"
+                            placeholder={isRu ? "Напишите ответ. Он появится в чате и уйдёт на email гостя." : "Write a full reply. It will appear in the chat and be sent to the guest email."}
+                            required
+                          />
+                        </label>
+                        <div className="flex justify-end">
+                          <Button className="w-full sm:w-fit" type="submit">
+                            {isRu ? "Отправить ответ гостю" : "Send reply to guest"}
+                          </Button>
+                        </div>
+                      </FeedbackForm>
+                    </article>
+                  );
+                })}
+              </section>
+            ) : (
+              <NotificationCard
+                title={isRu ? "Гостевых обращений пока нет" : "No guest requests yet"}
+                text={isRu ? "Новые сообщения с публичного виджета чата появятся здесь." : "New messages from the public chat widget will appear here."}
+              />
+            )}
 
             {threads.length ? (
               <div className="grid gap-5">
@@ -601,11 +773,14 @@ function SupportSearchForm({
 }
 
 async function buildSupportStats(locale: "ru" | "en") {
-  const [totalCount, openCount, pendingCount, closedCount, ratingAggregate, managerRows] = await Promise.all([
+  const [totalCount, openCount, pendingCount, closedCount, guestOpenCount, guestPendingCount, guestClosedCount, ratingAggregate, managerRows] = await Promise.all([
     prisma.supportThread.count(),
     prisma.supportThread.count({ where: { status: SupportThreadStatus.OPEN } }),
     prisma.supportThread.count({ where: { status: SupportThreadStatus.PENDING } }),
     prisma.supportThread.count({ where: { status: SupportThreadStatus.CLOSED } }),
+    prisma.guestSupportThread.count({ where: { status: SupportThreadStatus.OPEN } }),
+    prisma.guestSupportThread.count({ where: { status: SupportThreadStatus.PENDING } }),
+    prisma.guestSupportThread.count({ where: { status: SupportThreadStatus.CLOSED } }),
     prisma.supportThread.aggregate({
       _avg: { rating: true },
       _count: { rating: true },
@@ -656,6 +831,9 @@ async function buildSupportStats(locale: "ru" | "en") {
   return {
     averageRatingLabel: ratingAggregate._avg.rating ? ratingAggregate._avg.rating.toFixed(1) : "—",
     closedCount,
+    guestClosedCount,
+    guestOpenCount,
+    guestPendingCount,
     managerStats,
     openCount,
     pendingCount,
@@ -715,6 +893,73 @@ function buildSupportWhere({
         { subject: contains },
         { user: { is: { email: contains } } },
         { user: { is: { name: contains } } },
+        { messages: { some: { body: contains } } }
+      ]
+    });
+  }
+
+  if (queueFilter === "tech") {
+    and.push({ queue: SupportQueue.TECH_SUPPORT });
+  }
+
+  if (queueFilter === "sales") {
+    and.push({ queue: SupportQueue.SALES });
+  }
+
+  if (queueFilter === "unassigned") {
+    and.push({ assignedToId: null });
+  }
+
+  if (ownerFilter === "mine" && sessionUserId) {
+    and.push({ assignedToId: sessionUserId });
+  }
+
+  if (sessionRole === Role.TECH_SUPPORT && sessionUserId) {
+    and.push({
+      OR: [{ assignedToId: sessionUserId }, { queue: SupportQueue.TECH_SUPPORT }]
+    });
+  }
+
+  if (sessionRole === Role.SALES_MANAGER && sessionUserId) {
+    and.push({
+      OR: [{ assignedToId: sessionUserId }, { queue: SupportQueue.SALES }]
+    });
+  }
+
+  return and.length ? { AND: and } : {};
+}
+
+function buildGuestSupportWhere({
+  ownerFilter,
+  query,
+  queueFilter,
+  sessionRole,
+  sessionUserId,
+  statusFilter
+}: {
+  ownerFilter?: SupportOwnerFilter;
+  query: string;
+  queueFilter?: SupportQueueFilter;
+  sessionRole?: string;
+  sessionUserId?: string;
+  statusFilter?: SupportThreadStatus;
+}) {
+  const and: Prisma.GuestSupportThreadWhereInput[] = [];
+
+  if (statusFilter) {
+    and.push({ status: statusFilter });
+  }
+
+  if (query) {
+    const contains = { contains: query, mode: Prisma.QueryMode.insensitive };
+
+    and.push({
+      OR: [
+        { id: contains },
+        { email: contains },
+        { name: contains },
+        { contact: contains },
+        { subject: contains },
         { messages: { some: { body: contains } } }
       ]
     });
