@@ -236,13 +236,13 @@ export function GuestSupportChatWidget({
                   ? "Диалог сохранён в этом браузере. Продолжайте переписку здесь."
                   : "This conversation is saved in this browser. Continue chatting here."
                 : isRu
-                  ? "Если не получается войти в кабинет, напишите сюда. Команда поддержки увидит сообщение сразу."
-                  : "If you cannot access your account, message us here. The support team will see it right away."}
+                  ? "Задайте любой вопрос по аккаунту, платежам, проектам, документам или работе платформы. Команда поддержки увидит сообщение сразу."
+                  : "Ask any question about your account, payments, projects, documents, or the platform. The support team will see your message right away."}
             </p>
             <p className="mt-2 text-12 leading-snug text-qidra-grayBlue">
               {isRu
-                ? "Ответ менеджера появится в этом окне и дополнительно придёт на email. Telegram и почта команды используются только для уведомления, не для ответа."
-                : "The manager reply appears in this window and is also sent to email. Team Telegram and email are notification channels only, not reply channels."}
+                ? "Ответ менеджера появится в этом окне и дополнительно придёт на email. Если вопрос требует проверки, просто опишите ситуацию как можно подробнее."
+                : "The manager reply appears in this window and is also sent to email. If the issue needs review, describe the situation in as much detail as possible."}
             </p>
           </div>
 
