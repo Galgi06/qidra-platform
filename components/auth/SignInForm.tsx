@@ -104,12 +104,9 @@ async function resolveTargetPath(nextPath: string, locale: Locale) {
   }
 
   try {
-    const response = await fetch("/api/auth/session");
-    const session = (await response.json()) as { user?: { role?: string } };
-
-    if (session.user?.role === "ADMIN" || session.user?.role === "SUPER_ADMIN") {
-      return withLocale("/admin", locale);
-    }
+    const response = await fetch("/api/account/default-route");
+    const payload = (await response.json()) as { href?: string };
+    if (payload.href) return withLocale(payload.href, locale);
   } catch {
     return nextPath;
   }

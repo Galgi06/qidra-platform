@@ -84,6 +84,33 @@ enum SupportQueue {
   SALES
 }
 
+enum OrganizationMemberRole {
+  OWNER
+  ADMIN
+  EDITOR
+  ANALYST
+}
+
+enum OrganizationStatus {
+  DRAFT
+  REVIEW
+  APPROVED
+  REJECTED
+}
+
+enum OrganizationLeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  CLOSED
+}
+
+enum OrganizationAnalyticsEventType {
+  COMPANY_PAGE_VIEW
+  PROJECT_PAGE_VIEW
+  LEAD_CAPTURED
+}
+
 enum DocumentKind {
   PROJECT
   LEGAL
@@ -129,6 +156,11 @@ model User {
   dividendPayments       DividendPayment[]
   accounts               Account[]
   sessions               Session[]
+  organizationMemberships OrganizationMember[]
+  organizationsFounded    Organization[]            @relation("OrganizationFounder")
+  organizationInvitesSent OrganizationInvite[]      @relation("OrganizationInviteSender")
+  companyLeads           OrganizationLead[]         @relation("OrganizationLeadInvestor")
+  analyticsEvents        OrganizationAnalyticsEvent[]
 
   @@index([blockedAt])
   @@index([blockedUntil])
@@ -197,6 +229,7 @@ model WalletTransaction {
 
 model Project {
   id                  String                  @id @default(cuid())
+  organizationId      String?
   slug                String                  @unique
   titleRu             String
   titleEn             String
@@ -228,13 +261,17 @@ model Project {
   structure           String                  @default("Mudaraba")
   riskLevel           String?
   coverImage          String?
+  propertyData        Json?
   createdAt           DateTime                @default(now())
   updatedAt           DateTime                @updatedAt
   documents           ProjectDocument[]
   reports             ProjectReport[]
   investments         InvestmentApplication[]
+  organizationLeads   OrganizationLead[]
+  analyticsEvents     OrganizationAnalyticsEvent[]
   projectSubmissions  ProjectSubmission[]
   dividendPeriods     ProjectDividendPeriod[]
+  organization        Organization?           @relation(fields: [organizationId], references: [id], onDelete: SetNull)
 }
 
 model ProjectDocument {
@@ -263,6 +300,7 @@ model ProjectReport {
 model ProjectSubmission {
   id                 String                  @id @default(cuid())
   userId             String
+  organizationId     String?
   title              String
   sector             String?
   location           String?
@@ -281,6 +319,7 @@ model ProjectSubmission {
   participationTerm  String?
   raisePlan          String?                 @db.Text
   summary            String                  @db.Text
+  propertyData       Json?
   documents          Json?
   status             ProjectSubmissionStatus @default(SUBMITTED)
   adminNote          String?
@@ -288,10 +327,143 @@ model ProjectSubmission {
   updatedAt          DateTime                @updatedAt
   project            Project?                @relation(fields: [projectId], references: [id], onDelete: SetNull)
   user               User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization       Organization?           @relation(fields: [organizationId], references: [id], onDelete: SetNull)
 
+  @@index([organizationId])
   @@index([projectId])
   @@index([status])
   @@index([userId])
+}
+
+model Organization {
+  id                 String                  @id @default(cuid())
+  founderId          String
+  publicSlug         String                  @unique
+  legalName          String
+  displayName        String
+  typeLabel          String?
+  country            String?
+  city               String?
+  website            String?
+  contactEmail       String?
+  contactPhone       String?
+  overview           String?                 @db.Text
+  valueProposition   String?                 @db.Text
+  targetAudience     String?                 @db.Text
+  productSummary     String?                 @db.Text
+  logoUrl            String?
+  heroImageUrl       String?
+  status             OrganizationStatus      @default(DRAFT)
+  representativeName String?
+  representativeRole String?
+  verificationData   Json?
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+  founder            User                    @relation("OrganizationFounder", fields: [founderId], references: [id], onDelete: Cascade)
+  members            OrganizationMember[]
+  invites            OrganizationInvite[]
+  documents          OrganizationDocument[]
+  leads              OrganizationLead[]
+  analyticsEvents    OrganizationAnalyticsEvent[]
+  projects           Project[]
+  projectSubmissions ProjectSubmission[]
+
+  @@index([founderId])
+  @@index([status])
+}
+
+model OrganizationMember {
+  id             String                 @id @default(cuid())
+  organizationId String
+  userId         String
+  role           OrganizationMemberRole @default(EDITOR)
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+  organization   Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+}
+
+model OrganizationDocument {
+  id             String       @id @default(cuid())
+  organizationId String
+  title          String
+  kind           DocumentKind @default(COMPLIANCE)
+  fileUrl        String
+  note           String?      @db.Text
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
+model OrganizationInvite {
+  id             String                 @id @default(cuid())
+  organizationId String
+  email          String
+  name           String?
+  role           OrganizationMemberRole @default(EDITOR)
+  token          String                 @unique
+  invitedById    String
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+  organization   Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invitedBy      User                   @relation("OrganizationInviteSender", fields: [invitedById], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, acceptedAt])
+  @@index([email, acceptedAt])
+}
+
+model OrganizationLead {
+  id                    String                 @id @default(cuid())
+  organizationId        String
+  projectId             String?
+  investorUserId        String?
+  applicationId         String?                @unique
+  status                OrganizationLeadStatus @default(NEW)
+  source                String                 @default("platform_application")
+  leadName              String?
+  leadEmail             String?
+  leadPhone             String?
+  leadCountry           String?
+  leadWhatsapp          String?
+  requestedAmountUsdt   Decimal?               @db.Decimal(18, 6)
+  note                  String?                @db.Text
+  metadata              Json?
+  contactedAt           DateTime?
+  qualifiedAt           DateTime?
+  closedAt              DateTime?
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  organization          Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project               Project?               @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  investorUser          User?                  @relation("OrganizationLeadInvestor", fields: [investorUserId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, status, createdAt])
+  @@index([projectId, createdAt])
+  @@index([investorUserId])
+}
+
+model OrganizationAnalyticsEvent {
+  id             String                         @id @default(cuid())
+  organizationId String
+  projectId      String?
+  userId         String?
+  type           OrganizationAnalyticsEventType
+  path           String?
+  metadata       Json?
+  createdAt      DateTime                       @default(now())
+  organization   Organization                   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project        Project?                       @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  user           User?                          @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, type, createdAt])
+  @@index([projectId, type, createdAt])
+  @@index([userId, createdAt])
 }
 
 model InvestmentApplication {
@@ -303,6 +475,7 @@ model InvestmentApplication {
   status             InvestmentStatus @default(PENDING)
   termsAcceptedAt    DateTime?
   contractAcceptedAt DateTime?
+  contactDetails     Json?
   adminNote          String?
   createdAt          DateTime         @default(now())
   updatedAt          DateTime         @updatedAt

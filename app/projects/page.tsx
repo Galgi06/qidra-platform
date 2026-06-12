@@ -5,6 +5,7 @@ import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { ButtonLink } from "@/components/ui/Button";
 import { getLocale, type SearchParams, withLocale } from "@/lib/i18n";
 import { acceptsApplications, getPublicProjects, type CatalogProject } from "@/lib/project-catalog";
+import { incomeSourceLabel, propertyStatusLabel, propertyTypeLabel } from "@/lib/real-estate";
 
 export const dynamic = "force-dynamic";
 
@@ -15,20 +16,33 @@ export default async function ProjectsPage({ searchParams }: { searchParams?: Pr
   const query = searchParamString(params?.q).trim();
   const sectorFilter = searchParamString(params?.sector);
   const structureFilter = searchParamString(params?.structure);
+  const countryFilter = searchParamString(params?.country);
+  const cityFilter = searchParamString(params?.city);
+  const propertyTypeFilter = searchParamString(params?.propertyType);
+  const propertyStatusFilter = searchParamString(params?.propertyStatus);
+  const currencyFilter = searchParamString(params?.currency);
+  const incomeSourceFilter = searchParamString(params?.incomeSource);
   const projects = await getPublicProjects();
   const filteredProjects = projects.filter((project) => {
-    const sectorMatch = !sectorFilter || inferProjectSector(project, locale) === sectorFilter;
+    const sectorMatch = !sectorFilter || project.sector === sectorFilter;
     const structureMatch = !structureFilter || project.structure.toLowerCase() === structureFilter.toLowerCase();
-    const queryText = [project.title[locale], project.summary[locale], project.description[locale], project.location, project.structure, inferProjectSectorLabel(inferProjectSector(project, locale), locale)]
+    const countryMatch = !countryFilter || project.realEstate?.country?.toLowerCase() === countryFilter.toLowerCase();
+    const cityMatch = !cityFilter || project.realEstate?.city?.toLowerCase() === cityFilter.toLowerCase();
+    const propertyTypeMatch = !propertyTypeFilter || project.realEstate?.propertyType === propertyTypeFilter;
+    const propertyStatusMatch = !propertyStatusFilter || project.realEstate?.objectStatus === propertyStatusFilter;
+    const currencyMatch = !currencyFilter || (project.realEstate?.fundraisingCurrency || "").toLowerCase() === currencyFilter.toLowerCase();
+    const incomeSourceMatch = !incomeSourceFilter || Boolean(project.realEstate?.incomeSources?.includes(incomeSourceFilter as never));
+    const queryText = [project.title[locale], project.summary[locale], project.description[locale], project.location, project.structure, inferProjectSectorLabel(project.sector as SectorValue, locale), project.realEstate?.country, project.realEstate?.city, project.realEstate?.objectName, project.realEstate?.titleComplex]
       .join(" ")
       .toLowerCase();
     const queryMatch = !query || queryText.includes(query.toLowerCase());
 
-    return sectorMatch && structureMatch && queryMatch;
+    return sectorMatch && structureMatch && countryMatch && cityMatch && propertyTypeMatch && propertyStatusMatch && currencyMatch && incomeSourceMatch && queryMatch;
   });
   const openProjects = filteredProjects.filter((project) => acceptsApplications(project));
   const unavailableProjects = filteredProjects.filter((project) => !acceptsApplications(project));
   const sectors = buildSectorStats(projects, locale);
+  const realEstateProjects = projects.filter((project) => project.realEstate);
 
   return (
     <>
@@ -63,7 +77,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams?: Pr
                 <CatalogStat value="UAE" label={isRu ? "юрисдикция" : "jurisdiction"} />
               </div>
             </div>
-            <form className="grid gap-3 rounded-[20px] bg-white p-4 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] lg:grid-cols-[1fr_220px_220px_auto]" action="/projects">
+            <form className={`grid gap-3 rounded-[20px] bg-white p-4 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] ${sectorFilter === "real-estate" ? "lg:grid-cols-3 xl:grid-cols-4" : "lg:grid-cols-[1fr_220px_220px_auto]"}`} action="/projects">
               <input name="lang" type="hidden" value={locale} />
               <label className="grid gap-2 text-13 font-medium text-qidra-dark">
                 {isRu ? "Поиск проекта" : "Project search"}
@@ -91,6 +105,64 @@ export default async function ProjectsPage({ searchParams }: { searchParams?: Pr
                   <option value="Musharaka">Musharaka</option>
                 </select>
               </label>
+              {sectorFilter === "real-estate" ? (
+                <>
+                  <label className="grid gap-2 text-13 font-medium text-qidra-dark">
+                    {isRu ? "Страна" : "Country"}
+                    <select className="h-12 rounded-qidra border border-transparent bg-qidra-grayLight px-4 text-16 outline-none focus:border-qidra-accent" defaultValue={countryFilter} name="country">
+                      <option value="">{isRu ? "Все страны" : "All countries"}</option>
+                      {uniqueOptions(realEstateProjects.map((project) => project.realEstate?.country)).map((value) => (
+                        <option key={value} value={value}>{value}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="grid gap-2 text-13 font-medium text-qidra-dark">
+                    {isRu ? "Город" : "City"}
+                    <select className="h-12 rounded-qidra border border-transparent bg-qidra-grayLight px-4 text-16 outline-none focus:border-qidra-accent" defaultValue={cityFilter} name="city">
+                      <option value="">{isRu ? "Все города" : "All cities"}</option>
+                      {uniqueOptions(realEstateProjects.map((project) => project.realEstate?.city)).map((value) => (
+                        <option key={value} value={value}>{value}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="grid gap-2 text-13 font-medium text-qidra-dark">
+                    {isRu ? "Тип недвижимости" : "Property type"}
+                    <select className="h-12 rounded-qidra border border-transparent bg-qidra-grayLight px-4 text-16 outline-none focus:border-qidra-accent" defaultValue={propertyTypeFilter} name="propertyType">
+                      <option value="">{isRu ? "Все типы" : "All types"}</option>
+                      {uniqueOptions(realEstateProjects.map((project) => project.realEstate?.propertyType)).map((value) => (
+                        <option key={value} value={value}>{propertyTypeLabel(value as never, locale)}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="grid gap-2 text-13 font-medium text-qidra-dark">
+                    {isRu ? "Статус" : "Status"}
+                    <select className="h-12 rounded-qidra border border-transparent bg-qidra-grayLight px-4 text-16 outline-none focus:border-qidra-accent" defaultValue={propertyStatusFilter} name="propertyStatus">
+                      <option value="">{isRu ? "Все статусы" : "All statuses"}</option>
+                      {uniqueOptions(realEstateProjects.map((project) => project.realEstate?.objectStatus)).map((value) => (
+                        <option key={value} value={value}>{propertyStatusLabel(value as never, locale)}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="grid gap-2 text-13 font-medium text-qidra-dark">
+                    {isRu ? "Источник дохода" : "Income source"}
+                    <select className="h-12 rounded-qidra border border-transparent bg-qidra-grayLight px-4 text-16 outline-none focus:border-qidra-accent" defaultValue={incomeSourceFilter} name="incomeSource">
+                      <option value="">{isRu ? "Все источники" : "All sources"}</option>
+                      {uniqueOptions(realEstateProjects.flatMap((project) => project.realEstate?.incomeSources || [])).map((value) => (
+                        <option key={value} value={value}>{incomeSourceLabel(value as never, locale)}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="grid gap-2 text-13 font-medium text-qidra-dark">
+                    {isRu ? "Валюта" : "Currency"}
+                    <select className="h-12 rounded-qidra border border-transparent bg-qidra-grayLight px-4 text-16 outline-none focus:border-qidra-accent" defaultValue={currencyFilter} name="currency">
+                      <option value="">{isRu ? "Все валюты" : "All currencies"}</option>
+                      {uniqueOptions(realEstateProjects.map((project) => project.realEstate?.fundraisingCurrency || project.realEstate?.currency)).map((value) => (
+                        <option key={value} value={value}>{value}</option>
+                      ))}
+                    </select>
+                  </label>
+                </>
+              ) : null}
               <button className="h-12 self-end rounded-qidra bg-qidra-dark px-6 text-16 font-medium text-white transition-colors hover:bg-qidra-accent" type="submit">
                 {isRu ? "Найти" : "Search"}
               </button>
@@ -186,16 +258,7 @@ function sectorOptions(locale: "ru" | "en") {
 }
 
 function inferProjectSector(project: CatalogProject, locale: "ru" | "en"): SectorValue {
-  const text = [project.title.ru, project.title.en, project.summary.ru, project.summary.en, project.description.ru, project.description.en, project.location]
-    .join(" ")
-    .toLowerCase();
-
-  if (text.includes("estate") || text.includes("real estate") || text.includes("недвиж") || text.includes("квартир") || text.includes("дуба")) return "real-estate";
-  if (text.includes("trade") || text.includes("торгов") || text.includes("продаж")) return "trade";
-  if (text.includes("gold") || text.includes("золот") || text.includes("металл") || text.includes("добыч")) return "metallurgy";
-  if (text.includes("мед") || text.includes("health") || text.includes("clinic")) return "healthcare";
-  if (text.includes("tech") || text.includes("it") || text.includes("технолог")) return "technology";
-  return "other";
+  return (project.sector as SectorValue) || "other";
 }
 
 function inferProjectSectorLabel(sector: SectorValue, locale: "ru" | "en") {
@@ -238,4 +301,8 @@ function CatalogStat({ value, label }: { value: string; label: string }) {
       <p className="mt-2 text-14 text-qidra-grayBlue">{label}</p>
     </div>
   );
+}
+
+function uniqueOptions(values: Array<string | undefined>) {
+  return Array.from(new Set(values.filter((value): value is string => Boolean(value && value.trim()))));
 }

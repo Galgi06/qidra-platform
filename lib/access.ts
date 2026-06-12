@@ -4,6 +4,7 @@ import type { Locale } from "@/lib/i18n";
 import { withLocale } from "@/lib/i18n";
 import { canAccessAdmin, canAccessSupportDesk } from "@/lib/auth";
 import { authOptions } from "@/lib/next-auth";
+import { getOrganizationMembership } from "@/lib/organizations";
 
 type SessionWithRole = Awaited<ReturnType<typeof getServerSession>> & {
   user?: {
@@ -50,4 +51,21 @@ export async function requireSupportDesk(locale: Locale, nextPath: string) {
   }
 
   return session;
+}
+
+export async function requireCompanyAccess(locale: Locale, nextPath: string) {
+  const session = await requireAuth(locale, nextPath);
+  const userId = session.user?.id;
+
+  if (!userId) {
+    redirect(signInUrl(locale, nextPath));
+  }
+
+  const membership = await getOrganizationMembership(userId);
+
+  if (!membership) {
+    redirect(withLocale("/auth/sign-up?account=company", locale));
+  }
+
+  return { membership, session };
 }

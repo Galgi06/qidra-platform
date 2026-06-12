@@ -11,6 +11,7 @@ import { ProjectStatusBadge, type BadgeStatus } from "@/components/ui/ProjectSta
 import { requireAdmin } from "@/lib/access";
 import { getLocale, t, type SearchParams, withLocale } from "@/lib/i18n";
 import { prisma } from "@/lib/prisma";
+import { parseRealEstateLeadData } from "@/lib/real-estate";
 
 export default async function AdminInvestmentsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const params = await searchParams;
@@ -127,6 +128,7 @@ export default async function AdminInvestmentsPage({ searchParams }: { searchPar
                   latestKycStatus,
                   locale
                 });
+                const lead = parseRealEstateLeadData(request.contactDetails);
                 const userDossierHref = withLocale(`/admin/users/${request.userId}`, locale);
 
                 return (
@@ -187,6 +189,15 @@ export default async function AdminInvestmentsPage({ searchParams }: { searchPar
                     {request.status === "PENDING" && !canConfirm ? (
                       <div className="rounded-qidra border border-qidra-gold bg-qidra-accent8 p-4 text-14 text-qidra-dark">
                         {blockedMessage}
+                      </div>
+                    ) : null}
+                    {lead ? (
+                      <div className="rounded-qidra border border-qidra-grayLight bg-qidra-grayLight p-4 text-14 text-qidra-grayBlue">
+                        <p className="font-medium text-qidra-dark">{locale === "ru" ? "Контакты по недвижимости" : "Real estate lead details"}</p>
+                        <p className="mt-2">{[lead.firstName, lead.lastName].filter(Boolean).join(" ") || request.user.name || request.user.email}</p>
+                        <p>{lead.phone || "Phone not set"} / {lead.whatsapp || "WhatsApp not set"}</p>
+                        <p>{lead.contactCountry || (locale === "ru" ? "Страна не указана" : "Country not set")}</p>
+                        {lead.comment ? <p className="mt-2 whitespace-pre-wrap">{lead.comment}</p> : null}
                       </div>
                     ) : null}
                   </div>

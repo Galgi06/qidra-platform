@@ -10,6 +10,7 @@ import { ButtonLink } from "@/components/ui/Button";
 import { canAccessAdmin, canAccessSupportDesk } from "@/lib/auth";
 import { dictionary, getLocale, type SearchParams, withLocale } from "@/lib/i18n";
 import { authOptions } from "@/lib/next-auth";
+import { getPrimaryOrganizationForUser } from "@/lib/organizations";
 import { getPublicProjects } from "@/lib/project-catalog";
 import { getSiteContent } from "@/lib/site-content";
 
@@ -17,6 +18,7 @@ export const dynamic = "force-dynamic";
 
 type SessionWithRole = Awaited<ReturnType<typeof getServerSession>> & {
   user?: {
+    id?: string;
     role?: string;
   };
 };
@@ -27,9 +29,10 @@ export default async function Home({ searchParams }: { searchParams?: Promise<Se
   const isRu = locale === "ru";
   const [session, projects, siteContent] = await Promise.all([(getServerSession(authOptions) as Promise<SessionWithRole>), getPublicProjects(), getSiteContent()]);
   const signedIn = Boolean(session?.user);
+  const organization = session?.user?.id ? await getPrimaryOrganizationForUser(session.user.id) : null;
   const adminSession = canAccessAdmin(session?.user?.role as "ADMIN" | "SUPER_ADMIN" | "guest" | undefined);
   const supportDeskSession = canAccessSupportDesk(session?.user?.role as "ADMIN" | "SUPER_ADMIN" | "TECH_SUPPORT" | "SALES_MANAGER" | "guest" | undefined);
-  const accountHref = adminSession ? "/admin" : "/investor";
+  const accountHref = adminSession ? "/admin" : organization ? "/company" : "/investor";
   const chatHref = signedIn ? (supportDeskSession ? withLocale("/admin/support", locale) : withLocale("/investor/support", locale)) : null;
 
   return (
@@ -62,7 +65,7 @@ export default async function Home({ searchParams }: { searchParams?: Promise<Se
                 {signedIn ? (
                   <>
                     <ButtonLink href={withLocale(accountHref, locale)} variant="white" size="sm" className="h-11 min-w-0 px-3 text-14 sm:min-w-44 sm:px-6 sm:text-16">
-                      {adminSession ? (isRu ? "Операционный центр" : "Operations") : isRu ? "Профиль" : "Profile"}
+                      {adminSession ? (isRu ? "Операционный центр" : "Operations") : organization ? (isRu ? "Компания" : "Company") : isRu ? "Профиль" : "Profile"}
                     </ButtonLink>
                     <SignOutButton callbackUrl={withLocale("/", locale)} label={isRu ? "Выход" : "Sign out"} className="h-11 min-w-0 px-3 text-14 sm:px-4 sm:text-16" />
                   </>

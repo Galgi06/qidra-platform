@@ -3,8 +3,10 @@ import type { BadgeStatus } from "@/components/ui/ProjectStatusBadge";
 import { projects as baseProjects, type Project as ContentProject } from "@/lib/content";
 import type { Locale } from "@/lib/i18n";
 import { prisma } from "@/lib/prisma";
+import { parseRealEstateData, type RealEstateProjectData } from "@/lib/real-estate";
 
 export type CatalogProject = {
+  coverImage: string | null;
   documents: { title: Record<Locale, string>; href: string; kind: string }[];
   expectedReturn: Record<Locale, string>;
   expectedYield: Record<Locale, string>;
@@ -21,6 +23,11 @@ export type CatalogProject = {
     raisePlan: Record<Locale, string>;
     stage: Record<Locale, string>;
   };
+  organization: {
+    displayName: string;
+    id: string;
+    publicSlug: string;
+  } | null;
   location: string;
   riskLevel: string;
   slug: string;
@@ -36,6 +43,8 @@ export type CatalogProject = {
     id: string;
     name: string | null;
   } | null;
+  realEstate: RealEstateProjectData | null;
+  sector: string;
 };
 
 export function projectStatusToDb(status: ContentProject["status"]) {
@@ -70,7 +79,9 @@ export function contentProjectPayload(project: ContentProject) {
     fundedUsdt: project.fundedUsdt,
     location: project.location,
     structure: project.structure,
-    riskLevel: project.riskLevel
+    riskLevel: project.riskLevel,
+    coverImage: project.coverImage,
+    propertyData: project.realEstate ?? undefined
   };
 }
 
@@ -96,6 +107,8 @@ export async function ensureBaseProjects() {
     await prisma.project.update({
       where: { id: existing.id },
       data: {
+        coverImage: project.coverImage,
+        propertyData: project.realEstate ?? undefined,
         summaryRu: project.summary.ru,
         summaryEn: project.summary.en,
         descriptionRu: project.description.ru,
@@ -125,6 +138,11 @@ async function createBaseDocuments(projectId: string, project: ContentProject) {
 
 type ProjectWithPublicRelations = DbProject & {
   documents?: ProjectDocument[];
+  organization?: {
+    displayName: string;
+    id: string;
+    publicSlug: string;
+  } | null;
   projectSubmissions?: {
     status?: string;
     user?: {
@@ -153,6 +171,7 @@ export function mapProject(project: ProjectWithPublicRelations): CatalogProject 
     : null;
 
   return {
+    coverImage: project.coverImage ?? null,
     id: project.id,
     slug: project.slug,
     title: { ru: project.titleRu, en: project.titleEn },
@@ -192,10 +211,19 @@ export function mapProject(project: ProjectWithPublicRelations): CatalogProject 
     status: dbStatusToBadge(effectiveStatus),
     targetUsdt,
     fundedUsdt,
+    organization: project.organization
+      ? {
+          displayName: project.organization.displayName,
+          id: project.organization.id,
+          publicSlug: project.organization.publicSlug
+        }
+      : null,
     location: project.location ?? "UAE",
     structure: project.structure,
     riskLevel: project.riskLevel ?? "Moderate",
     initiator,
+    realEstate: parseRealEstateData(project.propertyData),
+    sector: inferProjectSectorValue(project.propertyData, project.titleRu, project.titleEn, project.summaryRu, project.summaryEn, project.descriptionRu, project.descriptionEn),
     documents:
       project.documents?.map((document) => ({
         title: { ru: document.titleRu, en: document.titleEn },
@@ -211,6 +239,7 @@ export function acceptsApplications(project: CatalogProject) {
 
 function mapContentProject(project: ContentProject): CatalogProject {
   return {
+    coverImage: project.coverImage ?? null,
     id: project.slug,
     slug: project.slug,
     title: project.title,
@@ -250,11 +279,14 @@ function mapContentProject(project: ContentProject): CatalogProject {
     status: project.status,
     targetUsdt: project.targetUsdt,
     fundedUsdt: project.fundedUsdt,
+    organization: null,
     location: project.location,
     structure: project.structure,
     riskLevel: project.riskLevel,
     documents: project.documents,
-    initiator: null
+    initiator: null,
+    realEstate: project.realEstate ?? null,
+    sector: project.realEstate ? "real-estate" : inferProjectSectorValue(undefined, project.title.ru, project.title.en, project.summary.ru, project.summary.en, project.description.ru, project.description.en)
   };
 }
 
@@ -313,10 +345,10 @@ function isDatabaseUnavailable(error: unknown) {
 export async function getAdminProjects() {
   await ensureBaseProjects();
 
-  const projects = await prisma.project.findMany({
-    include: { documents: true, projectSubmissions: publicInitiatorInclude() },
-    orderBy: { createdAt: "desc" }
-  });
+    const projects = await prisma.project.findMany({
+      include: { documents: true, organization: { select: { displayName: true, id: true, publicSlug: true } }, projectSubmissions: publicInitiatorInclude() },
+      orderBy: { createdAt: "desc" }
+    });
 
   return projects.map(mapProject);
 }
@@ -330,7 +362,7 @@ export async function getPublicProjects() {
         status: { in: [ProjectStatus.ACTIVE, ProjectStatus.FUNDED] },
         documents: { some: {} }
       },
-      include: { documents: true, projectSubmissions: publicInitiatorInclude() },
+      include: { documents: true, organization: { select: { displayName: true, id: true, publicSlug: true } }, projectSubmissions: publicInitiatorInclude() },
       orderBy: { createdAt: "desc" }
     });
 
@@ -350,7 +382,7 @@ export async function getProjectBySlug(slug: string) {
 
     const project = await prisma.project.findUnique({
       where: { slug },
-      include: { documents: true, projectSubmissions: publicInitiatorInclude() }
+      include: { documents: true, organization: { select: { displayName: true, id: true, publicSlug: true } }, projectSubmissions: publicInitiatorInclude() }
     });
 
     return project ? mapProject(project) : fallbackProjectBySlug(slug);
@@ -382,4 +414,22 @@ function publicInitiatorInclude() {
     },
     take: 1
   };
+}
+
+function inferProjectSectorValue(
+  propertyData: unknown,
+  titleRu: string,
+  titleEn: string,
+  summaryRu: string,
+  summaryEn: string,
+  descriptionRu: string,
+  descriptionEn: string
+) {
+  if (parseRealEstateData(propertyData)) return "real-estate";
+  const text = [titleRu, titleEn, summaryRu, summaryEn, descriptionRu, descriptionEn].join(" ").toLowerCase();
+  if (text.includes("trade") || text.includes("торгов")) return "trade";
+  if (text.includes("gold") || text.includes("металл")) return "metallurgy";
+  if (text.includes("health") || text.includes("мед")) return "healthcare";
+  if (text.includes("tech") || text.includes("технолог")) return "technology";
+  return "other";
 }

@@ -2,10 +2,12 @@ import { InvestmentStatus, KycStatus, PaymentStatus, Prisma, ProjectStatus, Tran
 import { getServerSession } from "next-auth";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
+import { createOrganizationLead } from "@/lib/company-workspace";
 import { authOptions } from "@/lib/next-auth";
 import { ensureBaseProjects } from "@/lib/project-catalog";
 import { prisma } from "@/lib/prisma";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
+import { parseRealEstateData } from "@/lib/real-estate";
 
 const amountSchema = z
   .string()
@@ -18,7 +20,17 @@ const applicationSchema = z.object({
   projectSlug: z.string().trim().min(2).max(120),
   amount: amountSchema,
   termsAccepted: z.literal("on"),
-  contractAccepted: z.literal("on")
+  contractAccepted: z.literal("on"),
+  comment: z.string().trim().max(1200).optional(),
+  contactCountry: z.string().trim().max(120).optional(),
+  email: z.string().trim().email().optional(),
+  firstName: z.string().trim().max(120).optional(),
+  lastName: z.string().trim().max(120).optional(),
+  phone: z.string().trim().max(120).optional(),
+  qidraDisclaimerAccepted: z.literal("on").optional(),
+  riskAccepted: z.literal("on").optional(),
+  transferAccepted: z.literal("on").optional(),
+  whatsapp: z.string().trim().max(120).optional()
 });
 
 type SessionUser = {
@@ -104,6 +116,27 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const realEstate = parseRealEstateData(project.propertyData);
+  if (realEstate) {
+    const missingLeadFields = ["firstName", "lastName", "email", "phone", "contactCountry"].filter((field) => {
+      const value = parsed.data[field as keyof typeof parsed.data];
+      return typeof value !== "string" || !value.trim();
+    });
+
+    if (missingLeadFields.length || !parsed.data.riskAccepted || !parsed.data.qidraDisclaimerAccepted || !parsed.data.transferAccepted) {
+      return NextResponse.json(
+        {
+          title: localeRu ? "Проверьте форму" : "Check the form",
+          message:
+            localeRu
+              ? "Для заявки по недвижимости заполните контактные данные и подтвердите предупреждения о рисках и роли Qidra."
+              : "For a real estate application, complete the contact details and confirm the risk and Qidra role disclosures."
+        },
+        { status: 400 }
+      );
+    }
+  }
+
   const reviewApplication = await prisma.kycApplication.findFirst({
     where: {
       userId,
@@ -177,6 +210,8 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    let committedApplicationId = activeApplication?.id;
+
     await prisma.$transaction(async (tx) => {
       const amountFromAvailableUsdt = requestedUsdt.minus(activeReservedUsdt);
       const availableDebitUsdt = amountFromAvailableUsdt.gt(0) ? amountFromAvailableUsdt : zeroUsdt;
@@ -204,7 +239,20 @@ export async function POST(request: NextRequest) {
         reservedUsdt: zeroUsdt,
         status: InvestmentStatus.CONFIRMED,
         termsAcceptedAt: new Date(),
-        contractAcceptedAt: new Date()
+        contractAcceptedAt: new Date(),
+        contactDetails: realEstate
+          ? {
+              comment: parsed.data.comment || undefined,
+              contactCountry: parsed.data.contactCountry || undefined,
+              firstName: parsed.data.firstName || undefined,
+              lastName: parsed.data.lastName || undefined,
+              phone: parsed.data.phone || undefined,
+              qidraDisclaimerAccepted: parsed.data.qidraDisclaimerAccepted === "on",
+              riskAccepted: parsed.data.riskAccepted === "on",
+              transferAccepted: parsed.data.transferAccepted === "on",
+              whatsapp: parsed.data.whatsapp || undefined
+            }
+          : undefined
       };
       let applicationId = activeApplication?.id;
 
@@ -223,6 +271,8 @@ export async function POST(request: NextRequest) {
         });
         applicationId = application.id;
       }
+
+      committedApplicationId = applicationId;
 
       await tx.walletTransaction.create({
         data: {
@@ -276,6 +326,28 @@ export async function POST(request: NextRequest) {
         }
       });
     });
+
+    if (project.organizationId && committedApplicationId) {
+      const fullName = [parsed.data.firstName, parsed.data.lastName].filter(Boolean).join(" ").trim();
+
+      await createOrganizationLead({
+        applicationId: committedApplicationId,
+        investorUserId: userId,
+        leadCountry: parsed.data.contactCountry || undefined,
+        leadEmail: parsed.data.email || undefined,
+        leadName: fullName || undefined,
+        leadPhone: parsed.data.phone || undefined,
+        leadWhatsapp: parsed.data.whatsapp || undefined,
+        metadata: {
+          projectSlug: project.slug,
+          realEstateLead: Boolean(realEstate)
+        },
+        note: parsed.data.comment || undefined,
+        organizationId: project.organizationId,
+        projectId: project.id,
+        requestedAmountUsdt: requestedUsdt.toString()
+      });
+    }
   } catch (error) {
     if (error instanceof Error && error.message === "insufficient_available_balance") {
       return NextResponse.json(

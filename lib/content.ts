@@ -1,6 +1,9 @@
 import type { Locale } from "@/lib/i18n";
+import type { RealEstateProjectData } from "@/lib/real-estate";
 
 export type Project = {
+  coverImage?: string;
+  realEstate?: RealEstateProjectData;
   slug: string;
   title: Record<Locale, string>;
   summary: Record<Locale, string>;
@@ -16,27 +19,75 @@ export type Project = {
 
 export const projects: Project[] = [
   {
-    slug: "qidra-real-estate-income",
+    slug: "am-capital-property-fund",
     title: {
-      ru: "Qidra Real Estate Income",
-      en: "Qidra Real Estate Income"
+      ru: "AM Capital Property Fund",
+      en: "AM Capital Property Fund"
     },
     summary: {
-      ru: "Партнёрское участие в объекте недвижимости в ОАЭ с раскрытием документов, структуры Mudaraba и регулярной отчётностью.",
-      en: "Partnership participation in a UAE real estate asset with document disclosure, Mudaraba structure and regular reporting."
+      ru: "Инвестиционный проект в жилой недвижимости Дубая: Mudaraba, раскрытые документы, понятная финансовая структура и прямое взаимодействие инвестора с предпринимателем.",
+      en: "A Dubai residential real estate opportunity with a Mudaraba structure, disclosed documents, transparent financial structure, and direct entrepreneur-investor interaction."
     },
     description: {
       ru:
-        "Проект предполагает участие в объекте недвижимости через структуру Mudaraba. До подачи заявки участник изучает регистрационные документы, правовую основу, целевой объём, статус сбора и порядок отчётности. Ожидаемый результат зависит от фактической реализации проекта, расходов, сроков и рыночных условий; фиксированная доходность не обещается.",
+        "AM Capital Property Fund представляет объект жилой недвижимости в Дубае, подготовленный по модели Mudaraba. Qidra выступает только как информационная и технологическая платформа: инвестор знакомится с материалами, подаёт заявку и далее взаимодействует напрямую с AM Capital LLC-FZ. Доход зависит от фактической эксплуатации объекта, динамики рынка, расходов и сроков проекта; фиксированная доходность и возврат капитала не гарантируются.",
       en:
-        "The project provides participation in a real estate asset through a Mudaraba structure. Before applying, a participant reviews registration documents, legal basis, target amount, funding status and reporting process. The expected result depends on actual execution, costs, timing and market conditions; fixed returns are not promised."
+        "AM Capital Property Fund is a Dubai residential real estate opportunity structured as Mudaraba. Qidra acts only as an informational and technology platform: an investor reviews the materials, submits an application, and then interacts directly with AM Capital LLC-FZ. Outcomes depend on actual property performance, market conditions, costs, and execution timing; fixed returns and capital repayment are not guaranteed."
     },
     status: "active",
     targetUsdt: 250000,
     fundedUsdt: 68000,
-    location: "UAE",
+    location: "UAE, Dubai",
     structure: "Mudaraba",
     riskLevel: "Moderate",
+    coverImage: "/assets/hero/qidra-hero-blue.png",
+    realEstate: {
+      address: "Dubai Land Residence Complex, Dubai, UAE",
+      city: "Dubai",
+      country: "UAE",
+      coverImage: "/assets/hero/qidra-hero-blue.png",
+      currency: "USD",
+      descriptionFull:
+        "Фонд ориентирован на жилую недвижимость в Дубае с потенциалом комбинации арендного дохода и роста стоимости актива. Предприниматель раскрывает документы объекта, параметры девелопера, структуру Mudaraba и финансовую модель до заключения прямых договорённостей с инвестором.",
+      descriptionShort: "Жилой объект в Дубае с моделью Mudaraba, целевым сбором 250,000 USD и фокусом на рост стоимости и возможный арендный поток.",
+      developer: "AM Capital LLC-FZ",
+      documents: [
+        {
+          category: "document",
+          href: "/assets/documents/compliance/business-license.pdf",
+          name: "Business License"
+        },
+        {
+          category: "document",
+          href: "/assets/documents/compliance/certificate-of-formation.pdf",
+          name: "Certificate of Formation"
+        },
+        {
+          category: "brochure",
+          href: "/assets/documents/compliance/esr-declaration.pdf",
+          name: "Project brochure"
+        }
+      ],
+      fundraisingCurrency: "USD",
+      gallery: ["/assets/hero/qidra-hero-blue.png"],
+      gatheredAmount: 68000,
+      incomeSources: ["rental-income", "capital-growth", "hybrid"],
+      managerFeePercent: 5,
+      managerName: "Adam Miziev",
+      managerSharePercent: 25,
+      minimumParticipation: 1000,
+      objectName: "AM Capital Property Fund",
+      objectStatus: "under-construction",
+      partnerName: "AM Capital LLC-FZ",
+      plannedStartDate: "2026-07-01",
+      projectTermMonths: 18,
+      propertyType: "residential",
+      remainingAmount: 182000,
+      targetRaise: 250000,
+      titleComplex: "Dubai Land Residence Complex",
+      totalAssetValue: 520000,
+      visuals: ["/assets/hero/qidra-hero-blue.png"]
+    },
     documents: [
       {
         title: { ru: "Business License", en: "Business License" },

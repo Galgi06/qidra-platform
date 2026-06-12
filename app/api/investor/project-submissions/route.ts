@@ -7,8 +7,10 @@ import { z } from "zod";
 import { authOptions } from "@/lib/next-auth";
 import { saveUploadedFile } from "@/lib/file-storage";
 import { isDetailedText, isMeaningfulText, zodFieldErrors } from "@/lib/form-validation";
+import { getPrimaryOrganizationForUser } from "@/lib/organizations";
 import { prisma } from "@/lib/prisma";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
+import { incomeSourceOptions, propertyStatusOptions, propertyTypeOptions, type RealEstateDocumentAsset } from "@/lib/real-estate";
 
 export const runtime = "nodejs";
 
@@ -49,7 +51,34 @@ const projectSubmissionSchema = z.object({
   payoutFrequency: z.nativeEnum(PayoutFrequency).default(PayoutFrequency.CUSTOM),
   participationTerm: meaningfulText(5, 180, 3),
   raisePlan: z.string().trim().max(2500).optional().refine((value) => !value || isDetailedText(value, { minLetters: 12, minWords: 5 })),
-  summary: detailedText(120, 5000, 70, 25)
+  summary: detailedText(120, 5000, 70, 25),
+  propertyObjectName: optionalText,
+  propertyComplexName: optionalText,
+  propertyDeveloper: optionalText,
+  propertyCountry: optionalText,
+  propertyCity: optionalText,
+  propertyDistrict: optionalText,
+  propertyAddress: z.string().trim().max(240).optional(),
+  propertyType: z.enum(propertyTypeOptions).optional(),
+  propertyStatus: z.enum(propertyStatusOptions).optional(),
+  propertyShortDescription: z.string().trim().max(300).optional(),
+  propertyFullDescription: z.string().trim().max(6000).optional(),
+  propertyVehicleName: optionalText,
+  propertyManagerName: optionalText,
+  propertyTotalAssetValue: moneyField(),
+  propertyCurrency: optionalText,
+  propertyMinimumParticipation: moneyField(),
+  propertyTargetRaise: moneyField(),
+  propertyGatheredAmount: moneyField(),
+  propertyRemainingAmount: moneyField(),
+  propertyTermMonths: integerField(),
+  propertyPlannedStartDate: optionalDateSchema(),
+  propertyCompletionDate: optionalDateSchema(),
+  propertyInvestorSharePercent: percentField(),
+  propertyManagerSharePercent: percentField(),
+  propertyManagerFeePercent: percentField(),
+  propertyFundraisingCurrency: optionalText,
+  propertyIncomeSources: z.array(z.enum(incomeSourceOptions)).optional().default([])
 }).superRefine((data, context) => {
   const fundraisingDays = Math.ceil((data.fundraisingEndAt.getTime() - data.fundraisingStartAt.getTime()) / 86_400_000);
 
@@ -59,6 +88,42 @@ const projectSubmissionSchema = z.object({
       message: "fundraising_period",
       path: ["fundraisingEndAt"]
     });
+  }
+
+  if (data.sector === "real-estate") {
+    const requiredRealEstateFields = [
+      "propertyObjectName",
+      "propertyComplexName",
+      "propertyDeveloper",
+      "propertyCountry",
+      "propertyCity",
+      "propertyAddress",
+      "propertyType",
+      "propertyStatus",
+      "propertyShortDescription",
+      "propertyFullDescription",
+      "propertyTotalAssetValue",
+      "propertyCurrency",
+      "propertyMinimumParticipation",
+      "propertyTargetRaise",
+      "propertyTermMonths",
+      "propertyPlannedStartDate",
+      "propertyCompletionDate",
+      "propertyInvestorSharePercent",
+      "propertyManagerSharePercent",
+      "propertyManagerFeePercent",
+      "propertyFundraisingCurrency"
+    ] as const;
+
+    for (const field of requiredRealEstateFields) {
+      if (!data[field]) {
+        context.addIssue({ code: z.ZodIssueCode.custom, message: "required_real_estate_field", path: [field] });
+      }
+    }
+
+    if (!data.propertyIncomeSources?.length) {
+      context.addIssue({ code: z.ZodIssueCode.custom, message: "required_real_estate_field", path: ["propertyIncomeSources"] });
+    }
   }
 });
 
@@ -72,6 +137,7 @@ const maxProjectFileSize = 20 * 1024 * 1024;
 const maxProjectFiles = 20;
 const maxProjectTotalSize = 100 * 1024 * 1024;
 const allowedMimeTypes = new Set([
+  "application/zip",
   "application/msword",
   "application/pdf",
   "application/vnd.ms-excel",
@@ -80,9 +146,10 @@ const allowedMimeTypes = new Set([
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   "image/jpeg",
-  "image/png"
+  "image/png",
+  "image/webp"
 ]);
-const allowedExtensions = new Set([".doc", ".docx", ".pdf", ".jpg", ".jpeg", ".png", ".ppt", ".pptx", ".xls", ".xlsx"]);
+const allowedExtensions = new Set([".doc", ".docx", ".pdf", ".jpg", ".jpeg", ".png", ".ppt", ".pptx", ".xls", ".xlsx", ".zip", ".webp"]);
 
 function isRu(request: NextRequest) {
   return request.nextUrl.searchParams.get("lang") !== "en";
@@ -102,6 +169,29 @@ function projectFieldLabels(localeRu: boolean) {
     plannedDividendAt: localeRu ? "Укажите дату планируемых первых выплат." : "Enter planned first distribution date.",
     plannedLaunchAt: localeRu ? "Укажите дату планируемого запуска." : "Enter planned launch date.",
     raisePlan: localeRu ? "Опишите этапы сбора понятным текстом или оставьте поле пустым." : "Describe raise phases clearly or leave this field empty.",
+    propertyAddress: localeRu ? "Укажите адрес объекта." : "Enter the property address.",
+    propertyCity: localeRu ? "Укажите город объекта." : "Enter the property city.",
+    propertyComplexName: localeRu ? "Укажите название комплекса." : "Enter the complex name.",
+    propertyCompletionDate: localeRu ? "Укажите планируемую дату завершения." : "Enter planned completion date.",
+    propertyCountry: localeRu ? "Укажите страну объекта." : "Enter the property country.",
+    propertyCurrency: localeRu ? "Укажите валюту объекта." : "Enter the property currency.",
+    propertyDeveloper: localeRu ? "Укажите девелопера." : "Enter the developer.",
+    propertyFloorPlans: localeRu ? "Добавьте хотя бы один файл объекта: план, брошюру или изображение." : "Add at least one property asset such as a floor plan, brochure or image.",
+    propertyFullDescription: localeRu ? "Добавьте развёрнутое описание объекта." : "Add a full property description.",
+    propertyFundraisingCurrency: localeRu ? "Укажите валюту участия." : "Enter the participation currency.",
+    propertyIncomeSources: localeRu ? "Выберите хотя бы один источник дохода." : "Select at least one income source.",
+    propertyInvestorSharePercent: localeRu ? "Укажите долю инвесторов." : "Enter investor share.",
+    propertyManagerFeePercent: localeRu ? "Укажите комиссию управляющего." : "Enter manager fee.",
+    propertyManagerSharePercent: localeRu ? "Укажите долю управляющего." : "Enter manager share.",
+    propertyMinimumParticipation: localeRu ? "Укажите минимальный вход." : "Enter minimum participation.",
+    propertyObjectName: localeRu ? "Укажите название объекта." : "Enter the property name.",
+    propertyPlannedStartDate: localeRu ? "Укажите дату начала проекта." : "Enter the project start date.",
+    propertyShortDescription: localeRu ? "Добавьте краткое описание объекта." : "Add a short property summary.",
+    propertyStatus: localeRu ? "Выберите статус объекта." : "Select property status.",
+    propertyTargetRaise: localeRu ? "Укажите целевой объём привлечения." : "Enter target raise.",
+    propertyTermMonths: localeRu ? "Укажите срок проекта в месяцах." : "Enter project term in months.",
+    propertyTotalAssetValue: localeRu ? "Укажите полную стоимость объекта." : "Enter total asset value.",
+    propertyType: localeRu ? "Выберите тип недвижимости." : "Select property type.",
     sector: localeRu ? "Выберите отрасль проекта." : "Select project sector.",
     sectorOther: localeRu ? "Укажите отрасль словами." : "Enter the sector in words.",
     stage: localeRu ? "Укажите реальную стадию проекта словами." : "Enter the real project stage in words.",
@@ -118,6 +208,10 @@ function readText(formData: FormData, key: string) {
 
 function readFiles(formData: FormData, key: string) {
   return formData.getAll(key).filter((value): value is File => value instanceof File && value.size > 0);
+}
+
+function readTexts(formData: FormData, key: string) {
+  return formData.getAll(key).filter((value): value is string => typeof value === "string" && value.trim().length > 0);
 }
 
 function validateProjectFile(file: File) {
@@ -165,6 +259,38 @@ async function saveProjectFile(file: File, userId: string, submissionFolder: str
   };
 }
 
+function moneyField() {
+  return z.preprocess((value) => {
+    if (typeof value !== "string" || !value.trim()) return undefined;
+    const normalized = Number(value.replace(",", "."));
+    return Number.isFinite(normalized) ? normalized : value;
+  }, z.number().positive().max(1000000000).optional());
+}
+
+function percentField() {
+  return z.preprocess((value) => {
+    if (typeof value !== "string" || !value.trim()) return undefined;
+    const normalized = Number(value.replace(",", "."));
+    return Number.isFinite(normalized) ? normalized : value;
+  }, z.number().min(0).max(100).optional());
+}
+
+function integerField() {
+  return z.preprocess((value) => {
+    if (typeof value !== "string" || !value.trim()) return undefined;
+    const normalized = Number.parseInt(value, 10);
+    return Number.isFinite(normalized) ? normalized : value;
+  }, z.number().int().positive().max(600).optional());
+}
+
+function optionalDateSchema() {
+  return z.preprocess((value) => {
+    if (typeof value !== "string" || !value.trim()) return undefined;
+    const date = new Date(`${value}T00:00:00.000Z`);
+    return Number.isNaN(date.getTime()) ? value : date;
+  }, z.date().optional());
+}
+
 export async function POST(request: NextRequest) {
   const localeRu = isRu(request);
   const session = (await getServerSession(authOptions)) as SessionUser | null;
@@ -196,6 +322,7 @@ export async function POST(request: NextRequest) {
     orderBy: { createdAt: "desc" },
     select: { status: true }
   });
+  const organization = await getPrimaryOrganizationForUser(userId);
 
   if (latestKyc?.status !== "APPROVED") {
     return NextResponse.json(
@@ -229,9 +356,44 @@ export async function POST(request: NextRequest) {
     payoutFrequency: readText(formData, "payoutFrequency"),
     participationTerm: readText(formData, "participationTerm"),
     raisePlan: readText(formData, "raisePlan"),
-    summary: readText(formData, "summary")
+    summary: readText(formData, "summary"),
+    propertyObjectName: readText(formData, "propertyObjectName"),
+    propertyComplexName: readText(formData, "propertyComplexName"),
+    propertyDeveloper: readText(formData, "propertyDeveloper"),
+    propertyCountry: readText(formData, "propertyCountry"),
+    propertyCity: readText(formData, "propertyCity"),
+    propertyDistrict: readText(formData, "propertyDistrict"),
+    propertyAddress: readText(formData, "propertyAddress"),
+    propertyType: readText(formData, "propertyType"),
+    propertyStatus: readText(formData, "propertyStatus"),
+    propertyShortDescription: readText(formData, "propertyShortDescription"),
+    propertyFullDescription: readText(formData, "propertyFullDescription"),
+    propertyVehicleName: readText(formData, "propertyVehicleName"),
+    propertyManagerName: readText(formData, "propertyManagerName"),
+    propertyTotalAssetValue: readText(formData, "propertyTotalAssetValue"),
+    propertyCurrency: readText(formData, "propertyCurrency"),
+    propertyMinimumParticipation: readText(formData, "propertyMinimumParticipation"),
+    propertyTargetRaise: readText(formData, "propertyTargetRaise"),
+    propertyGatheredAmount: readText(formData, "propertyGatheredAmount"),
+    propertyRemainingAmount: readText(formData, "propertyRemainingAmount"),
+    propertyTermMonths: readText(formData, "propertyTermMonths"),
+    propertyPlannedStartDate: readText(formData, "propertyPlannedStartDate"),
+    propertyCompletionDate: readText(formData, "propertyCompletionDate"),
+    propertyInvestorSharePercent: readText(formData, "propertyInvestorSharePercent"),
+    propertyManagerSharePercent: readText(formData, "propertyManagerSharePercent"),
+    propertyManagerFeePercent: readText(formData, "propertyManagerFeePercent"),
+    propertyFundraisingCurrency: readText(formData, "propertyFundraisingCurrency"),
+    propertyIncomeSources: readTexts(formData, "propertyIncomeSources")
   });
   const documents = readFiles(formData, "documents");
+  const propertyAssetFiles = {
+    brochures: readFiles(formData, "propertyBrochures"),
+    coverImage: readFiles(formData, "propertyCoverImage"),
+    floorPlans: readFiles(formData, "propertyFloorPlans"),
+    gallery: readFiles(formData, "propertyGalleryImages"),
+    visuals: readFiles(formData, "propertyVisuals")
+  };
+  const extraFiles = Object.values(propertyAssetFiles).flat();
 
   if (!parsed.success) {
     const fieldErrors = zodFieldErrors(parsed.error, projectFieldLabels(localeRu));
@@ -249,7 +411,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (!documents.length) {
+  if (!documents.length && !(parsed.success && parsed.data.sector === "real-estate" && extraFiles.length)) {
     return NextResponse.json(
       {
         title: localeRu ? "Прикрепите документы" : "Attach documents",
@@ -265,7 +427,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (documents.length > maxProjectFiles) {
+  if (documents.length + extraFiles.length > maxProjectFiles) {
     return NextResponse.json(
       {
         title: localeRu ? "Слишком много файлов" : "Too many files",
@@ -278,7 +440,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const totalUploadSize = documents.reduce((sum, file) => sum + file.size, 0);
+  const totalUploadSize = [...documents, ...extraFiles].reduce((sum, file) => sum + file.size, 0);
 
   if (totalUploadSize > maxProjectTotalSize) {
     return NextResponse.json(
@@ -293,7 +455,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  for (const file of documents) {
+  for (const file of [...documents, ...extraFiles]) {
     const error = validateProjectFile(file);
 
     if (error) {
@@ -317,10 +479,17 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const submissionFolder = randomUUID();
-  const savedDocuments = await Promise.all(documents.map((file) => saveProjectFile(file, userId, submissionFolder)));
   const data = parsed.data;
   const sector = resolveSector(data.sector, data.sectorOther);
+  const submissionFolder = randomUUID();
+  const savedDocuments = await Promise.all(documents.map((file) => saveProjectFile(file, userId, submissionFolder)));
+  const savedPropertyAssets = await Promise.all([
+    saveAssetGroup(propertyAssetFiles.coverImage, "gallery", userId, submissionFolder),
+    saveAssetGroup(propertyAssetFiles.gallery, "gallery", userId, submissionFolder),
+    saveAssetGroup(propertyAssetFiles.floorPlans, "floor-plan", userId, submissionFolder),
+    saveAssetGroup(propertyAssetFiles.brochures, "brochure", userId, submissionFolder),
+    saveAssetGroup(propertyAssetFiles.visuals, "render", userId, submissionFolder)
+  ]).then((groups) => groups.flat());
 
   if (data.sector === "other" && !sector) {
     return NextResponse.json(
@@ -338,6 +507,7 @@ export async function POST(request: NextRequest) {
   const submission = await prisma.$transaction(async (tx) => {
     const created = await tx.projectSubmission.create({
       data: {
+        organizationId: organization?.id,
         userId,
         title: data.title,
         sector,
@@ -356,8 +526,45 @@ export async function POST(request: NextRequest) {
         participationTerm: data.participationTerm,
         raisePlan: data.raisePlan,
         summary: data.summary,
+        propertyData:
+          data.sector === "real-estate"
+            ? {
+                address: data.propertyAddress,
+                city: data.propertyCity,
+                completionDate: data.propertyCompletionDate?.toISOString(),
+                country: data.propertyCountry,
+                coverImage: savedPropertyAssets.find((asset) => asset.category === "gallery")?.href,
+                currency: data.propertyCurrency,
+                descriptionFull: data.propertyFullDescription,
+                descriptionShort: data.propertyShortDescription,
+                developer: data.propertyDeveloper,
+                district: data.propertyDistrict,
+                documents: savedPropertyAssets,
+                fundraisingCurrency: data.propertyFundraisingCurrency,
+                gallery: savedPropertyAssets.filter((asset) => asset.category === "gallery").map((asset) => asset.href),
+                gatheredAmount: data.propertyGatheredAmount,
+                incomeSources: data.propertyIncomeSources,
+                managerFeePercent: data.propertyManagerFeePercent,
+                managerName: data.propertyManagerName,
+                managerSharePercent: data.propertyManagerSharePercent,
+                minimumParticipation: data.propertyMinimumParticipation,
+                objectName: data.propertyObjectName,
+                objectStatus: data.propertyStatus,
+                partnerName: data.propertyDeveloper,
+                plannedStartDate: data.propertyPlannedStartDate?.toISOString(),
+                projectTermMonths: data.propertyTermMonths,
+                propertyType: data.propertyType,
+                remainingAmount: data.propertyRemainingAmount,
+                targetRaise: data.propertyTargetRaise,
+                titleComplex: data.propertyComplexName,
+                totalAssetValue: data.propertyTotalAssetValue,
+                vehicleName: data.propertyVehicleName,
+                visuals: savedPropertyAssets.filter((asset) => asset.category === "render").map((asset) => asset.href)
+              }
+            : undefined,
         documents: {
           files: savedDocuments,
+          propertyAssets: savedPropertyAssets,
           submittedAt: new Date().toISOString()
         }
       }
@@ -369,22 +576,26 @@ export async function POST(request: NextRequest) {
         action: "project.submission.create",
         entityType: "ProjectSubmission",
         entityId: created.id,
-        payload: {
-          sector,
-          title: data.title,
+          payload: {
+            sector,
+            organizationId: organization?.id ?? null,
+            title: data.title,
           expectedReturn: data.expectedReturn,
           expectedYield: data.expectedYield,
           stage: data.stage,
           fundraisingStartAt: data.fundraisingStartAt.toISOString(),
           fundraisingEndAt: data.fundraisingEndAt.toISOString(),
           plannedLaunchAt: data.plannedLaunchAt.toISOString(),
-          plannedDividendAt: data.plannedDividendAt.toISOString(),
-          payoutFrequency: data.payoutFrequency,
-          participationTerm: data.participationTerm,
-          documents: savedDocuments.map((document) => document.name)
+            plannedDividendAt: data.plannedDividendAt.toISOString(),
+            payoutFrequency: data.payoutFrequency,
+            participationTerm: data.participationTerm,
+            documents: savedDocuments.map((document) => document.name),
+            propertyObjectName: data.propertyObjectName,
+            propertyType: data.propertyType,
+            propertyStatus: data.propertyStatus
+          }
         }
-      }
-    });
+      });
 
     return created;
   });
@@ -397,4 +608,19 @@ export async function POST(request: NextRequest) {
         : "Your project listing application was sent to the Qidra team. Its status will appear in your profile after initial review.",
     submissionId: submission.id
   });
+}
+
+async function saveAssetGroup(files: File[], category: RealEstateDocumentAsset["category"], userId: string, submissionFolder: string) {
+  return Promise.all(
+    files.map(async (file) => {
+      const saved = await saveProjectFile(file, userId, submissionFolder);
+      return {
+        category,
+        href: saved.storagePath,
+        name: saved.name,
+        size: saved.size,
+        type: saved.type
+      } satisfies RealEstateDocumentAsset;
+    })
+  );
 }

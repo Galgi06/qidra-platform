@@ -4,6 +4,7 @@ import { withLocale } from "@/lib/i18n";
 import { ButtonLink } from "@/components/ui/Button";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { ProjectStatusBadge } from "@/components/ui/ProjectStatusBadge";
+import { incomeSourceLabel, propertyStatusLabel, propertyTypeLabel } from "@/lib/real-estate";
 
 export function ProjectCard({ project, locale }: { project: CatalogProject; locale: Locale }) {
   const progress = Math.min(100, Math.round((project.fundedUsdt / Math.max(project.targetUsdt, 1)) * 100));
@@ -11,13 +12,30 @@ export function ProjectCard({ project, locale }: { project: CatalogProject; loca
   const isRu = locale === "ru";
   const riskLabel = isRu ? { Moderate: "Средний", High: "Высокий" }[project.riskLevel] ?? project.riskLevel : project.riskLevel;
   const availability = projectAvailability(project, locale);
+  const realEstate = project.realEstate;
+  const incomeSources = realEstate?.incomeSources?.map((value) => incomeSourceLabel(value, locale)).join(", ");
+  const minimumParticipation = realEstate?.minimumParticipation ?? 100;
 
   return (
-    <article className="premium-card grid min-h-[360px] gap-7 p-7 transition-transform duration-150 hover:-translate-y-0.5 sm:p-9">
+    <article className="premium-card grid min-h-[360px] gap-7 overflow-hidden p-7 transition-transform duration-150 hover:-translate-y-0.5 sm:p-9">
+      {project.coverImage ? (
+        <div className="relative -mx-7 -mt-7 min-h-[220px] overflow-hidden sm:-mx-9 sm:-mt-9">
+          <img alt={project.title[locale]} className="absolute inset-0 h-full w-full object-cover" src={project.coverImage} />
+          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(17,24,39,0.14)_0%,rgba(17,24,39,0.74)_100%)]" />
+          <div className="relative z-10 flex h-full items-end p-7 sm:p-9">
+            <div>
+              <ProjectStatusBadge status={project.status} locale={locale} />
+              {realEstate?.objectName ? <p className="mt-4 text-15 font-medium text-white/80">{realEstate.objectName}</p> : null}
+              <h3 className="mt-2 text-[30px] font-medium leading-[1.15] tracking-[0] text-white sm:text-[36px]">{project.title[locale]}</h3>
+            </div>
+          </div>
+        </div>
+      ) : null}
       <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
         <div className="grid gap-2">
-          <ProjectStatusBadge status={project.status} locale={locale} />
-          <h3 className="text-[30px] font-medium leading-[1.15] tracking-[0] text-qidra-dark sm:text-[36px]">{project.title[locale]}</h3>
+          {!project.coverImage ? <ProjectStatusBadge status={project.status} locale={locale} /> : null}
+          {!project.coverImage ? <h3 className="text-[30px] font-medium leading-[1.15] tracking-[0] text-qidra-dark sm:text-[36px]">{project.title[locale]}</h3> : null}
+          {realEstate?.titleComplex ? <p className="text-15 text-qidra-grayBlue">{realEstate.titleComplex}</p> : null}
         </div>
         <span className="w-fit rounded-full bg-qidra-accent8 px-4 py-2 text-14 font-semibold text-qidra-accent shadow-[inset_0_0_0_1px_rgba(79,70,229,0.14)]">{project.structure}</span>
       </div>
@@ -30,15 +48,40 @@ export function ProjectCard({ project, locale }: { project: CatalogProject; loca
           {isRu ? "Инициатор" : "Initiator"}: {project.initiator.name || (isRu ? "Участник Qidra" : "Qidra participant")}
         </a>
       ) : null}
-      <dl className="grid gap-3 text-14 text-qidra-grayBlue sm:grid-cols-3">
+      {project.organization ? (
+        <a
+          className="w-fit rounded-full bg-qidra-accent8 px-4 py-2 text-14 font-semibold text-qidra-accent shadow-[inset_0_0_0_1px_rgba(79,70,229,0.14)] transition-colors hover:text-qidra-dark"
+          href={withLocale(`/companies/${project.organization.publicSlug}`, locale)}
+        >
+          {isRu ? "Компания" : "Company"}: {project.organization.displayName}
+        </a>
+      ) : null}
+      <dl className={`grid gap-3 text-14 text-qidra-grayBlue ${realEstate ? "sm:grid-cols-2 xl:grid-cols-4" : "sm:grid-cols-3"}`}>
         <div className="rounded-qidra bg-qidra-grayLight p-4">
           <dt>{isRu ? "Локация" : "Location"}</dt>
-          <dd className="mt-1 font-medium text-qidra-dark">{project.location}</dd>
+          <dd className="mt-1 font-medium text-qidra-dark">{realEstate ? [realEstate.country, realEstate.city].filter(Boolean).join(", ") : project.location}</dd>
         </div>
-        <div className="rounded-qidra bg-qidra-grayLight p-4">
-          <dt>{isRu ? "Риск" : "Risk"}</dt>
-          <dd className="mt-1 font-medium text-qidra-dark">{riskLabel}</dd>
-        </div>
+        {realEstate ? (
+          <>
+            <div className="rounded-qidra bg-qidra-grayLight p-4">
+              <dt>{isRu ? "Тип недвижимости" : "Property type"}</dt>
+              <dd className="mt-1 font-medium text-qidra-dark">{propertyTypeLabel(realEstate.propertyType, locale)}</dd>
+            </div>
+            <div className="rounded-qidra bg-qidra-grayLight p-4">
+              <dt>{isRu ? "Статус объекта" : "Property status"}</dt>
+              <dd className="mt-1 font-medium text-qidra-dark">{propertyStatusLabel(realEstate.objectStatus, locale)}</dd>
+            </div>
+            <div className="rounded-qidra bg-qidra-grayLight p-4">
+              <dt>{isRu ? "Минимальный вход" : "Minimum participation"}</dt>
+              <dd className="mt-1 font-medium text-qidra-dark">{minimumParticipation.toLocaleString()} {realEstate.fundraisingCurrency || realEstate.currency || "USD"}</dd>
+            </div>
+          </>
+        ) : (
+          <div className="rounded-qidra bg-qidra-grayLight p-4">
+            <dt>{isRu ? "Риск" : "Risk"}</dt>
+            <dd className="mt-1 font-medium text-qidra-dark">{riskLabel}</dd>
+          </div>
+        )}
         <div className="rounded-qidra bg-qidra-grayLight p-4">
           <dt>
             <a className="transition-colors hover:text-qidra-accent" href={`${withLocale(`/projects/${project.slug}`, locale)}#documents`}>
@@ -64,7 +107,7 @@ export function ProjectCard({ project, locale }: { project: CatalogProject; loca
           <dl className="grid gap-3 sm:grid-cols-2">
             <ProjectInfo label={isRu ? "Целевой объём" : "Target"} value={`${project.targetUsdt.toLocaleString()} USDT`} />
             <ProjectInfo label={isRu ? "Модель" : "Model"} value={project.structure} />
-            <ProjectInfo label={isRu ? "Стадия" : "Stage"} value={project.lifecycle.stage[locale]} />
+            <ProjectInfo label={isRu ? "Стадия" : "Stage"} value={realEstate ? propertyStatusLabel(realEstate.objectStatus, locale) : project.lifecycle.stage[locale]} />
             <ProjectInfo label={isRu ? "Период сбора" : "Raise period"} value={formatDateRange(project.lifecycle.fundraisingStartAt, project.lifecycle.fundraisingEndAt, locale)} />
             <ProjectInfo label={isRu ? "План запуска" : "Planned launch"} value={formatDate(project.lifecycle.plannedLaunchAt, locale)} />
             <ProjectInfo label={isRu ? "Первые выплаты" : "First distributions"} value={formatDate(project.lifecycle.plannedDividendAt, locale)} />
@@ -75,6 +118,8 @@ export function ProjectCard({ project, locale }: { project: CatalogProject; loca
               value={project.expectedReturn[locale]}
             />
             <ProjectInfo label={isRu ? "Ориентир доходности" : "Return guidance"} value={project.expectedYield[locale]} />
+            {realEstate?.incomeSources?.length ? <ProjectInfo label={isRu ? "Источник дохода" : "Income source"} value={incomeSources || ""} /> : null}
+            {realEstate?.managerFeePercent ? <ProjectInfo label={isRu ? "Комиссия управляющего" : "Manager fee"} value={`${realEstate.managerFeePercent}%`} /> : null}
           </dl>
           <div className="rounded-qidra bg-white px-3 py-2 text-14">
             <p className="font-medium text-qidra-dark">{isRu ? "Что сделано сейчас" : "Current progress"}</p>

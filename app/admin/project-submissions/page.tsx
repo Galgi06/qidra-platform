@@ -14,6 +14,7 @@ import { getLocale, type SearchParams, withLocale } from "@/lib/i18n";
 import { prisma } from "@/lib/prisma";
 import { normalizeProjectSubmissionStatus, projectSubmissionStatusLabel, projectSubmissionStatuses } from "@/lib/project-submission-status";
 import { payoutFrequencyLabel } from "@/lib/project-catalog";
+import { incomeSourceLabel, parseRealEstateData, propertyStatusLabel, propertyTypeLabel } from "@/lib/real-estate";
 
 type SubmissionDocument = {
   name: string;
@@ -96,6 +97,7 @@ export default async function AdminProjectSubmissionsPage({ searchParams }: { se
               {submissions.length ? (
                 submissions.map((submission) => {
                   const documents = readSubmissionDocuments(submission.documents);
+                  const realEstate = parseRealEstateData(submission.propertyData);
 
                   return (
                     <article key={submission.id} className="surface grid gap-6 bg-white p-6 sm:p-8">
@@ -154,6 +156,22 @@ export default async function AdminProjectSubmissionsPage({ searchParams }: { se
                               <p className="mt-2 whitespace-pre-line text-14 text-qidra-grayBlue">{submission.raisePlan}</p>
                             </div>
                           ) : null}
+                        </div>
+                      ) : null}
+                      {realEstate ? (
+                        <div className="grid gap-4 rounded-[12px] bg-qidra-grayLight p-4">
+                          <h3 className="text-16 font-medium text-qidra-dark">{isRu ? "Параметры недвижимости" : "Real estate parameters"}</h3>
+                          <dl className="grid gap-3 text-14 text-qidra-grayBlue md:grid-cols-3">
+                            <Fact label={isRu ? "Объект" : "Property"} value={realEstate.objectName || (isRu ? "Не указано" : "Not set")} />
+                            <Fact label={isRu ? "Комплекс" : "Complex"} value={realEstate.titleComplex || (isRu ? "Не указано" : "Not set")} />
+                            <Fact label={isRu ? "Девелопер" : "Developer"} value={realEstate.developer || (isRu ? "Не указано" : "Not set")} />
+                            <Fact label={isRu ? "Тип" : "Type"} value={propertyTypeLabel(realEstate.propertyType, locale)} />
+                            <Fact label={isRu ? "Статус" : "Status"} value={propertyStatusLabel(realEstate.objectStatus, locale)} />
+                            <Fact label={isRu ? "Источник дохода" : "Income source"} value={realEstate.incomeSources?.map((item) => incomeSourceLabel(item, locale)).join(", ") || (isRu ? "Не указано" : "Not set")} />
+                            <Fact label={isRu ? "Минимальный вход" : "Minimum participation"} value={realEstate.minimumParticipation ? `${realEstate.minimumParticipation.toLocaleString()} ${realEstate.fundraisingCurrency || realEstate.currency || "USD"}` : (isRu ? "Не указано" : "Not set")} />
+                            <Fact label={isRu ? "Целевой объём" : "Target raise"} value={realEstate.targetRaise ? `${realEstate.targetRaise.toLocaleString()} ${realEstate.fundraisingCurrency || realEstate.currency || "USD"}` : (isRu ? "Не указано" : "Not set")} />
+                            <Fact label={isRu ? "Стоимость объекта" : "Asset value"} value={realEstate.totalAssetValue ? `${realEstate.totalAssetValue.toLocaleString()} ${realEstate.currency || "USD"}` : (isRu ? "Не указано" : "Not set")} />
+                          </dl>
                         </div>
                       ) : null}
                       {submission.adminNote ? (

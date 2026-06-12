@@ -316,6 +316,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const project = await prisma.$transaction(async (tx) => {
     const created = await tx.project.create({
       data: {
+        coverImage:
+          submission.propertyData && typeof submission.propertyData === "object" && "coverImage" in submission.propertyData
+            ? ((submission.propertyData as { coverImage?: unknown }).coverImage as string | undefined)
+            : undefined,
         descriptionEn: data.descriptionEn,
         descriptionRu: data.descriptionRu,
         expectedReturnEn: data.expectedReturnEn,
@@ -328,6 +332,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         currentProgressEn: data.currentProgressEn,
         fundraisingStartAt: data.fundraisingStartAt,
         fundraisingEndAt: data.fundraisingEndAt,
+        organizationId: submission.organizationId,
         plannedLaunchAt: data.plannedLaunchAt,
         plannedDividendAt: data.plannedDividendAt,
         payoutFrequency: data.payoutFrequency,
@@ -337,6 +342,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         raisePlanEn: data.raisePlanEn,
         fundedUsdt: 0,
         location: data.location,
+        propertyData: submission.propertyData ?? undefined,
         riskLevel: data.riskLevel,
         slug: data.slug,
         status: projectStatus,

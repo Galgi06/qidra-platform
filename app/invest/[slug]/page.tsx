@@ -17,7 +17,7 @@ export default async function InvestPage({ params, searchParams }: { params: Pro
   const userId = session.user?.id ?? "";
   const project = await getProjectBySlug(slug);
   if (!project) notFound();
-  const [latestKyc, wallet, activeApplication] = await Promise.all([
+  const [latestKyc, wallet, activeApplication, user] = await Promise.all([
     prisma.kycApplication.findFirst({
       where: { userId },
       orderBy: { createdAt: "desc" },
@@ -35,6 +35,14 @@ export default async function InvestPage({ params, searchParams }: { params: Pro
       },
       orderBy: { createdAt: "desc" },
       select: { amountUsdt: true, id: true, reservedUsdt: true }
+    }),
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        email: true,
+        investorProfile: { select: { country: true, phone: true } },
+        name: true
+      }
     })
   ]);
   const availableUsdt = Number(wallet?.availableUsdt?.toString() ?? 0);
@@ -56,8 +64,16 @@ export default async function InvestPage({ params, searchParams }: { params: Pro
             kycApproved={kycApproved}
             locale={locale}
             noFixedYieldText={dictionary[locale].common.noFixedYield}
+            prefills={{
+              country: user?.investorProfile?.country || "",
+              email: user?.email || "",
+              firstName: user?.name?.split(" ")[0] || "",
+              lastName: user?.name?.split(" ").slice(1).join(" ") || "",
+              phone: user?.investorProfile?.phone || ""
+            }}
             projectSlug={project.slug}
             projectTitle={project.title[locale]}
+            realEstate={project.realEstate}
           />
         ) : (
           <div className="container-qidra grid max-w-2xl gap-5">

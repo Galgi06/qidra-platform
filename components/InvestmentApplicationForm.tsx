@@ -8,6 +8,7 @@ import { Button, ButtonLink } from "@/components/ui/Button";
 import { InvestmentAmountInput } from "@/components/InvestmentAmountInput";
 import { NotificationCard } from "@/components/NotificationCard";
 import type { Locale } from "@/lib/i18n";
+import type { RealEstateProjectData } from "@/lib/real-estate";
 
 type PopupState = {
   title: string;
@@ -25,8 +26,16 @@ type InvestmentApplicationFormProps = {
   kycApproved: boolean;
   locale: Locale;
   noFixedYieldText: string;
+  prefills: {
+    country: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    phone: string;
+  };
   projectSlug: string;
   projectTitle: string;
+  realEstate: RealEstateProjectData | null;
 };
 
 const minParticipationUsdt = 100;
@@ -39,8 +48,10 @@ export function InvestmentApplicationForm({
   kycApproved,
   locale,
   noFixedYieldText,
+  prefills,
   projectSlug,
-  projectTitle
+  projectTitle,
+  realEstate
 }: InvestmentApplicationFormProps) {
   const isRu = locale === "ru";
   const router = useRouter();
@@ -155,6 +166,22 @@ export function InvestmentApplicationForm({
         <h1 className="subtitle-28">{isRu ? "Заявка на участие" : "Participation application"}</h1>
         <p className="text-18 text-qidra-grayBlue">{projectTitle}</p>
         <input name="projectSlug" type="hidden" value={projectSlug} />
+        {realEstate ? (
+          <div className="grid gap-4 rounded-[20px] border border-qidra-grayLight bg-qidra-grayLight/50 p-5 md:grid-cols-2">
+            <InputField defaultValue={prefills.firstName} label={isRu ? "Имя" : "First name"} name="firstName" required />
+            <InputField defaultValue={prefills.lastName} label={isRu ? "Фамилия" : "Last name"} name="lastName" required />
+            <InputField defaultValue={prefills.email} label="Email" name="email" required type="email" />
+            <InputField defaultValue={prefills.phone} label={isRu ? "Телефон" : "Phone"} name="phone" required />
+            <InputField label="WhatsApp" name="whatsapp" />
+            <InputField defaultValue={prefills.country} label={isRu ? "Страна" : "Country"} name="contactCountry" required />
+            <div className="md:col-span-2">
+              <label className="grid gap-2 text-14 font-semibold text-qidra-dark">
+                <span>{isRu ? "Комментарий" : "Comment"}</span>
+                <textarea className="field-shell min-h-[120px] rounded-qidra px-4 py-3 text-16 outline-none" name="comment" maxLength={1200} />
+              </label>
+            </div>
+          </div>
+        ) : null}
         <InvestmentAmountInput locale={locale} />
         {hasActiveApplication ? (
           <NotificationCard
@@ -178,6 +205,19 @@ export function InvestmentApplicationForm({
         <Checkbox name="contractAccepted" required>
           {isRu ? "Я принимаю договорную структуру Mudaraba/Musharaka." : "I accept the Mudaraba/Musharaka contractual structure."}
         </Checkbox>
+        {realEstate ? (
+          <>
+            <Checkbox name="riskAccepted" required>
+              {isRu ? "Я ознакомлен с рисками." : "I acknowledge the risks."}
+            </Checkbox>
+            <Checkbox name="qidraDisclaimerAccepted" required>
+              {isRu ? "Я понимаю, что Qidra является информационной платформой." : "I understand that Qidra is an informational platform."}
+            </Checkbox>
+            <Checkbox name="transferAccepted" required>
+              {isRu ? "Я согласен на передачу моей заявки предпринимателю." : "I agree that my application may be shared with the entrepreneur."}
+            </Checkbox>
+          </>
+        ) : null}
         <Button loading={submitting} loadingLabel={isRu ? "Отправка" : "Submitting"} type="submit">
           {hasActiveApplication ? (isRu ? "Обновить заявку" : "Update application") : isRu ? "Создать заявку" : "Create application"}
         </Button>
@@ -187,6 +227,15 @@ export function InvestmentApplicationForm({
       </form>
       {popup ? <InvestmentPopup locale={locale} popup={popup} onClose={() => setPopup(null)} /> : null}
     </>
+  );
+}
+
+function InputField(props: { defaultValue?: string; label: string; name: string; required?: boolean; type?: string }) {
+  return (
+    <label className="grid gap-2 text-14 font-semibold text-qidra-dark">
+      <span>{props.label}</span>
+      <input className="field-shell h-12 rounded-qidra px-4 text-16 outline-none" defaultValue={props.defaultValue} name={props.name} required={props.required} type={props.type || "text"} />
+    </label>
   );
 }
 

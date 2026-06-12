@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { requireAuth } from "@/lib/access";
 import { getLocale, type SearchParams, withLocale } from "@/lib/i18n";
+import { getPrimaryOrganizationForUser } from "@/lib/organizations";
 import { prisma } from "@/lib/prisma";
 
 export default async function NewProjectSubmissionPage({ searchParams }: { searchParams?: Promise<SearchParams> }) {
@@ -17,9 +18,10 @@ export default async function NewProjectSubmissionPage({ searchParams }: { searc
   const session = await requireAuth(locale, "/investor/projects/new");
   const isRu = locale === "ru";
   const userId = session.user?.id ?? "";
-  const [latestKyc, recentSubmissions] = await Promise.all([
+  const [latestKyc, recentSubmissions, organization] = await Promise.all([
     prisma.kycApplication.findFirst({ where: { userId }, orderBy: { createdAt: "desc" } }),
-    prisma.projectSubmission.findMany({ where: { userId }, orderBy: { createdAt: "desc" }, take: 5 })
+    prisma.projectSubmission.findMany({ where: { userId }, orderBy: { createdAt: "desc" }, take: 5 }),
+    getPrimaryOrganizationForUser(userId)
   ]);
   const approved = latestKyc?.status === "APPROVED";
 
@@ -32,12 +34,16 @@ export default async function NewProjectSubmissionPage({ searchParams }: { searc
             <div>
               <p className="section-kicker">{isRu ? "Профиль участника" : "Participant profile"}</p>
               <h1 className="mt-3 max-w-4xl text-[42px] font-medium leading-tight tracking-[0] text-qidra-dark sm:text-[56px]">
-                {isRu ? "Разместить свой проект" : "List your project"}
+                {organization ? (isRu ? "Создать листинг компании" : "Create a company listing") : isRu ? "Разместить свой проект" : "List your project"}
               </h1>
               <p className="mt-4 max-w-3xl text-20 text-qidra-grayBlue">
-                {isRu
-                  ? "Опишите инициативу, приложите документы и отправьте проект на первичную проверку Qidra перед публикацией в каталоге."
-                  : "Describe the initiative, attach documents and send the project for Qidra's initial review."}
+                {organization
+                  ? isRu
+                    ? `Листинг будет создан от имени компании ${organization.displayName}. Опишите продукт, приложите документы и отправьте его на модерацию.`
+                    : `This listing will be created on behalf of ${organization.displayName}. Describe the offering, attach documents, and send it for moderation.`
+                  : isRu
+                    ? "Опишите инициативу, приложите документы и отправьте проект на первичную проверку Qidra перед публикацией в каталоге."
+                    : "Describe the initiative, attach documents and send the project for Qidra's initial review."}
               </p>
             </div>
           </div>
@@ -64,6 +70,17 @@ export default async function NewProjectSubmissionPage({ searchParams }: { searc
               reloadOnSuccess
             >
               <fieldset className="grid gap-6" disabled={!approved}>
+                {organization ? (
+                  <NotificationCard
+                    title={isRu ? "Листинг компании" : "Company listing"}
+                    text={
+                      isRu
+                        ? `Публикация идёт от имени ${organization.displayName}. После одобрения карточка компании сможет собирать входящие лиды и заявки.`
+                        : `The listing is being created on behalf of ${organization.displayName}. Once approved, the company profile can collect inbound leads and applications.`
+                    }
+                    tone="info"
+                  />
+                ) : null}
                 <div>
                   <h2 className="text-[32px] font-medium leading-tight tracking-[0] text-qidra-dark">{isRu ? "Информация о проекте" : "Project information"}</h2>
                   <p className="mt-3 max-w-2xl text-16 text-qidra-grayBlue">

@@ -10,6 +10,7 @@ import { GuestSupportChatWidget } from "@/components/support/GuestSupportChatWid
 import { authOptions } from "@/lib/next-auth";
 import { SignOutButton } from "@/components/auth/SignOutButton";
 import { canAccessAdmin, canAccessSupportDesk } from "@/lib/auth";
+import { getPrimaryOrganizationForUser } from "@/lib/organizations";
 
 type SessionWithRole = Awaited<ReturnType<typeof getServerSession>> & {
   user?: {
@@ -20,6 +21,7 @@ type SessionWithRole = Awaited<ReturnType<typeof getServerSession>> & {
 export async function Header({ locale, path = "/" }: { locale: Locale; path?: string }) {
   const session = (await getServerSession(authOptions)) as SessionWithRole;
   const signedIn = Boolean(session?.user);
+  const organization = session?.user ? await getPrimaryOrganizationForUser((session.user as { id?: string }).id || "") : null;
   const adminSession = canAccessAdmin(session?.user?.role as "ADMIN" | "SUPER_ADMIN" | "guest" | undefined);
   const supportDeskSession = canAccessSupportDesk(session?.user?.role as "ADMIN" | "SUPER_ADMIN" | "TECH_SUPPORT" | "SALES_MANAGER" | "guest" | undefined);
   const operationsHref = adminSession ? "/admin" : "/admin/support";
@@ -27,6 +29,7 @@ export async function Header({ locale, path = "/" }: { locale: Locale; path?: st
   const t = dictionary[locale].nav;
   const links = [
     ...(supportDeskSession ? [{ href: operationsHref, label: locale === "ru" ? "Операционный центр" : "Operations center" }] : []),
+    ...(organization ? [{ href: "/company", label: locale === "ru" ? "Кабинет компании" : "Company workspace" }] : []),
     { href: "/projects", label: t.projects },
     { href: "/faq", label: t.faq },
     { href: "/legal/terms", label: t.legal }
