@@ -6,7 +6,7 @@ import { NotificationCard } from "@/components/NotificationCard";
 import { dictionary, getLocale, type SearchParams } from "@/lib/i18n";
 import { getSiteContent, legalAssetHref } from "@/lib/site-content";
 
-export default async function LegalPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams?: SearchParams }) {
+export default async function LegalPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams?: Promise<SearchParams> }) {
   const [{ slug }, locale] = await Promise.all([params, getLocale(searchParams)]);
   const content = await getSiteContent();
   const page = content.legalPages.find((item) => item.slug === slug);

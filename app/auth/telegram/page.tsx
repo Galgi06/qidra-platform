@@ -19,7 +19,7 @@ function safeNextPath(value?: string) {
   return value;
 }
 
-export default async function TelegramAuthPage({ searchParams }: { searchParams?: TelegramSearchParams | Promise<TelegramSearchParams> }) {
+export default async function TelegramAuthPage({ searchParams }: { searchParams?: Promise<TelegramSearchParams> }) {
   const params = await searchParams;
   const locale = await getLocale(params);
   const nextPath = safeNextPath(readParam(params?.next));

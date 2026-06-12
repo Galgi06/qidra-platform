@@ -11,7 +11,7 @@ import { acceptsApplications, getProjectBySlug } from "@/lib/project-catalog";
 
 export const dynamic = "force-dynamic";
 
-export default async function InvestPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams?: SearchParams }) {
+export default async function InvestPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams?: Promise<SearchParams> }) {
   const [{ slug }, locale] = await Promise.all([params, getLocale(searchParams)]);
   const session = await requireAuth(locale, `/invest/${slug}`);
   const userId = session.user?.id ?? "";

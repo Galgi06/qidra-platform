@@ -13,7 +13,7 @@ import { prisma } from "@/lib/prisma";
 import { getPublicTronPaymentConfig, preferredDepositAddress } from "@/lib/trongrid";
 import { ensureUserDepositWallet } from "@/lib/wallet-addresses";
 
-export default async function WalletPage({ searchParams }: { searchParams?: SearchParams }) {
+export default async function WalletPage({ searchParams }: { searchParams?: Promise<SearchParams> }) {
   const params = await searchParams;
   const locale = await getLocale(params);
   const session = await requireAuth(locale, "/investor/wallet");

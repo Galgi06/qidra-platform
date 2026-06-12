@@ -20,7 +20,7 @@ function safeNextPath(value?: string) {
   return value;
 }
 
-export default async function SignInPage({ searchParams }: { searchParams?: SignInSearchParams | Promise<SignInSearchParams> }) {
+export default async function SignInPage({ searchParams }: { searchParams?: Promise<SignInSearchParams> }) {
   const params = await searchParams;
   const locale = await getLocale(params);
   const nextPath = safeNextPath(readParam(params?.next));

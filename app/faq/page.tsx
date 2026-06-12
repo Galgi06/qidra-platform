@@ -4,7 +4,7 @@ import { Header } from "@/components/Header";
 import { getLocale, type SearchParams } from "@/lib/i18n";
 import { getSiteContent } from "@/lib/site-content";
 
-export default async function FaqPage({ searchParams }: { searchParams?: SearchParams }) {
+export default async function FaqPage({ searchParams }: { searchParams?: Promise<SearchParams> }) {
   const locale = await getLocale(searchParams);
   const content = await getSiteContent();
 

@@ -4,6 +4,7 @@ import { withLocale } from "@/lib/i18n";
 
 const adminSections = [
   { path: "/admin", label: { ru: "Обзор", en: "Overview" }, description: { ru: "Сводка платформы", en: "Platform summary" } },
+  { path: "/admin/analytics", label: { ru: "Аналитика", en: "Analytics" }, description: { ru: "Метрики по всей платформе", en: "Site-wide platform metrics" } },
   { path: "/admin/users", label: { ru: "Пользователи", en: "Users" }, description: { ru: "Клиенты, роли, доступы", en: "Clients, roles, access" } },
   { path: "/admin/kyc", label: { ru: "KYC", en: "KYC" }, description: { ru: "Анкеты и документы", en: "Profiles and documents" } },
   { path: "/admin/projects", label: { ru: "Проекты", en: "Projects" }, description: { ru: "Карточки и статусы", en: "Cards and statuses" } },

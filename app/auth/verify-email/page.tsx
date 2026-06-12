@@ -10,7 +10,7 @@ type VerifyEmailSearchParams = SearchParams & {
   token?: string | string[];
 };
 
-export default async function VerifyEmailPage({ searchParams }: { searchParams?: VerifyEmailSearchParams | Promise<VerifyEmailSearchParams> }) {
+export default async function VerifyEmailPage({ searchParams }: { searchParams?: Promise<VerifyEmailSearchParams> }) {
   const params = await searchParams;
   const locale = await getLocale(params);
   const email = readParam(params?.email)?.toLowerCase();

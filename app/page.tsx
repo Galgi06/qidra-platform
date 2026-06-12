@@ -20,7 +20,7 @@ type SessionWithRole = Awaited<ReturnType<typeof getServerSession>> & {
   };
 };
 
-export default async function Home({ searchParams }: { searchParams?: SearchParams }) {
+export default async function Home({ searchParams }: { searchParams?: Promise<SearchParams> }) {
   const locale = await getLocale(searchParams);
   const t = dictionary[locale];
   const isRu = locale === "ru";

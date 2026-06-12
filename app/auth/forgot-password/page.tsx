@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { getLocale, type SearchParams } from "@/lib/i18n";
 
-export default async function ForgotPasswordPage({ searchParams }: { searchParams?: SearchParams }) {
+export default async function ForgotPasswordPage({ searchParams }: { searchParams?: Promise<SearchParams> }) {
   const locale = await getLocale(searchParams);
 
   return (

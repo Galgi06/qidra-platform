@@ -13,6 +13,7 @@ import { requireSupportDesk } from "@/lib/access";
 import { canManageManagers } from "@/lib/auth";
 import { getLocale, t, type SearchParams, withLocale } from "@/lib/i18n";
 import { prisma } from "@/lib/prisma";
+import { isImportedPlaceholderEmail, participantEmailHint } from "@/lib/user-email";
 import { userBlockMode } from "@/lib/user-access";
 
 export default async function AdminUsersPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
@@ -116,8 +117,18 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
                           <div className="flex items-center gap-3">
                             <UserAvatar name={user.name || user.email} />
                             <div>
+                              {isImportedPlaceholderEmail(user.email) ? (
+                                <p className="mb-1 text-12 font-medium uppercase tracking-[0.08em] text-qidra-gold">
+                                  {locale === "ru" ? "Импортный email" : "Imported email"}
+                                </p>
+                              ) : (
+                                <p className="mb-1 text-12 font-medium uppercase tracking-[0.08em] text-qidra-accent">
+                                  {locale === "ru" ? "Email участника" : "Participant email"}
+                                </p>
+                              )}
                               <p className="text-16 font-medium text-qidra-dark">{user.name || (locale === "ru" ? "Без имени" : "No name")}</p>
-                              <p className="text-14 text-qidra-grayBlue">{user.email}</p>
+                              <p className={`text-14 font-medium ${isImportedPlaceholderEmail(user.email) ? "text-qidra-gold" : "text-qidra-dark"}`}>{user.email}</p>
+                              <p className="mt-1 text-12 text-qidra-grayBlue">{participantEmailHint(user.email, locale)}</p>
                               {userBlockMode(user) !== "active" ? <p className="mt-1 text-12 font-medium text-qidra-red">{accessStatusLabel(user, locale)}</p> : null}
                               <p className="mt-1 text-12 text-qidra-grayBlue">{formatDate(user.createdAt, locale)}</p>
                             </div>

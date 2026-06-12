@@ -14,7 +14,7 @@ export default async function PublicProfilePage({
   searchParams
 }: {
   params: Promise<{ userId: string }>;
-  searchParams?: SearchParams;
+  searchParams?: Promise<SearchParams>;
 }) {
   const [{ userId }, locale] = await Promise.all([params, getLocale(searchParams)]);
   const isRu = locale === "ru";

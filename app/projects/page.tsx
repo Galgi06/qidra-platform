@@ -8,7 +8,7 @@ import { acceptsApplications, getPublicProjects, type CatalogProject } from "@/l
 
 export const dynamic = "force-dynamic";
 
-export default async function ProjectsPage({ searchParams }: { searchParams?: SearchParams }) {
+export default async function ProjectsPage({ searchParams }: { searchParams?: Promise<SearchParams> }) {
   const params = await searchParams;
   const locale = await getLocale(params);
   const isRu = locale === "ru";

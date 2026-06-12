@@ -11,7 +11,7 @@ import { getLocale, type SearchParams, withLocale } from "@/lib/i18n";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 
-export default async function InvestorPage({ searchParams }: { searchParams?: SearchParams }) {
+export default async function InvestorPage({ searchParams }: { searchParams?: Promise<SearchParams> }) {
   const locale = await getLocale(searchParams);
   const session = await requireAuth(locale, "/investor");
   const isRu = locale === "ru";
