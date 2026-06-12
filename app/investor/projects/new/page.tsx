@@ -12,7 +12,7 @@ import { requireAuth } from "@/lib/access";
 import { getLocale, type SearchParams, withLocale } from "@/lib/i18n";
 import { prisma } from "@/lib/prisma";
 
-export default async function NewProjectSubmissionPage({ searchParams }: { searchParams?: SearchParams }) {
+export default async function NewProjectSubmissionPage({ searchParams }: { searchParams?: Promise<SearchParams> }) {
   const locale = await getLocale(searchParams);
   const session = await requireAuth(locale, "/investor/projects/new");
   const isRu = locale === "ru";

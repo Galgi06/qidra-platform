@@ -13,7 +13,7 @@ import { getLocale, type SearchParams } from "@/lib/i18n";
 import { readKycDocuments } from "@/lib/kyc-documents";
 import { prisma } from "@/lib/prisma";
 
-export default async function KycPage({ searchParams }: { searchParams?: SearchParams }) {
+export default async function KycPage({ searchParams }: { searchParams?: Promise<SearchParams> }) {
   const locale = await getLocale(searchParams);
   const session = await requireAuth(locale, "/investor/kyc");
   const isRu = locale === "ru";

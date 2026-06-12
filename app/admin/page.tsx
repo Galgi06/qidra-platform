@@ -12,6 +12,11 @@ import { prisma } from "@/lib/prisma";
 
 const sections = [
   {
+    href: "/admin/analytics",
+    label: { ru: "Аналитика", en: "Analytics" },
+    text: { ru: "Метрики по пользователям, проектам, платежам и поддержке.", en: "Metrics for users, projects, payments and support." }
+  },
+  {
     href: "/admin/users",
     label: { ru: "Пользователи", en: "Users" },
     text: { ru: "Роли, профили участников и проверка доступа.", en: "Roles, participant profiles and access review." }
@@ -217,6 +222,9 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                 </div>
                 <ButtonLink href={withLocale("/admin/audit", locale)} size="sm" variant="outline">
                   {locale === "ru" ? "Открыть журнал" : "Open audit log"}
+                </ButtonLink>
+                <ButtonLink href={withLocale("/admin/analytics", locale)} size="sm" variant="outline">
+                  {locale === "ru" ? "Открыть аналитику" : "Open analytics"}
                 </ButtonLink>
               </div>
               <div className="mt-5 grid gap-4 lg:grid-cols-3 xl:grid-cols-6">

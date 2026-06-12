@@ -22,6 +22,7 @@ import { getLocale, t, type Locale, type SearchParams, withLocale } from "@/lib/
 import { readKycDocuments, type KycDocumentKind } from "@/lib/kyc-documents";
 import { prisma } from "@/lib/prisma";
 import { projectSubmissionStatusLabel } from "@/lib/project-submission-status";
+import { isImportedPlaceholderEmail, participantEmailHint } from "@/lib/user-email";
 import { userBlockMode } from "@/lib/user-access";
 
 export const dynamic = "force-dynamic";
@@ -243,7 +244,8 @@ export default async function AdminUserDetailPage({
                 <div className="min-w-0">
                   <p className="section-kicker">{isRu ? "Карточка клиента" : "Client card"}</p>
                   <h1 className="mt-3 break-words title-48 text-qidra-dark">{displayName}</h1>
-                  <p className="mt-3 break-all text-18 text-qidra-grayBlue">{user.email}</p>
+                  <p className={`mt-3 break-all text-18 font-medium ${isImportedPlaceholderEmail(user.email) ? "text-qidra-gold" : "text-qidra-dark"}`}>{user.email}</p>
+                  <p className="mt-2 text-14 text-qidra-grayBlue">{participantEmailHint(user.email, locale)}</p>
                 </div>
               </div>
               <div className="flex flex-wrap gap-3">

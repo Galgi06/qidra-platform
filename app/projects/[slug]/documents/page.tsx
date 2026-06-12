@@ -8,7 +8,7 @@ import { getProjectBySlug } from "@/lib/project-catalog";
 
 export const dynamic = "force-dynamic";
 
-export default async function ProjectDocumentsPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams?: SearchParams }) {
+export default async function ProjectDocumentsPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams?: Promise<SearchParams> }) {
   const [{ slug }, locale] = await Promise.all([params, getLocale(searchParams)]);
   const project = await getProjectBySlug(slug);
   if (!project) notFound();

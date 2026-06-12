@@ -20,7 +20,7 @@ export default async function InvestorContractPage({
   searchParams
 }: {
   params: Promise<{ applicationId: string }>;
-  searchParams?: SearchParams;
+  searchParams?: Promise<SearchParams>;
 }) {
   const [{ applicationId }, locale] = await Promise.all([params, getLocale(searchParams)]);
   const session = await requireAuth(locale, `/investor/investments/${applicationId}`);

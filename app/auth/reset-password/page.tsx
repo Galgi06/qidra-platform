@@ -13,7 +13,7 @@ type ResetPasswordSearchParams = SearchParams & {
   token?: string | string[];
 };
 
-export default async function ResetPasswordPage({ searchParams }: { searchParams?: ResetPasswordSearchParams | Promise<ResetPasswordSearchParams> }) {
+export default async function ResetPasswordPage({ searchParams }: { searchParams?: Promise<ResetPasswordSearchParams> }) {
   const params = await searchParams;
   const locale = await getLocale(params);
   const email = readParam(params?.email) || "";

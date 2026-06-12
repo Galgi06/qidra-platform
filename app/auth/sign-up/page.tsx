@@ -9,7 +9,7 @@ import { getLocale, type SearchParams } from "@/lib/i18n";
 import { passwordPolicyDescription } from "@/lib/password-policy";
 import { getSocialAuthConfig } from "@/lib/social-auth";
 
-export default async function SignUpPage({ searchParams }: { searchParams?: SearchParams }) {
+export default async function SignUpPage({ searchParams }: { searchParams?: Promise<SearchParams> }) {
   const locale = await getLocale(searchParams);
   const socialAuth = getSocialAuthConfig();
 
