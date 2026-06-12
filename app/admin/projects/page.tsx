@@ -353,6 +353,14 @@ function AdminProjectPanel({ fundingStats, project, locale }: { fundingStats: Pr
         <DocumentForm projectId={project.id} locale={locale} />
       </div>
 
+      <div className="border-t border-qidra-grayLight pt-6">
+        <PermanentProjectDeletePanel
+          fundingStats={fundingStats}
+          locale={locale}
+          project={project}
+        />
+      </div>
+
       <div className="grid gap-3 border-t border-qidra-grayLight pt-6">
         <h3 className="text-18 font-medium text-qidra-dark">{isRu ? "Документы проекта" : "Project documents"}</h3>
         {project.documents.length ? (
@@ -449,6 +457,81 @@ function DocumentForm({ projectId, locale }: { projectId: string; locale: Locale
       </div>
       <Button className="w-full sm:w-fit" size="sm" type="submit">
         {locale === "ru" ? "Добавить документ" : "Add document"}
+      </Button>
+    </FeedbackForm>
+  );
+}
+
+function PermanentProjectDeletePanel({
+  fundingStats,
+  locale,
+  project
+}: {
+  fundingStats: ProjectFundingStats;
+  locale: Locale;
+  project: CatalogProject;
+}) {
+  const isRu = locale === "ru";
+
+  return (
+    <FeedbackForm
+      className="grid gap-4 rounded-[14px] border border-qidra-red/30 bg-qidra-red/5 p-5"
+      confirm={{
+        cancelLabel: isRu ? "Отмена" : "Cancel",
+        confirmLabel: isRu ? "Да, удалить проект" : "Yes, delete project",
+        text: isRu
+          ? "После этого шага карточка проекта, документы, отчёты, заявки участия и связанные дивидендные периоды будут удалены безвозвратно."
+          : "After this step, the project card, documents, reports, participation applications and linked dividend periods will be removed permanently.",
+        title: isRu ? "Последнее предупреждение" : "Final warning",
+        tone: "warning"
+      }}
+      endpoint={`/api/admin/projects/${project.id}/delete?lang=${locale}`}
+      feedback={{
+        title: isRu ? "Проект удалён" : "Project deleted",
+        text: isRu
+          ? "Карточка проекта удалена из системы."
+          : "The project card was removed from the system.",
+        buttonLabel: isRu ? "Понятно" : "Got it",
+        dismissLabel: isRu ? "Закрыть уведомление" : "Close notification",
+        tone: "warning"
+      }}
+      popupPlacement="center"
+    >
+      <NotificationCard
+        title={isRu ? "Опасная зона" : "Danger zone"}
+        text={
+          isRu
+            ? `Это действие удалит проект «${project.title[locale]}», ${formatCount(fundingStats.confirmedApplicationsCount)} подтверждённых заявок, ${formatCount(fundingStats.pendingApplicationsCount)} заявок на проверке и связанные документы/дивидендные периоды.`
+            : `This action removes the project “${project.title[locale]}”, ${formatCount(fundingStats.confirmedApplicationsCount)} confirmed applications, ${formatCount(fundingStats.pendingApplicationsCount)} pending applications and linked documents/dividend periods.`
+        }
+        tone="warning"
+      />
+      <div className="grid gap-4 md:grid-cols-2">
+        <Input
+          label={isRu ? "Адрес проекта" : "Project address"}
+          name="slug"
+          placeholder={project.slug}
+          required
+        />
+        <Input
+          label={isRu ? "Подтверждение" : "Confirmation"}
+          name="confirmation"
+          pattern="DELETE"
+          placeholder="DELETE"
+          required
+        />
+      </div>
+      <TextArea
+        label={isRu ? "Причина полного удаления" : "Permanent deletion reason"}
+        name="reason"
+        placeholder={
+          isRu
+            ? "Например: карточка была создана ошибочно и должна быть удалена вместе со связанными заявками."
+            : "For example: the card was created by mistake and must be removed together with linked applications."
+        }
+      />
+      <Button className="w-full border-qidra-red bg-qidra-red hover:bg-qidra-red/90 sm:w-fit" type="submit" variant="dark">
+        {isRu ? "Удалить карточку проекта" : "Delete project card"}
       </Button>
     </FeedbackForm>
   );
