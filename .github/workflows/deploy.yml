@@ -1,0 +1,138 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        type: choice
+        required: true
+        default: staging
+        options:
+          - staging
+          - production
+      ref:
+        description: Git ref to deploy
+        required: true
+        default: main
+      run_migrations:
+        description: Run Prisma migrations before switching traffic
+        type: boolean
+        required: true
+        default: true
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_branch == 'main')
+    runs-on: ubuntu-latest
+    environment: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'staging' }}
+    concurrency:
+      group: deploy-${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'staging' }}
+      cancel-in-progress: false
+    env:
+      DEPLOY_ENVIRONMENT: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'staging' }}
+      DEPLOY_REF: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.event.workflow_run.head_sha }}
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+      DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+      DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+      DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+      DEPLOY_COMPOSE_FILE: ${{ secrets.DEPLOY_COMPOSE_FILE }}
+      HEALTHCHECK_URL: ${{ secrets.HEALTHCHECK_URL }}
+      HEALTHCHECK_STATUS: ${{ secrets.HEALTHCHECK_STATUS }}
+      RUN_MIGRATIONS: ${{ github.event_name == 'workflow_dispatch' && inputs.run_migrations || 'true' }}
+    steps:
+      - name: Checkout selected ref
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DEPLOY_REF }}
+
+      - name: Validate deploy secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          for key in DEPLOY_HOST DEPLOY_USER DEPLOY_PATH HEALTHCHECK_URL; do
+            if [[ -z "${!key:-}" ]]; then
+              echo "::error::Missing required secret ${key} for environment ${DEPLOY_ENVIRONMENT}"
+              exit 1
+            fi
+          done
+
+      - name: Write deployed revision marker
+        shell: bash
+        run: printf '%s\n' "$DEPLOY_REF" > .deploy-revision
+
+      - name: Start SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
+
+      - name: Trust deploy host
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+
+          port="${DEPLOY_PORT:-22}"
+          if [[ -n "${DEPLOY_KNOWN_HOSTS:-}" ]]; then
+            printf '%s\n' "$DEPLOY_KNOWN_HOSTS" >> ~/.ssh/known_hosts
+          else
+            ssh-keyscan -p "$port" -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+          fi
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Sync release to server
+        shell: bash
+        run: |
+          set -euo pipefail
+          port="${DEPLOY_PORT:-22}"
+          rsync -az --delete \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='.next' \
+            --exclude='.env.production' \
+            --exclude='tsconfig.tsbuildinfo' \
+            -e "ssh -p ${port}" \
+            ./ "${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/"
+
+      - name: Run remote deploy
+        shell: bash
+        run: |
+          set -euo pipefail
+          port="${DEPLOY_PORT:-22}"
+          compose_file="${DEPLOY_COMPOSE_FILE:-docker-compose.prod.yml}"
+          ssh -p "$port" "${DEPLOY_USER}@${DEPLOY_HOST}" \
+            "export QIDRA_DEPLOY_ENVIRONMENT='${DEPLOY_ENVIRONMENT}' \
+             QIDRA_DEPLOY_RUN_MIGRATIONS='${RUN_MIGRATIONS}' \
+             COMPOSE_FILE='${compose_file}'; \
+             bash '${DEPLOY_PATH}/scripts/deploy-remote.sh' '${DEPLOY_PATH}'"
+
+      - name: Verify public healthcheck
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="${HEALTHCHECK_STATUS:-200}"
+          for _ in {1..30}; do
+            status="$(curl -sS -o /dev/null -w '%{http_code}' "$HEALTHCHECK_URL" || true)"
+            if [[ "$status" == "$expected" ]]; then
+              exit 0
+            fi
+            sleep 10
+          done
+
+          echo "::error::Healthcheck failed for ${HEALTHCHECK_URL}. Expected ${expected}."
+          exit 1

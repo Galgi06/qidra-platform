@@ -191,7 +191,46 @@ QIDRA_HEALTHCHECK_URL=https://qidra.io npm run healthcheck:production
 QIDRA_HEALTHCHECK_URL=https://qidra.io QIDRA_HEALTHCHECK_RUN_CRON=true CRON_SECRET='<secret>' npm run healthcheck:production
 ```
 
-## 9. Security smoke-test перед открытием пользователей
+## 9. GitHub Actions deploy workflow
+
+В репозитории есть workflow [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml), который:
+
+- автоматически деплоит `main` в `staging` после успешного `CI`;
+- умеет ручной `workflow_dispatch` для `staging` и `production`;
+- отправляет код на сервер по `ssh`/`rsync`;
+- запускает [`scripts/deploy-remote.sh`](../scripts/deploy-remote.sh), который делает `docker compose up`, `prisma migrate deploy` и локальный healthcheck;
+- после выката проверяет публичный `HEALTHCHECK_URL`.
+
+Настройте GitHub Environments `staging` и `production` с одинаковыми именами secrets:
+
+- `DEPLOY_HOST`: hostname или IP сервера.
+- `DEPLOY_USER`: SSH user, обычно `root` или отдельный deploy user.
+- `DEPLOY_SSH_KEY`: приватный SSH key для сервера.
+- `DEPLOY_PATH`: путь на сервере, например `/opt/qidra-platform`.
+- `HEALTHCHECK_URL`: например `https://staging.qidra.io` или `https://qidra.io`.
+
+Опционально:
+
+- `DEPLOY_PORT`: если SSH не на `22`.
+- `DEPLOY_KNOWN_HOSTS`: заранее зафиксированный host key. Если не задан, workflow использует `ssh-keyscan`.
+- `DEPLOY_COMPOSE_FILE`: если нужен не `docker-compose.prod.yml`.
+- `HEALTHCHECK_STATUS`: если ожидается не `200`.
+
+Точная ручная команда на сервере для того же rollout:
+
+```bash
+cd /opt/qidra-platform
+bash scripts/deploy-remote.sh /opt/qidra-platform
+```
+
+С миграциями по умолчанию. Без миграций:
+
+```bash
+cd /opt/qidra-platform
+QIDRA_DEPLOY_RUN_MIGRATIONS=false bash scripts/deploy-remote.sh /opt/qidra-platform
+```
+
+## 10. Security smoke-test перед открытием пользователей
 
 - `npm run lint`
 - `npm run build`
@@ -206,7 +245,7 @@ QIDRA_HEALTHCHECK_URL=https://qidra.io QIDRA_HEALTHCHECK_RUN_CRON=true CRON_SECR
 - Проверка, что blocked user не получает рабочую сессию.
 - Проверка, что последний `SUPER_ADMIN` не может быть понижен/заблокирован.
 
-## 10. Business smoke-test перед официальным запуском
+## 11. Business smoke-test перед официальным запуском
 
 - регистрация;
 - email verification;
@@ -225,7 +264,7 @@ QIDRA_HEALTHCHECK_URL=https://qidra.io QIDRA_HEALTHCHECK_RUN_CRON=true CRON_SECR
 - audit log для всех админских действий;
 - backup и restore на отдельную базу.
 
-## 11. Go / no-go
+## 12. Go / no-go
 
 Официальный запуск разрешён только если:
 
