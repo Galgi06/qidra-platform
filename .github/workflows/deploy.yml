@@ -7,10 +7,10 @@ on:
         description: Target environment
         type: choice
         required: true
-        default: staging
+        default: production
         options:
-          - staging
           - production
+          - staging
       ref:
         description: Git ref to deploy
         required: true
@@ -38,12 +38,12 @@ jobs:
        github.event.workflow_run.event == 'push' &&
        github.event.workflow_run.head_branch == 'main')
     runs-on: ubuntu-latest
-    environment: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'staging' }}
+    environment: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'production' }}
     concurrency:
-      group: deploy-${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'staging' }}
+      group: deploy-${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'production' }}
       cancel-in-progress: false
     env:
-      DEPLOY_ENVIRONMENT: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'staging' }}
+      DEPLOY_ENVIRONMENT: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'production' }}
       DEPLOY_REF: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.event.workflow_run.head_sha }}
       DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
       DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
