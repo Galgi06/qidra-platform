@@ -268,6 +268,11 @@ export default async function AdminSupportPage({ searchParams }: { searchParams:
                       ? "Сообщения от посетителей, которые пишут с главной страницы без входа в кабинет."
                       : "Messages from visitors who contact support from the public site without signing in."}
                   </p>
+                  <p className="mt-2 text-14 text-qidra-grayBlue">
+                    {isRu
+                      ? "Важно: Telegram и email здесь работают как уведомления. Отвечать гостю нужно из этого раздела, через форму ответа ниже."
+                      : "Important: Telegram and email are notification channels here. Reply to the guest from this section using the reply form below."}
+                  </p>
                 </div>
                 {guestThreads.map((thread) => {
                   const messages = [...thread.messages].reverse();

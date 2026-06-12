@@ -219,14 +219,14 @@ export function GuestSupportChatWidget({
   return (
     <>
       <button
-        className="fixed bottom-6 right-6 z-40 inline-flex h-14 items-center justify-center rounded-full bg-qidra-accent px-5 text-15 font-semibold text-white shadow-[0_18px_40px_rgba(79,70,229,0.26)]"
+        className="fixed bottom-4 right-4 z-40 inline-flex h-14 items-center justify-center rounded-full bg-qidra-accent px-5 text-15 font-semibold text-white shadow-[0_18px_40px_rgba(79,70,229,0.26)] sm:bottom-6 sm:right-6"
         onClick={() => setOpen((value) => !value)}
         type="button"
       >
         {open ? (isRu ? "Закрыть чат" : "Close chat") : isRu ? "Онлайн-чат" : "Live chat"}
       </button>
       {open ? (
-        <section className="fixed bottom-24 right-6 z-40 grid w-[min(92vw,420px)] gap-4 rounded-[22px] border border-qidra-grayLight bg-white p-5 shadow-[0_28px_70px_rgba(18,20,23,0.18)]">
+        <section className="fixed bottom-20 left-3 right-3 z-40 flex max-h-[calc(100vh-7rem)] flex-col gap-4 overflow-hidden rounded-[22px] border border-qidra-grayLight bg-white p-4 shadow-[0_28px_70px_rgba(18,20,23,0.18)] sm:bottom-24 sm:left-auto sm:right-6 sm:w-[min(88vw,390px)] sm:p-5">
           <div>
             <p className="text-12 font-semibold uppercase tracking-[0.08em] text-qidra-accent">{isRu ? "Qidra support" : "Qidra support"}</p>
             <h2 className="mt-2 text-24 font-medium text-qidra-dark">{isRu ? "Напишите нам" : "Message us"}</h2>
@@ -239,10 +239,16 @@ export function GuestSupportChatWidget({
                   ? "Если не получается войти в кабинет, напишите сюда. Команда поддержки увидит сообщение сразу."
                   : "If you cannot access your account, message us here. The support team will see it right away."}
             </p>
+            <p className="mt-2 text-12 leading-snug text-qidra-grayBlue">
+              {isRu
+                ? "Ответ менеджера появится в этом окне и дополнительно придёт на email. Telegram и почта команды используются только для уведомления, не для ответа."
+                : "The manager reply appears in this window and is also sent to email. Team Telegram and email are notification channels only, not reply channels."}
+            </p>
           </div>
 
+          <div className="grid min-h-0 gap-4 overflow-y-auto pr-1">
           {thread?.messages.length ? (
-            <div className="grid max-h-72 gap-3 overflow-y-auto rounded-[18px] bg-qidra-grayLight/60 p-3">
+            <div className="grid max-h-64 gap-3 overflow-y-auto rounded-[18px] bg-qidra-grayLight/60 p-3 sm:max-h-72">
               {thread.messages.map((message) => {
                 const own = message.senderKind === "guest";
                 return (
@@ -313,6 +319,7 @@ export function GuestSupportChatWidget({
           ) : null}
 
           {error ? <p className="text-13 text-qidra-red">{error}</p> : null}
+          </div>
 
           <Button
             type="button"
