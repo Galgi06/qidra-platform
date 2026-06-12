@@ -5,8 +5,9 @@ import { Footer } from "@/components/Footer";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ProjectCard } from "@/components/ProjectCard";
 import { SignOutButton } from "@/components/auth/SignOutButton";
+import { GuestSupportChatWidget } from "@/components/support/GuestSupportChatWidget";
 import { ButtonLink } from "@/components/ui/Button";
-import { canAccessAdmin } from "@/lib/auth";
+import { canAccessAdmin, canAccessSupportDesk } from "@/lib/auth";
 import { dictionary, getLocale, type SearchParams, withLocale } from "@/lib/i18n";
 import { authOptions } from "@/lib/next-auth";
 import { getPublicProjects } from "@/lib/project-catalog";
@@ -27,7 +28,9 @@ export default async function Home({ searchParams }: { searchParams?: Promise<Se
   const [session, projects, siteContent] = await Promise.all([(getServerSession(authOptions) as Promise<SessionWithRole>), getPublicProjects(), getSiteContent()]);
   const signedIn = Boolean(session?.user);
   const adminSession = canAccessAdmin(session?.user?.role as "ADMIN" | "SUPER_ADMIN" | "guest" | undefined);
+  const supportDeskSession = canAccessSupportDesk(session?.user?.role as "ADMIN" | "SUPER_ADMIN" | "TECH_SUPPORT" | "SALES_MANAGER" | "guest" | undefined);
   const accountHref = adminSession ? "/admin" : "/investor";
+  const chatHref = signedIn ? (supportDeskSession ? withLocale("/admin/support", locale) : withLocale("/investor/support", locale)) : null;
 
   return (
     <>
@@ -236,6 +239,7 @@ export default async function Home({ searchParams }: { searchParams?: Promise<Se
           </div>
         </section>
       </main>
+      <GuestSupportChatWidget chatHref={chatHref} locale={locale} path="/" signedIn={signedIn} />
       <Footer locale={locale} />
     </>
   );
