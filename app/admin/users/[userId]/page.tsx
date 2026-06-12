@@ -47,6 +47,11 @@ export default async function AdminUserDetailPage({
   const canManageRoles = canManageManagers(session.user?.role as "ADMIN" | "SUPER_ADMIN" | "TECH_SUPPORT" | "SALES_MANAGER" | "guest" | undefined);
   const canEditParticipantCard = canEditParticipantCards(session.user?.role as "ADMIN" | "SUPER_ADMIN" | "TECH_SUPPORT" | "guest" | undefined);
   const canSendAccessRecovery = canAccessSupportDesk(session.user?.role as "ADMIN" | "SUPER_ADMIN" | "TECH_SUPPORT" | "SALES_MANAGER" | "guest" | undefined);
+  const needsInvestmentData = view === "overview" || view === "contracts" || view === "audit";
+  const needsKycData = view === "overview" || view === "kyc" || view === "audit";
+  const needsProjectSubmissionData = view === "projects" || view === "audit";
+  const needsSupportData = view === "support" || view === "audit";
+  const needsWalletData = view === "overview" || view === "wallet" || view === "audit";
   const user = await prisma.user.findUnique({
     where: { id: userId },
     include: {
@@ -57,86 +62,6 @@ export default async function AdminUserDetailPage({
         }
       },
       investorProfile: true,
-      investments: {
-        include: {
-          dividendPayments: {
-            include: {
-              period: {
-                include: {
-                  project: {
-                    select: {
-                      titleEn: true,
-                      titleRu: true
-                    }
-                  }
-                }
-              }
-            },
-            orderBy: { createdAt: "desc" }
-          },
-          project: {
-            include: {
-              documents: true,
-              reports: true
-            }
-          }
-        },
-        orderBy: { createdAt: "desc" },
-        take: 50
-      },
-      kycApplications: {
-        orderBy: { createdAt: "desc" },
-        take: 8
-      },
-      projectSubmissions: {
-        orderBy: { createdAt: "desc" },
-        take: 8
-      },
-      supportThreads: {
-        include: {
-          assignedTo: {
-            select: {
-              email: true,
-              name: true,
-              role: true
-            }
-          },
-          messages: {
-            include: {
-              sender: {
-                select: {
-                  email: true,
-                  name: true,
-                  role: true
-                }
-              }
-            },
-            orderBy: { createdAt: "desc" }
-          }
-        },
-        orderBy: { updatedAt: "desc" }
-      },
-      wallet: {
-        include: {
-          transactions: {
-            include: {
-              paymentReview: {
-                include: {
-                  reviewer: {
-                    select: {
-                      email: true,
-                      name: true,
-                      role: true
-                    }
-                  }
-                }
-              }
-            },
-            orderBy: { createdAt: "desc" },
-            take: 80
-          }
-        }
-      },
       _count: {
         select: {
           accounts: true,
@@ -154,33 +79,140 @@ export default async function AdminUserDetailPage({
     notFound();
   }
 
-  const entityIds = [
-    user.id,
-    ...user.kycApplications.map((item) => item.id),
-    ...user.investments.map((item) => item.id),
-    ...user.projectSubmissions.map((item) => item.id),
-    ...(user.wallet?.transactions.map((item) => item.id) ?? []),
-    ...user.supportThreads.map((item) => item.id)
-  ];
-  const auditLogs = await prisma.adminAuditLog.findMany({
-    where: {
-      OR: [{ actorId: user.id }, { entityId: { in: entityIds } }]
-    },
-    include: {
-      actor: {
-        select: {
-          email: true,
-          name: true,
-          role: true
-        }
-      }
-    },
-    orderBy: { createdAt: "desc" },
-    take: 14
-  });
-  const latestKyc = user.kycApplications[0];
+  const [investments, kycApplications, projectSubmissions, supportThreads, wallet] = await Promise.all([
+    needsInvestmentData
+      ? prisma.investmentApplication.findMany({
+          where: { userId },
+          include: {
+            dividendPayments: {
+              include: {
+                period: {
+                  include: {
+                    project: {
+                      select: {
+                        titleEn: true,
+                        titleRu: true
+                      }
+                    }
+                  }
+                }
+              },
+              orderBy: { createdAt: "desc" }
+            },
+            project: {
+              include: {
+                documents: true,
+                reports: true
+              }
+            }
+          },
+          orderBy: { createdAt: "desc" },
+          take: 50
+        })
+      : Promise.resolve([]),
+    needsKycData
+      ? prisma.kycApplication.findMany({
+          where: { userId },
+          orderBy: { createdAt: "desc" },
+          take: 8
+        })
+      : Promise.resolve([]),
+    needsProjectSubmissionData
+      ? prisma.projectSubmission.findMany({
+          where: { userId },
+          orderBy: { createdAt: "desc" },
+          take: 8
+        })
+      : Promise.resolve([]),
+    needsSupportData
+      ? prisma.supportThread.findMany({
+          where: { userId },
+          include: {
+            assignedTo: {
+              select: {
+                email: true,
+                name: true,
+                role: true
+              }
+            },
+            messages: {
+              include: {
+                sender: {
+                  select: {
+                    email: true,
+                    name: true,
+                    role: true
+                  }
+                }
+              },
+              orderBy: { createdAt: "desc" }
+            }
+          },
+          orderBy: { updatedAt: "desc" }
+        })
+      : Promise.resolve([]),
+    needsWalletData
+      ? prisma.wallet.findUnique({
+          where: { userId },
+          include: {
+            transactions: {
+              include: {
+                paymentReview: {
+                  include: {
+                    reviewer: {
+                      select: {
+                        email: true,
+                        name: true,
+                        role: true
+                      }
+                    }
+                  }
+                }
+              },
+              orderBy: { createdAt: "desc" },
+              take: 80
+            }
+          }
+        })
+      : Promise.resolve(null)
+  ]);
+
+  const auditLogs =
+    view === "audit"
+      ? await prisma.adminAuditLog.findMany({
+          where: {
+            OR: [
+              { actorId: user.id },
+              {
+                entityId: {
+                  in: [
+                    user.id,
+                    ...kycApplications.map((item) => item.id),
+                    ...investments.map((item) => item.id),
+                    ...projectSubmissions.map((item) => item.id),
+                    ...(wallet?.transactions.map((item) => item.id) ?? []),
+                    ...supportThreads.map((item) => item.id)
+                  ]
+                }
+              }
+            ]
+          },
+          include: {
+            actor: {
+              select: {
+                email: true,
+                name: true,
+                role: true
+              }
+            }
+          },
+          orderBy: { createdAt: "desc" },
+          take: 14
+        })
+      : [];
+
+  const latestKyc = kycApplications[0];
   const displayName = user.name || user.email;
-  const wallet = user.wallet;
   const adjustmentEndpoint = `/api/admin/users/${user.id}/adjustments?lang=${locale}`;
   const blockEndpoint = `/api/admin/users/${user.id}/block?lang=${locale}`;
   const roleEndpoint = `/api/admin/users/${user.id}/role?lang=${locale}`;
@@ -202,15 +234,15 @@ export default async function AdminUserDetailPage({
   };
   const pendingPaymentTransactions =
     wallet?.transactions.filter((transaction) => transaction.status === PaymentStatus.PENDING && (transaction.type === TransactionType.DEPOSIT || transaction.type === TransactionType.WITHDRAWAL)) ?? [];
-  const hasApprovedKyc = user.kycApplications.some((application) => application.status === KycStatus.APPROVED);
-  const approvedKycApplication = user.kycApplications.find((application) => application.status === KycStatus.APPROVED);
+  const hasApprovedKyc = kycApplications.some((application) => application.status === KycStatus.APPROVED);
+  const approvedKycApplication = kycApplications.find((application) => application.status === KycStatus.APPROVED);
   const accessRecoveryDocumentLinks = approvedKycApplication
     ? kycDocumentLinkItems(approvedKycApplication.id, readKycDocuments(approvedKycApplication.documents), locale)
     : [];
-  const confirmedContractUsdt = sumUsdt(user.investments.filter((item) => item.status === InvestmentStatus.CONFIRMED).map((item) => item.amountUsdt));
-  const pendingContractUsdt = sumUsdt(user.investments.filter((item) => item.status === InvestmentStatus.PENDING).map((item) => item.amountUsdt));
-  const confirmedContractApplications = user.investments.filter((item) => item.status === InvestmentStatus.CONFIRMED);
-  const dividendPayments = user.investments.flatMap((item) => item.dividendPayments);
+  const confirmedContractUsdt = sumUsdt(investments.filter((item) => item.status === InvestmentStatus.CONFIRMED).map((item) => item.amountUsdt));
+  const pendingContractUsdt = sumUsdt(investments.filter((item) => item.status === InvestmentStatus.PENDING).map((item) => item.amountUsdt));
+  const confirmedContractApplications = investments.filter((item) => item.status === InvestmentStatus.CONFIRMED);
+  const dividendPayments = investments.flatMap((item) => item.dividendPayments);
   const dividendAccruedUsdt = sumUsdt(dividendPayments.filter((item) => item.status !== DividendPaymentStatus.CANCELLED).map((item) => item.amountUsdt));
   const dividendPaidUsdt = sumUsdt(dividendPayments.filter((item) => item.status === DividendPaymentStatus.PAID).map((item) => item.amountUsdt));
   const walletTransactions = wallet?.transactions ?? [];
@@ -350,9 +382,9 @@ export default async function AdminUserDetailPage({
                   </Panel>
 
                   <Panel title={isRu ? "KYC и решения" : "KYC and decisions"} description={isRu ? "История анкет, статусов и комментариев проверяющих." : "History of profiles, statuses and reviewer notes."}>
-                    {user.kycApplications.length ? (
+                    {kycApplications.length ? (
                       <div className="grid gap-3">
-                        {user.kycApplications.map((item) => (
+                        {kycApplications.map((item) => (
                           <TimelineItem
                             key={item.id}
                             title={kycStatusLabel(item.status, locale)}
@@ -455,9 +487,9 @@ export default async function AdminUserDetailPage({
                     : "Staff can review original client documents, profile history and access recovery decisions here."
                 }
               >
-                {user.kycApplications.length ? (
+                {kycApplications.length ? (
                   <div className="grid gap-3">
-                    {user.kycApplications.map((item) => (
+                    {kycApplications.map((item) => (
                       <TimelineItem
                         key={item.id}
                         title={kycStatusLabel(item.status, locale)}
@@ -497,7 +529,7 @@ export default async function AdminUserDetailPage({
             <SafeAdjustmentsPanel
               canAdjustBalance={canAdjustBalance}
               endpoint={adjustmentEndpoint}
-              kycApplications={user.kycApplications.map((application) => ({
+              kycApplications={kycApplications.map((application) => ({
                 createdAt: application.createdAt,
                 id: application.id,
                 status: application.status
@@ -538,11 +570,11 @@ export default async function AdminUserDetailPage({
                 <InfoBlock label={isRu ? "Заявки на проверке" : "Pending applications"} value={formatUsdt(pendingContractUsdt)} locale={locale} />
                 <InfoBlock label={isRu ? "Начислено дивидендов" : "Dividends accrued"} value={formatUsdt(dividendAccruedUsdt)} locale={locale} />
                 <InfoBlock label={isRu ? "Выплачено дивидендов" : "Dividends paid"} value={formatUsdt(dividendPaidUsdt)} locale={locale} />
-                <InfoBlock label={isRu ? "Всего контрактов и заявок" : "Total contracts and applications"} value={formatCount(user.investments.length)} locale={locale} />
+                <InfoBlock label={isRu ? "Всего контрактов и заявок" : "Total contracts and applications"} value={formatCount(investments.length)} locale={locale} />
               </div>
-              {user.investments.length ? (
+              {investments.length ? (
                 <div className="grid gap-4">
-                  {user.investments.map((item) => (
+                  {investments.map((item) => (
                     <ContractDossierCard
                       key={item.id}
                       application={item}
@@ -559,9 +591,9 @@ export default async function AdminUserDetailPage({
 
             {view === "projects" ? (
             <Panel title={isRu ? "Проекты клиента" : "Client projects"} description={isRu ? "Заявки участника на размещение собственных проектов." : "Participant submissions for listing their own projects."}>
-              {user.projectSubmissions.length ? (
+              {projectSubmissions.length ? (
                 <div className="grid gap-3">
-                  {user.projectSubmissions.map((submission) => (
+                  {projectSubmissions.map((submission) => (
                     <TimelineItem
                       key={submission.id}
                       title={submission.title}
@@ -586,9 +618,9 @@ export default async function AdminUserDetailPage({
 
             {view === "support" ? (
               <Panel title={isRu ? "Коммуникации" : "Communications"} description={isRu ? "Последние личные диалоги с участником." : "Recent personal threads with the participant."}>
-                {user.supportThreads.length ? (
+                {supportThreads.length ? (
                   <div className="grid gap-4">
-                    {user.supportThreads.map((thread) => (
+                    {supportThreads.map((thread) => (
                       <article key={thread.id} className="rounded-qidra border border-qidra-grayLight bg-white p-4">
                         <div className="flex flex-wrap items-start justify-between gap-3">
                           <div>
