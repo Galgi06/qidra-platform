@@ -50,13 +50,33 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ title: localeRu ? "Лид не найден" : "Lead not found", message: localeRu ? "Этот лид недоступен в текущем кабинете компании." : "This lead is not available in the current company workspace." }, { status: 404 });
   }
 
+  const closingStatuses: OrganizationLeadStatus[] = [OrganizationLeadStatus.WON, OrganizationLeadStatus.LOST, OrganizationLeadStatus.CLOSED];
+  const contactedStatuses: OrganizationLeadStatus[] = [
+    OrganizationLeadStatus.CONTACT_ATTEMPT,
+    OrganizationLeadStatus.CONTACTED,
+    OrganizationLeadStatus.QUALIFIED,
+    OrganizationLeadStatus.PROPOSAL_SENT,
+    OrganizationLeadStatus.NEGOTIATION,
+    OrganizationLeadStatus.WON
+  ];
+  const qualifiedStatuses: OrganizationLeadStatus[] = [
+    OrganizationLeadStatus.QUALIFIED,
+    OrganizationLeadStatus.PROPOSAL_SENT,
+    OrganizationLeadStatus.NEGOTIATION,
+    OrganizationLeadStatus.WON
+  ];
+
   await prisma.organizationLead.update({
     where: { id: lead.id },
     data: {
-      closedAt: parsed.data.status === OrganizationLeadStatus.CLOSED ? new Date() : null,
-      contactedAt: parsed.data.status === OrganizationLeadStatus.CONTACTED ? new Date() : lead.contactedAt,
+      closedAt: closingStatuses.includes(parsed.data.status) ? new Date() : null,
+      contactedAt: contactedStatuses.includes(parsed.data.status)
+        ? lead.contactedAt ?? new Date()
+        : null,
       note: parsed.data.note?.trim() || null,
-      qualifiedAt: parsed.data.status === OrganizationLeadStatus.QUALIFIED ? new Date() : lead.qualifiedAt,
+      qualifiedAt: qualifiedStatuses.includes(parsed.data.status)
+        ? lead.qualifiedAt ?? new Date()
+        : null,
       status: parsed.data.status
     }
   });

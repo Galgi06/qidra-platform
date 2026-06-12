@@ -9,7 +9,7 @@ import { getLocale, type SearchParams } from "@/lib/i18n";
 import { companyLeadStatusLabel } from "@/lib/organizations";
 import { prisma } from "@/lib/prisma";
 
-const leadStatuses = ["NEW", "CONTACTED", "QUALIFIED", "CLOSED"] as const;
+const leadStatuses = ["NEW", "CONTACT_ATTEMPT", "CONTACTED", "QUALIFIED", "PROPOSAL_SENT", "NEGOTIATION", "WON", "LOST", "CLOSED"] as const;
 
 export default async function CompanyLeadsPage({ searchParams }: { searchParams?: Promise<SearchParams> }) {
   const locale = await getLocale(searchParams);
@@ -22,6 +22,8 @@ export default async function CompanyLeadsPage({ searchParams }: { searchParams?
     },
     orderBy: [{ status: "asc" }, { createdAt: "desc" }]
   });
+  const openPipelineCount = leads.filter((lead) => !["WON", "LOST", "CLOSED"].includes(lead.status)).length;
+  const conversionCount = leads.filter((lead) => lead.status === "WON").length;
 
   return (
     <>
@@ -44,7 +46,10 @@ export default async function CompanyLeadsPage({ searchParams }: { searchParams?
         <section className="px-5 py-12 sm:px-8 lg:px-11 lg:py-16">
           <CompanyWorkspace activePath="/company/leads" locale={locale}>
             <div className="grid gap-5">
-              <div className="grid gap-5 md:grid-cols-4">
+              <div className="grid gap-5 md:grid-cols-3 xl:grid-cols-6">
+                <MetricCard label={isRu ? "В работе" : "Open pipeline"} value={openPipelineCount.toString()} />
+                <MetricCard label={isRu ? "Успешно закрыты" : "Won"} value={conversionCount.toString()} />
+                <MetricCard label={isRu ? "Потеряны" : "Lost"} value={leads.filter((lead) => lead.status === "LOST").length.toString()} />
                 {leadStatuses.map((status) => (
                   <MetricCard key={status} label={companyLeadStatusLabel(status, locale)} value={leads.filter((lead) => lead.status === status).length.toString()} />
                 ))}

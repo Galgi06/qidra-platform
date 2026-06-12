@@ -8,10 +8,15 @@ import { canManageCompanyTeam } from "@/lib/organizations";
 import { authOptions } from "@/lib/next-auth";
 import { prisma } from "@/lib/prisma";
 
-const schema = z.object({
+const createSchema = z.object({
   email: z.string().trim().email().max(255),
   name: z.string().trim().max(120).optional(),
   role: z.nativeEnum(OrganizationMemberRole)
+});
+
+const inviteActionSchema = z.object({
+  action: z.enum(["resend", "cancel"]),
+  inviteId: z.string().trim().min(2).max(120)
 });
 
 type SessionUser = { user?: { id?: string } };
@@ -38,7 +43,66 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ title: localeRu ? "Нет доступа" : "Access denied", message: localeRu ? "Только owner или admin могут управлять командой." : "Only owner or admin can manage the team." }, { status: 403 });
   }
 
-  const parsed = schema.safeParse(await request.json().catch(() => null));
+  const body = await request.json().catch(() => null);
+  const inviteAction = inviteActionSchema.safeParse(body);
+
+  if (inviteAction.success) {
+    const invite = await prisma.organizationInvite.findFirst({
+      where: {
+        id: inviteAction.data.inviteId,
+        organizationId: membership.organizationId
+      }
+    });
+
+    if (!invite || invite.acceptedAt) {
+      return NextResponse.json({
+        title: localeRu ? "Приглашение не найдено" : "Invitation not found",
+        message: localeRu ? "Это приглашение уже недоступно." : "This invitation is no longer available."
+      }, { status: 404 });
+    }
+
+    if (inviteAction.data.action === "cancel") {
+      await prisma.organizationInvite.delete({ where: { id: invite.id } });
+
+      return NextResponse.json({
+        title: localeRu ? "Приглашение отменено" : "Invitation cancelled",
+        message: localeRu ? "Ссылка приглашения отключена." : "The invitation link was disabled."
+      });
+    }
+
+    const nextToken = createRawToken();
+    const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+    const refreshedInvite = await prisma.organizationInvite.update({
+      where: { id: invite.id },
+      data: {
+        expiresAt,
+        token: nextToken
+      }
+    });
+
+    const inviteUrl = new URL("/auth/sign-up", getAppBaseUrl());
+    inviteUrl.searchParams.set("account", "company");
+    inviteUrl.searchParams.set("invite", refreshedInvite.token);
+    inviteUrl.searchParams.set("lang", localeRu ? "ru" : "en");
+
+    await sendEmail({
+      to: refreshedInvite.email,
+      subject: localeRu ? `Повторное приглашение в команду ${membership.organization.displayName} на Qidra` : `Renewed invitation to join ${membership.organization.displayName} on Qidra`,
+      text: localeRu
+        ? `Вам повторно отправлено приглашение в кабинет компании ${membership.organization.displayName} на Qidra с ролью ${refreshedInvite.role}. Новая ссылка: ${inviteUrl.toString()}`
+        : `Your invitation to the ${membership.organization.displayName} company workspace on Qidra was renewed with the role ${refreshedInvite.role}. New link: ${inviteUrl.toString()}`,
+      html: localeRu
+        ? `<p>Приглашение в кабинет компании <strong>${membership.organization.displayName}</strong> обновлено.</p><p>Роль: <strong>${refreshedInvite.role}</strong></p><p><a href="${inviteUrl.toString()}">Открыть приглашение</a></p>`
+        : `<p>Your invitation to the <strong>${membership.organization.displayName}</strong> company workspace was renewed.</p><p>Role: <strong>${refreshedInvite.role}</strong></p><p><a href="${inviteUrl.toString()}">Open invitation</a></p>`
+    });
+
+    return NextResponse.json({
+      title: localeRu ? "Приглашение отправлено повторно" : "Invitation resent",
+      message: localeRu ? "Мы обновили ссылку и повторно отправили email сотруднику." : "The link was refreshed and the email was sent again."
+    });
+  }
+
+  const parsed = createSchema.safeParse(body);
 
   if (!parsed.success) {
     return NextResponse.json({ title: localeRu ? "Проверьте данные" : "Check the details", message: localeRu ? "Укажите email участника и роль внутри компании." : "Provide the teammate email and role inside the company." }, { status: 400 });

@@ -111,9 +111,56 @@ export default async function CompanyTeamPage({ searchParams }: { searchParams?:
                           <p className="text-17 font-medium text-qidra-dark">{invite.name || invite.email}</p>
                           <p className="mt-1 text-14 text-qidra-grayBlue">{invite.email}</p>
                           <p className="mt-2 text-13 text-qidra-grayBlue">{companyMemberRoleLabel(invite.role, locale)}</p>
+                          <p className="mt-1 text-13 text-qidra-grayBlue">
+                            {isRu ? "Действует до" : "Valid until"}{" "}
+                            {new Intl.DateTimeFormat(locale === "ru" ? "ru-RU" : "en-US", { dateStyle: "medium", timeStyle: "short" }).format(invite.expiresAt)}
+                          </p>
                           <a className="mt-3 inline-block text-14 font-medium text-qidra-accent hover:text-qidra-dark" href={withLocale(`/auth/sign-up?invite=${invite.token}`, locale)}>
                             {isRu ? "Открыть ссылку приглашения" : "Open invitation link"}
                           </a>
+                          <div className="mt-4 flex flex-wrap gap-3">
+                            <FeedbackForm
+                              endpoint={`/api/company/team?lang=${locale}`}
+                              feedback={{
+                                title: isRu ? "Приглашение обновлено" : "Invitation refreshed",
+                                text: isRu ? "Ссылка обновлена и письмо отправлено повторно." : "The link was refreshed and the email was sent again.",
+                                buttonLabel: isRu ? "Понятно" : "Got it",
+                                dismissLabel: isRu ? "Закрыть уведомление" : "Close notification",
+                                tone: "success"
+                              }}
+                              refreshOnSuccess
+                            >
+                              <input name="action" type="hidden" value="resend" />
+                              <input name="inviteId" type="hidden" value={invite.id} />
+                              <Button type="submit" variant="outline">
+                                {isRu ? "Отправить повторно" : "Resend"}
+                              </Button>
+                            </FeedbackForm>
+                            <FeedbackForm
+                              confirm={{
+                                title: isRu ? "Отменить приглашение?" : "Cancel invitation?",
+                                text: isRu ? "Ссылка перестанет работать, а сотрудник не сможет завершить регистрацию по текущему invite." : "The link will stop working and the teammate will no longer be able to register with this invite.",
+                                confirmLabel: isRu ? "Отменить приглашение" : "Cancel invitation",
+                                cancelLabel: isRu ? "Не отменять" : "Keep it",
+                                tone: "warning"
+                              }}
+                              endpoint={`/api/company/team?lang=${locale}`}
+                              feedback={{
+                                title: isRu ? "Приглашение отменено" : "Invitation cancelled",
+                                text: isRu ? "Ссылка приглашения отключена." : "The invitation link was disabled.",
+                                buttonLabel: isRu ? "Понятно" : "Got it",
+                                dismissLabel: isRu ? "Закрыть уведомление" : "Close notification",
+                                tone: "success"
+                              }}
+                              refreshOnSuccess
+                            >
+                              <input name="action" type="hidden" value="cancel" />
+                              <input name="inviteId" type="hidden" value={invite.id} />
+                              <Button type="submit" variant="outline">
+                                {isRu ? "Отменить" : "Cancel"}
+                              </Button>
+                            </FeedbackForm>
+                          </div>
                         </article>
                       ))
                     ) : (

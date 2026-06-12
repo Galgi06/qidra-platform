@@ -100,8 +100,13 @@ enum OrganizationStatus {
 
 enum OrganizationLeadStatus {
   NEW
+  CONTACT_ATTEMPT
   CONTACTED
   QUALIFIED
+  PROPOSAL_SENT
+  NEGOTIATION
+  WON
+  LOST
   CLOSED
 }
 

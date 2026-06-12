@@ -25,8 +25,13 @@ export function companyMemberRoleLabel(role: OrganizationMemberRole, locale: Loc
 export function companyLeadStatusLabel(status: OrganizationLeadStatus, locale: Locale) {
   const labels: Record<OrganizationLeadStatus, Record<Locale, string>> = {
     NEW: { ru: "Новый", en: "New" },
+    CONTACT_ATTEMPT: { ru: "Первичный контакт", en: "Contact attempt" },
     CONTACTED: { ru: "В работе", en: "Contacted" },
     QUALIFIED: { ru: "Квалифицирован", en: "Qualified" },
+    PROPOSAL_SENT: { ru: "Отправлено предложение", en: "Proposal sent" },
+    NEGOTIATION: { ru: "Переговоры", en: "Negotiation" },
+    WON: { ru: "Успешно закрыт", en: "Won" },
+    LOST: { ru: "Потерян", en: "Lost" },
     CLOSED: { ru: "Закрыт", en: "Closed" }
   };
 
