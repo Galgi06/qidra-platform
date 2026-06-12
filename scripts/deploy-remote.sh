@@ -25,23 +25,40 @@ if [[ -f .deploy-revision ]]; then
   echo "Revision: $(cat .deploy-revision)"
 fi
 
-docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d postgres
+compose_args=(--env-file "$ENV_FILE" -f "$COMPOSE_FILE")
+run_without_local_postgres=false
 
-if [[ "$RUN_MIGRATIONS" == "true" ]]; then
-  docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" run --rm migrate
+if ! grep -Eq '^[[:space:]]*POSTGRES_PASSWORD=' "$ENV_FILE"; then
+  export POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-unused-external-db}"
+  run_without_local_postgres=true
+  echo "POSTGRES_PASSWORD is not set in $ENV_FILE; deploying against external DATABASE_URL without local postgres service."
+else
+  docker compose "${compose_args[@]}" up -d postgres
 fi
 
-docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d --build app
+if [[ "$RUN_MIGRATIONS" == "true" ]]; then
+  if [[ "$run_without_local_postgres" == "true" ]]; then
+    docker compose "${compose_args[@]}" run --rm --no-deps migrate
+  else
+    docker compose "${compose_args[@]}" run --rm migrate
+  fi
+fi
+
+if [[ "$run_without_local_postgres" == "true" ]]; then
+  docker compose "${compose_args[@]}" up -d --build --no-deps app
+else
+  docker compose "${compose_args[@]}" up -d --build app
+fi
 
 deadline=$((SECONDS + WAIT_SECONDS))
 until curl -fsS "$LOCAL_HEALTHCHECK_URL" >/dev/null; do
   if (( SECONDS >= deadline )); then
     echo "Application did not become healthy at $LOCAL_HEALTHCHECK_URL" >&2
-    docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" ps
-    docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" logs --tail=200 app
+    docker compose "${compose_args[@]}" ps
+    docker compose "${compose_args[@]}" logs --tail=200 app
     exit 1
   fi
   sleep 5
 done
 
-docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" ps
+docker compose "${compose_args[@]}" ps
