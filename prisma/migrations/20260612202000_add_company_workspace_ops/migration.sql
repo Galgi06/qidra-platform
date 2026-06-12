@@ -1,5 +1,22 @@
-CREATE TYPE "OrganizationLeadStatus" AS ENUM ('NEW', 'CONTACTED', 'QUALIFIED', 'CLOSED');
-CREATE TYPE "OrganizationAnalyticsEventType" AS ENUM ('COMPANY_PAGE_VIEW', 'PROJECT_PAGE_VIEW', 'LEAD_CAPTURED');
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'OrganizationLeadStatus') THEN
+    CREATE TYPE "OrganizationLeadStatus" AS ENUM ('NEW', 'CONTACTED', 'QUALIFIED', 'CLOSED');
+  END IF;
+END $$;
+
+ALTER TYPE "OrganizationLeadStatus" ADD VALUE IF NOT EXISTS 'CONTACT_ATTEMPT';
+ALTER TYPE "OrganizationLeadStatus" ADD VALUE IF NOT EXISTS 'PROPOSAL_SENT';
+ALTER TYPE "OrganizationLeadStatus" ADD VALUE IF NOT EXISTS 'NEGOTIATION';
+ALTER TYPE "OrganizationLeadStatus" ADD VALUE IF NOT EXISTS 'WON';
+ALTER TYPE "OrganizationLeadStatus" ADD VALUE IF NOT EXISTS 'LOST';
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'OrganizationAnalyticsEventType') THEN
+    CREATE TYPE "OrganizationAnalyticsEventType" AS ENUM ('COMPANY_PAGE_VIEW', 'PROJECT_PAGE_VIEW', 'LEAD_CAPTURED');
+  END IF;
+END $$;
 
 ALTER TABLE "OrganizationDocument" ADD COLUMN "note" TEXT;
 
