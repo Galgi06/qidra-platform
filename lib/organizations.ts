@@ -1,4 +1,4 @@
-import { OrganizationLeadStatus, OrganizationMemberRole, OrganizationStatus } from "@prisma/client";
+import { OrganizationLeadStatus, OrganizationMemberRole, OrganizationStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { Locale } from "@/lib/i18n";
 
@@ -41,39 +41,62 @@ export function canManageCompanyLeads(role: OrganizationMemberRole) {
   return role === OrganizationMemberRole.OWNER || role === OrganizationMemberRole.ADMIN || role === OrganizationMemberRole.EDITOR;
 }
 
-export async function getPrimaryOrganizationForUser(userId: string) {
-  const membership = await prisma.organizationMember.findFirst({
-    where: { userId },
-    orderBy: [{ role: "asc" }, { createdAt: "asc" }],
-    include: { organization: true }
-  });
+export function isOrganizationSchemaUnavailable(error: unknown) {
+  return (
+    error instanceof Prisma.PrismaClientInitializationError ||
+    (error instanceof Prisma.PrismaClientKnownRequestError && ["P1001", "P2021", "P2022"].includes(error.code))
+  );
+}
 
-  return membership?.organization ?? null;
+export async function getPrimaryOrganizationForUser(userId: string) {
+  try {
+    const membership = await prisma.organizationMember.findFirst({
+      where: { userId },
+      orderBy: [{ role: "asc" }, { createdAt: "asc" }],
+      include: { organization: true }
+    });
+
+    return membership?.organization ?? null;
+  } catch (error) {
+    if (isOrganizationSchemaUnavailable(error)) {
+      return null;
+    }
+
+    throw error;
+  }
 }
 
 export async function getOrganizationMembership(userId: string, organizationId?: string | null) {
-  const membership = await prisma.organizationMember.findFirst({
-    where: {
-      userId,
-      ...(organizationId ? { organizationId } : {})
-    },
-    include: {
-      organization: {
-        include: {
-          documents: true,
-          _count: {
-            select: {
-              members: true,
-              projects: true,
-              projectSubmissions: true
+  try {
+    const membership = await prisma.organizationMember.findFirst({
+      where: {
+        userId,
+        ...(organizationId ? { organizationId } : {})
+      },
+      include: {
+        organization: {
+          include: {
+            documents: true,
+            _count: {
+              select: {
+                members: true,
+                projects: true,
+                projectSubmissions: true
+              }
             }
           }
         }
       }
-    }
-  });
+    });
 
-  return membership ?? null;
+    return membership ?? null;
+  } catch (error) {
+    if (isOrganizationSchemaUnavailable(error)) {
+      return null;
+    }
+
+    throw error;
+  }
 }
 
 export function companyHomeNextStep(status: OrganizationStatus, locale: Locale) {

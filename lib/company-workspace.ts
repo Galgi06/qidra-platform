@@ -1,6 +1,7 @@
 import { OrganizationAnalyticsEventType, OrganizationLeadStatus, OrganizationMemberRole, Prisma } from "@prisma/client";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
+import { isOrganizationSchemaUnavailable } from "@/lib/organizations";
 import { prisma } from "@/lib/prisma";
 import { saveUploadedFile } from "@/lib/file-storage";
 
@@ -47,16 +48,24 @@ export async function recordOrganizationEvent({
   type: OrganizationAnalyticsEventType;
   userId?: string | null;
 }) {
-  await prisma.organizationAnalyticsEvent.create({
-    data: {
-      metadata,
-      organizationId,
-      path,
-      projectId: projectId || undefined,
-      type,
-      userId: userId || undefined
+  try {
+    await prisma.organizationAnalyticsEvent.create({
+      data: {
+        metadata,
+        organizationId,
+        path,
+        projectId: projectId || undefined,
+        type,
+        userId: userId || undefined
+      }
+    });
+  } catch (error) {
+    if (isOrganizationSchemaUnavailable(error)) {
+      return;
     }
-  });
+
+    throw error;
+  }
 }
 
 export async function createOrganizationLead({

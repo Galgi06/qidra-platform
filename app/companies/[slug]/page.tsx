@@ -8,38 +8,75 @@ import { ButtonLink } from "@/components/ui/Button";
 import { recordOrganizationEvent } from "@/lib/company-workspace";
 import { getLocale, type SearchParams, withLocale } from "@/lib/i18n";
 import { authOptions } from "@/lib/next-auth";
-import { companyStatusLabel } from "@/lib/organizations";
+import { companyStatusLabel, isOrganizationSchemaUnavailable } from "@/lib/organizations";
 import { getPublicProjects } from "@/lib/project-catalog";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
+type PublicOrganizationViewModel = {
+  id: string;
+  publicSlug: string;
+  displayName: string;
+  heroImageUrl: string | null;
+  valueProposition: string | null;
+  status: "DRAFT" | "REVIEW" | "APPROVED" | "REJECTED";
+  country: string | null;
+  city: string | null;
+  contactEmail: string | null;
+  representativeName: string | null;
+  overview: string | null;
+  targetAudience: string | null;
+  productSummary: string | null;
+  legalName: string;
+  typeLabel: string | null;
+  website: string | null;
+  _count: {
+    members: number;
+    projects: number;
+  };
+};
+
 export default async function CompanyPublicPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams?: Promise<SearchParams> }) {
   const [{ slug }, locale] = await Promise.all([params, getLocale(searchParams)]);
   const session = (await getServerSession(authOptions)) as { user?: { id?: string } } | null;
-  const organization = await prisma.organization.findUnique({
-    where: { publicSlug: slug },
-    include: {
-      _count: {
-        select: {
-          members: true,
-          projects: true
+  const fallbackOrganization = buildFallbackOrganization(slug);
+  let hasOrganizationRecord = false;
+  let organization: PublicOrganizationViewModel = fallbackOrganization;
+
+  try {
+    const record = await prisma.organization.findUnique({
+      where: { publicSlug: slug },
+      include: {
+        _count: {
+          select: {
+            members: true,
+            projects: true
+          }
         }
       }
-    }
-  });
+    });
 
-  if (!organization) notFound();
+    if (!record) notFound();
+    hasOrganizationRecord = true;
+    organization = mapOrganizationRecord(record);
+  } catch (error) {
+    if (!isOrganizationSchemaUnavailable(error)) {
+      throw error;
+    }
+  }
 
   const isRu = locale === "ru";
   const projects = (await getPublicProjects()).filter((project) => project.organization?.publicSlug === slug);
 
-  await recordOrganizationEvent({
-    organizationId: organization.id,
-    path: `/companies/${slug}`,
-    type: "COMPANY_PAGE_VIEW",
-    userId: session?.user?.id
-  });
+  if (hasOrganizationRecord) {
+    await recordOrganizationEvent({
+      organizationId: organization.id,
+      path: `/companies/${slug}`,
+      type: "COMPANY_PAGE_VIEW",
+      userId: session?.user?.id
+    });
+  }
 
   return (
     <>
@@ -146,6 +183,80 @@ export default async function CompanyPublicPage({ params, searchParams }: { para
       <Footer locale={locale} />
     </>
   );
+}
+
+function buildFallbackOrganization(slug: string): PublicOrganizationViewModel {
+  const displayName = slug
+    .split("-")
+    .filter(Boolean)
+    .map((part) => `${part.slice(0, 1).toUpperCase()}${part.slice(1)}`)
+    .join(" ");
+
+  return {
+    id: `fallback-${slug}`,
+    publicSlug: slug,
+    displayName: displayName || "Company",
+    heroImageUrl: null,
+    valueProposition: null,
+    status: "DRAFT" as const,
+    country: null,
+    city: null,
+    contactEmail: null,
+    representativeName: null,
+    overview: null,
+    targetAudience: null,
+    productSummary: null,
+    legalName: displayName || "Company",
+    typeLabel: null,
+    website: null,
+    _count: {
+      members: 0,
+      projects: 0
+    }
+  };
+}
+
+function mapOrganizationRecord(record: {
+  id: string;
+  publicSlug: string;
+  displayName: string;
+  heroImageUrl: string | null;
+  valueProposition: string | null;
+  status: "DRAFT" | "REVIEW" | "APPROVED" | "REJECTED";
+  country: string | null;
+  city: string | null;
+  contactEmail: string | null;
+  representativeName: string | null;
+  overview: string | null;
+  targetAudience: string | null;
+  productSummary: string | null;
+  legalName: string;
+  typeLabel: string | null;
+  website: string | null;
+  _count: {
+    members: number;
+    projects: number;
+  };
+}): PublicOrganizationViewModel {
+  return {
+    id: record.id,
+    publicSlug: record.publicSlug,
+    displayName: record.displayName,
+    heroImageUrl: record.heroImageUrl,
+    valueProposition: record.valueProposition,
+    status: record.status,
+    country: record.country,
+    city: record.city,
+    contactEmail: record.contactEmail,
+    representativeName: record.representativeName,
+    overview: record.overview,
+    targetAudience: record.targetAudience,
+    productSummary: record.productSummary,
+    legalName: record.legalName,
+    typeLabel: record.typeLabel,
+    website: record.website,
+    _count: record._count
+  };
 }
 
 function MetricCard({ label, value }: { label: string; value: string }) {

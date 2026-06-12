@@ -338,7 +338,7 @@ function fallbackProjectBySlug(slug: string) {
 function isDatabaseUnavailable(error: unknown) {
   return (
     error instanceof Prisma.PrismaClientInitializationError ||
-    (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P1001")
+    (error instanceof Prisma.PrismaClientKnownRequestError && ["P1001", "P2021", "P2022"].includes(error.code))
   );
 }
 
