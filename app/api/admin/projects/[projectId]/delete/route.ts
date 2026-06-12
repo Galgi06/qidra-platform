@@ -7,8 +7,7 @@ import { prisma } from "@/lib/prisma";
 
 const deleteSchema = z.object({
   confirmation: z.string().trim(),
-  reason: z.string().trim().min(12).max(800),
-  slug: z.string().trim().min(3).max(120)
+  reason: z.string().trim().min(12).max(800)
 });
 
 type SessionUser = {
@@ -47,8 +46,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         title: localeRu ? "Проверьте форму" : "Check the form",
         message:
           localeRu
-            ? "Введите адрес проекта, причину не короче 12 символов и подтверждение DELETE."
-            : "Enter the project address, a reason of at least 12 characters and DELETE confirmation."
+            ? "Введите причину не короче 12 символов и подтверждение DELETE."
+            : "Enter a reason of at least 12 characters and DELETE confirmation."
       },
       { status: 400 }
     );
@@ -88,19 +87,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         message: localeRu ? "Обновите страницу и выберите проект из списка." : "Refresh the page and choose a project from the list."
       },
       { status: 404 }
-    );
-  }
-
-  if (parsed.data.slug.toLowerCase() !== project.slug.toLowerCase()) {
-    return NextResponse.json(
-      {
-        fieldErrors: {
-          slug: localeRu ? "Адрес проекта должен совпадать с удаляемой карточкой." : "The project address must match the project being deleted."
-        },
-        title: localeRu ? "Адрес не совпадает" : "Address does not match",
-        message: localeRu ? "Введите адрес именно этой карточки проекта." : "Enter the address from this project card."
-      },
-      { status: 400 }
     );
   }
 

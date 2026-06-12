@@ -501,23 +501,18 @@ function PermanentProjectDeletePanel({
         title={isRu ? "Опасная зона" : "Danger zone"}
         text={
           isRu
-            ? `Это действие удалит проект «${project.title[locale]}», ${formatCount(fundingStats.confirmedApplicationsCount)} подтверждённых заявок, ${formatCount(fundingStats.pendingApplicationsCount)} заявок на проверке и связанные документы/дивидендные периоды.`
-            : `This action removes the project “${project.title[locale]}”, ${formatCount(fundingStats.confirmedApplicationsCount)} confirmed applications, ${formatCount(fundingStats.pendingApplicationsCount)} pending applications and linked documents/dividend periods.`
+            ? `Это действие удалит проект «${project.title[locale]}», ${formatCount(fundingStats.confirmedApplicationsCount)} подтверждённых заявок, ${formatCount(fundingStats.pendingApplicationsCount)} заявок на проверке и связанные документы/дивидендные периоды. Для защиты нужен только код DELETE и причина удаления.`
+            : `This action removes the project “${project.title[locale]}”, ${formatCount(fundingStats.confirmedApplicationsCount)} confirmed applications, ${formatCount(fundingStats.pendingApplicationsCount)} pending applications and linked documents/dividend periods. For safety, only the DELETE code and a reason are required.`
         }
         tone="warning"
       />
-      <div className="grid gap-4 md:grid-cols-2">
-        <Input
-          label={isRu ? "Адрес проекта" : "Project address"}
-          name="slug"
-          placeholder={project.slug}
-          required
-        />
+      <div className="grid gap-4">
         <Input
           label={isRu ? "Подтверждение" : "Confirmation"}
           name="confirmation"
           pattern="DELETE"
           placeholder="DELETE"
+          hint={isRu ? "Введите ровно DELETE." : "Enter DELETE exactly."}
           required
         />
       </div>
