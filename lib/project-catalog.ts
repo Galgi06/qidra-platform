@@ -86,39 +86,21 @@ export function contentProjectPayload(project: ContentProject) {
 }
 
 export async function ensureBaseProjects() {
+  const projectsCount = await prisma.project.count();
+
+  if (projectsCount > 0) {
+    return;
+  }
+
   for (const project of baseProjects) {
-    const existing = await prisma.project.findUnique({
-      where: { slug: project.slug },
-      include: { documents: true }
-    });
-
-    if (!existing) {
-      const created = await prisma.project.create({
-        data: {
-          slug: project.slug,
-          ...contentProjectPayload(project)
-        }
-      });
-
-      await createBaseDocuments(created.id, project);
-      continue;
-    }
-
-    await prisma.project.update({
-      where: { id: existing.id },
+    const created = await prisma.project.create({
       data: {
-        coverImage: project.coverImage,
-        propertyData: project.realEstate ?? undefined,
-        summaryRu: project.summary.ru,
-        summaryEn: project.summary.en,
-        descriptionRu: project.description.ru,
-        descriptionEn: project.description.en
+        slug: project.slug,
+        ...contentProjectPayload(project)
       }
     });
 
-    if (!existing.documents.length) {
-      await createBaseDocuments(existing.id, project);
-    }
+    await createBaseDocuments(created.id, project);
   }
 }
 
@@ -385,7 +367,7 @@ export async function getProjectBySlug(slug: string) {
       include: { documents: true, organization: { select: { displayName: true, id: true, publicSlug: true } }, projectSubmissions: publicInitiatorInclude() }
     });
 
-    return project ? mapProject(project) : fallbackProjectBySlug(slug);
+    return project ? mapProject(project) : null;
   } catch (error) {
     if (isDatabaseUnavailable(error)) {
       return fallbackProjectBySlug(slug);

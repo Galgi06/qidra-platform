@@ -518,12 +518,15 @@ function PermanentProjectDeletePanel({
       </div>
       <TextArea
         label={isRu ? "Причина полного удаления" : "Permanent deletion reason"}
+        hint={isRu ? "Минимум 12 символов. Без причины проект не удалится." : "Minimum 12 characters. The project will not be deleted without a reason."}
+        minLength={12}
         name="reason"
         placeholder={
           isRu
             ? "Например: карточка была создана ошибочно и должна быть удалена вместе со связанными заявками."
             : "For example: the card was created by mistake and must be removed together with linked applications."
         }
+        required
       />
       <Button className="w-full border-qidra-red bg-qidra-red hover:bg-qidra-red/90 sm:w-fit" type="submit" variant="dark">
         {isRu ? "Удалить карточку проекта" : "Delete project card"}
@@ -550,16 +553,33 @@ function ProjectMoneyStat({ label, tone = "neutral", value }: { label: string; t
   );
 }
 
-function TextArea({ label, name, placeholder }: { label: string; name: string; placeholder: string }) {
+function TextArea({
+  label,
+  name,
+  placeholder,
+  required = false,
+  minLength,
+  hint
+}: {
+  label: string;
+  name: string;
+  placeholder: string;
+  required?: boolean;
+  minLength?: number;
+  hint?: string;
+}) {
   return (
     <label className="grid gap-2 text-14 font-medium text-qidra-dark">
       {label}
       <textarea
         className="min-h-28 rounded-qidra border border-transparent bg-qidra-grayLight px-4 py-3 text-16 outline-none transition-colors placeholder:text-qidra-grayMedium focus:border-qidra-accent"
         maxLength={5000}
+        minLength={minLength}
         name={name}
         placeholder={placeholder}
+        required={required}
       />
+      {hint ? <span className="text-12 font-normal text-qidra-grayBlue">{hint}</span> : null}
     </label>
   );
 }
