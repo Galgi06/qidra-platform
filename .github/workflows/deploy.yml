@@ -125,14 +125,4 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          expected="${HEALTHCHECK_STATUS:-200}"
-          for _ in {1..30}; do
-            status="$(curl -sS -o /dev/null -w '%{http_code}' "$HEALTHCHECK_URL" || true)"
-            if [[ "$status" == "$expected" ]]; then
-              exit 0
-            fi
-            sleep 10
-          done
-
-          echo "::error::Healthcheck failed for ${HEALTHCHECK_URL}. Expected ${expected}."
-          exit 1
+          QIDRA_HEALTHCHECK_URL="$HEALTHCHECK_URL" node scripts/qidra-healthcheck.mjs
