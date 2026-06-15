@@ -12,6 +12,7 @@ import { AccessRecoveryForm } from "@/components/admin/AccessRecoveryForm";
 import { ParticipantProfileEditForm } from "@/components/admin/ParticipantProfileEditForm";
 import { RoleManagementForm } from "@/components/admin/RoleManagementForm";
 import { UserBlockForm } from "@/components/admin/UserBlockForm";
+import { UserPasswordChangeForm } from "@/components/admin/UserPasswordChangeForm";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
@@ -44,6 +45,7 @@ export default async function AdminUserDetailPage({
   const walletStatusFilter = parseWalletStatus(searchParamString(resolvedSearchParams.walletStatus));
   const canAdjustBalance = session.user?.role === Role.SUPER_ADMIN;
   const canManageBlock = session.user?.role === Role.SUPER_ADMIN;
+  const canManagePassword = session.user?.role === Role.SUPER_ADMIN;
   const canManageRoles = canManageManagers(session.user?.role as "ADMIN" | "SUPER_ADMIN" | "TECH_SUPPORT" | "SALES_MANAGER" | "guest" | undefined);
   const canEditParticipantCard = canEditParticipantCards(session.user?.role as "ADMIN" | "SUPER_ADMIN" | "TECH_SUPPORT" | "guest" | undefined);
   const canSendAccessRecovery = canAccessSupportDesk(session.user?.role as "ADMIN" | "SUPER_ADMIN" | "TECH_SUPPORT" | "SALES_MANAGER" | "guest" | undefined);
@@ -217,6 +219,7 @@ export default async function AdminUserDetailPage({
   const blockEndpoint = `/api/admin/users/${user.id}/block?lang=${locale}`;
   const roleEndpoint = `/api/admin/users/${user.id}/role?lang=${locale}`;
   const accessRecoveryEndpoint = `/api/admin/users/${user.id}/password-reset?lang=${locale}`;
+  const passwordChangeEndpoint = `/api/admin/users/${user.id}/password?lang=${locale}`;
   const participantProfileEndpoint = `/api/admin/users/${user.id}/profile?lang=${locale}`;
   const permanentDeleteEndpoint = `/api/admin/users/${user.id}/delete?lang=${locale}`;
   const participantProfileDefaults = {
@@ -447,6 +450,11 @@ export default async function AdminUserDetailPage({
                       <InfoBlock label={isRu ? "Провайдеры входа" : "Sign-in providers"} value={authProviders(user.accounts, locale)} locale={locale} />
                       <InfoBlock label={isRu ? "Активные сессии" : "Active sessions"} value={formatCount(user._count.sessions)} locale={locale} />
                     </div>
+                    {canManagePassword && user.role === Role.INVESTOR && user.id !== session.user?.id ? (
+                      <div className="premium-panel p-5">
+                        <UserPasswordChangeForm endpoint={passwordChangeEndpoint} locale={locale} />
+                      </div>
+                    ) : null}
                     {canManageRoles && user.id !== session.user?.id ? (
                       <div className="premium-panel p-5">
                         <RoleManagementForm currentRole={user.role} endpoint={roleEndpoint} locale={locale} />

@@ -25,6 +25,14 @@ function requireAuthSecret() {
   return secret;
 }
 
+function passwordHashFingerprint(passwordHash?: string | null) {
+  if (!passwordHash) {
+    return null;
+  }
+
+  return createHash("sha256").update(passwordHash).digest("hex");
+}
+
 function toAdapterUser(user: PrismaUser): AdapterUser {
   return {
     id: user.id,
@@ -332,20 +340,35 @@ export const authOptions: NextAuthOptions = {
             blockReason: true,
             blockedAt: true,
             blockedUntil: true,
+            passwordHash: true,
             role: true
           }
         });
+
+        const currentPasswordFingerprint = passwordHashFingerprint(dbUser?.passwordHash);
+        const previousPasswordFingerprint = typeof token.passwordHashFingerprint === "string" ? token.passwordHashFingerprint : null;
+        const passwordChanged =
+          previousPasswordFingerprint !== null && previousPasswordFingerprint !== currentPasswordFingerprint;
 
         token.id = tokenUserId;
         token.role = (user as { role?: string } | undefined)?.role ?? dbUser?.role ?? "INVESTOR";
         token.blocked = !dbUser || isUserBlocked(dbUser);
         token.blockReason = dbUser?.blockReason ?? null;
         token.blockedUntil = dbUser?.blockedUntil?.toISOString() ?? null;
+        token.invalidated = Boolean(passwordChanged);
+        token.passwordHashFingerprint = currentPasswordFingerprint;
       }
 
       return token;
     },
     async session({ session, token }) {
+      if (token.invalidated) {
+        const invalidatedSession = session as typeof session & { user?: undefined };
+        invalidatedSession.user = undefined;
+        invalidatedSession.expires = new Date(0).toISOString();
+        return invalidatedSession;
+      }
+
       if (session.user) {
         const sessionUser = session.user as {
           blockReason?: string | null;
