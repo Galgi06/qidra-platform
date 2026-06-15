@@ -1,18 +1,17 @@
-import bcrypt from "bcryptjs";
 import { Role } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { canManageManagers } from "@/lib/auth";
 import { authOptions } from "@/lib/next-auth";
-import { isStrongPassword, passwordPolicyDescription } from "@/lib/password-policy";
+import { hashPassword } from "@/lib/passwords";
 import { prisma } from "@/lib/prisma";
 
 const changePasswordSchema = z
   .object({
     confirmation: z.string().trim(),
-    password: z.string().max(128).refine(isStrongPassword),
-    passwordConfirm: z.string().max(128),
+    password: z.string().min(1),
+    passwordConfirm: z.string().min(1),
     reason: z.string().trim().min(12).max(800)
   })
   .superRefine((data, context) => {
@@ -34,6 +33,36 @@ type SessionUser = {
 
 function isRu(request: NextRequest) {
   return request.nextUrl.searchParams.get("lang") !== "en";
+}
+
+function passwordFieldErrors(localeRu: boolean, error: z.ZodError) {
+  const fieldErrors = error.flatten().fieldErrors as Record<string, string[] | undefined>;
+  const nextFieldErrors: Record<string, string> = {};
+
+  if (fieldErrors.password?.length) {
+    nextFieldErrors.password = localeRu ? "Введите новый пароль." : "Enter a new password.";
+  }
+
+  if (fieldErrors.passwordConfirm?.length) {
+    nextFieldErrors.passwordConfirm =
+      fieldErrors.passwordConfirm.some((message) => message === "password_mismatch")
+        ? localeRu
+          ? "Пароли должны совпадать."
+          : "Passwords must match."
+        : localeRu
+          ? "Повторите пароль ещё раз."
+          : "Repeat the password again.";
+  }
+
+  if (fieldErrors.reason?.length) {
+    nextFieldErrors.reason = localeRu ? "Укажите причину минимум на 12 символов." : "Provide a reason with at least 12 characters.";
+  }
+
+  if (fieldErrors.confirmation?.length) {
+    nextFieldErrors.confirmation = localeRu ? "Введите CONFIRM." : "Enter CONFIRM.";
+  }
+
+  return Object.keys(nextFieldErrors).length ? nextFieldErrors : undefined;
 }
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ userId: string }> }) {
@@ -68,23 +97,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const parsed = changePasswordSchema.safeParse(await request.json().catch(() => null));
 
   if (!parsed.success) {
-    const passwordMismatch = parsed.error.issues.some((issue) => issue.message === "password_mismatch");
-
     return NextResponse.json(
       {
-        fieldErrors: passwordMismatch
-          ? {
-              passwordConfirm: localeRu ? "Пароли должны совпадать." : "Passwords must match."
-            }
-          : undefined,
+        fieldErrors: passwordFieldErrors(localeRu, parsed.error),
         title: localeRu ? "Проверьте форму" : "Check the form",
-        message: passwordMismatch
-          ? localeRu
-            ? "Подтверждение пароля не совпадает."
-            : "Password confirmation does not match."
-          : localeRu
-            ? `Укажите новый пароль, причину и подтверждение CONFIRM. ${passwordPolicyDescription.ru}`
-            : `Provide the new password, reason and CONFIRM confirmation. ${passwordPolicyDescription.en}`
+        message: localeRu
+          ? "Исправьте подсвеченные поля."
+          : "Fix the highlighted fields."
       },
       { status: 400 }
     );
@@ -93,6 +112,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (parsed.data.confirmation !== "CONFIRM") {
     return NextResponse.json(
       {
+        fieldErrors: {
+          confirmation: localeRu ? "Введите CONFIRM." : "Enter CONFIRM."
+        },
         title: localeRu ? "Нужно подтверждение" : "Confirmation required",
         message: localeRu ? "Введите CONFIRM, чтобы сохранить новый пароль." : "Enter CONFIRM to save the new password."
       },
@@ -129,7 +151,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     );
   }
 
-  const passwordHash = await bcrypt.hash(parsed.data.password, 12);
+  const passwordHash = await hashPassword(parsed.data.password);
   const resetIdentifier = `password-reset:${user.email.toLowerCase()}`;
 
   await prisma.$transaction([

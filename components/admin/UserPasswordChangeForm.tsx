@@ -2,7 +2,6 @@ import { FeedbackForm } from "@/components/ActionFeedback";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import type { Locale } from "@/lib/i18n";
-import { passwordPolicyDescription } from "@/lib/password-policy";
 
 export function UserPasswordChangeForm({
   endpoint,
@@ -41,6 +40,7 @@ export function UserPasswordChangeForm({
       >
         <Input
           autoComplete="new-password"
+          hint={isRu ? "Можно использовать любой набор символов." : "You can use any characters."}
           label={isRu ? "Новый пароль" : "New password"}
           name="password"
           placeholder={isRu ? "Введите новый пароль" : "Enter a new password"}
@@ -74,7 +74,7 @@ export function UserPasswordChangeForm({
           </span>
         </label>
         <Input
-          hint={isRu ? `${passwordPolicyDescription.ru} Введите CONFIRM для фиксации действия.` : `${passwordPolicyDescription.en} Enter CONFIRM to record the action.`}
+          hint={isRu ? "Введите CONFIRM для фиксации действия." : "Enter CONFIRM to record the action."}
           label={isRu ? "Подтверждение" : "Confirmation"}
           name="confirmation"
           pattern="CONFIRM"

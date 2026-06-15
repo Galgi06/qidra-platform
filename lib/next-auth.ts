@@ -1,4 +1,3 @@
-import bcrypt from "bcryptjs";
 import { createHash, createHmac, timingSafeEqual } from "crypto";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import type { User as PrismaUser } from "@prisma/client";
@@ -7,6 +6,7 @@ import type { Adapter, AdapterAccount, AdapterUser } from "next-auth/adapters";
 import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
 import { prisma } from "@/lib/prisma";
+import { verifyPassword } from "@/lib/passwords";
 import { isSocialProviderConfigured } from "@/lib/social-auth";
 import { isUserBlocked } from "@/lib/user-access";
 
@@ -265,7 +265,7 @@ export const authOptions: NextAuthOptions = {
           return null;
         }
 
-        const passwordValid = await bcrypt.compare(password, user.passwordHash);
+        const passwordValid = await verifyPassword(password, user.passwordHash);
 
         if (!passwordValid) {
           return null;
