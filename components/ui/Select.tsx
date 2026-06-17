@@ -8,10 +8,10 @@ type SelectProps = SelectHTMLAttributes<HTMLSelectElement> & {
 
 export function Select({ label, options, error, className = "", ...props }: SelectProps) {
   return (
-    <label className="grid gap-2 text-14 font-semibold text-qidra-dark">
-      <span>{label}</span>
+    <label className="grid min-w-0 gap-2 text-14 font-semibold text-qidra-dark">
+      <span className="break-words leading-snug">{label}</span>
       <select
-        className={`field-shell h-12 rounded-qidra px-4 text-16 outline-none ${
+        className={`field-shell h-12 w-full min-w-0 rounded-qidra px-4 text-16 outline-none ${
           error ? "border-qidra-red bg-red-50/30" : ""
         } ${className}`}
         {...props}

@@ -18,6 +18,7 @@ export type RealEstateDocumentAsset = {
 
 export type RealEstateProjectData = {
   address?: string;
+  appraisedValue?: number;
   city?: string;
   completionDate?: string;
   country?: string;
@@ -26,11 +27,15 @@ export type RealEstateProjectData = {
   descriptionFull?: string;
   descriptionShort?: string;
   developer?: string;
+  district?: string;
   documents?: RealEstateDocumentAsset[];
+  fundingPercent?: number;
   fundraisingCurrency?: string;
   gallery?: string[];
   gatheredAmount?: number;
   incomeSources?: IncomeSourceValue[];
+  investorSharePercent?: number;
+  investorCount?: number;
   managerCarryPercent?: number;
   managerFeePercent?: number;
   managerName?: string;
@@ -44,6 +49,7 @@ export type RealEstateProjectData = {
   propertyType?: PropertyTypeValue;
   remainingAmount?: number;
   riskNotice?: Record<Locale, string>;
+  statsMode?: "auto" | "manual";
   targetRaise?: number;
   titleComplex?: string;
   totalAssetValue?: number;
@@ -54,10 +60,18 @@ export type RealEstateLeadData = {
   comment?: string;
   contactCountry?: string;
   firstName?: string;
+  exitWindowAccepted?: boolean;
+  investmentAmountUsdt?: number;
   lastName?: string;
+  managementFeePercent?: number;
+  managementFeeUsdt?: number;
+  marketPriceAccepted?: boolean;
+  minHoldAccepted?: boolean;
   phone?: string;
   qidraDisclaimerAccepted?: boolean;
   riskAccepted?: boolean;
+  totalPaymentUsdt?: number;
+  transferExitAccepted?: boolean;
   transferAccepted?: boolean;
   whatsapp?: string;
 };
@@ -107,6 +121,7 @@ export function parseRealEstateData(value: unknown): RealEstateProjectData | nul
 
   return {
     address: asString(source.address),
+    appraisedValue: asNumber(source.appraisedValue),
     city: asString(source.city),
     completionDate: asString(source.completionDate),
     country: asString(source.country),
@@ -115,11 +130,15 @@ export function parseRealEstateData(value: unknown): RealEstateProjectData | nul
     descriptionFull: asString(source.descriptionFull),
     descriptionShort: asString(source.descriptionShort),
     developer: asString(source.developer),
+    district: asString(source.district),
     documents,
+    fundingPercent: asNumber(source.fundingPercent),
     fundraisingCurrency: asString(source.fundraisingCurrency),
     gallery: asStringArray(source.gallery),
     gatheredAmount: asNumber(source.gatheredAmount),
     incomeSources,
+    investorSharePercent: asNumber(source.investorSharePercent),
+    investorCount: asNumber(source.investorCount),
     managerCarryPercent: asNumber(source.managerCarryPercent),
     managerFeePercent: asNumber(source.managerFeePercent),
     managerName: asString(source.managerName),
@@ -132,6 +151,7 @@ export function parseRealEstateData(value: unknown): RealEstateProjectData | nul
     projectTermMonths: asNumber(source.projectTermMonths),
     propertyType,
     remainingAmount: asNumber(source.remainingAmount),
+    statsMode: asString(source.statsMode) === "manual" ? "manual" : "auto",
     targetRaise: asNumber(source.targetRaise),
     titleComplex: asString(source.titleComplex),
     totalAssetValue: asNumber(source.totalAssetValue),
@@ -145,11 +165,19 @@ export function parseRealEstateLeadData(value: unknown): RealEstateLeadData | nu
   return {
     comment: asString(source.comment),
     contactCountry: asString(source.contactCountry),
+    exitWindowAccepted: source.exitWindowAccepted === true,
     firstName: asString(source.firstName),
+    investmentAmountUsdt: asNumber(source.investmentAmountUsdt),
     lastName: asString(source.lastName),
+    managementFeePercent: asNumber(source.managementFeePercent),
+    managementFeeUsdt: asNumber(source.managementFeeUsdt),
+    marketPriceAccepted: source.marketPriceAccepted === true,
+    minHoldAccepted: source.minHoldAccepted === true,
     phone: asString(source.phone),
     qidraDisclaimerAccepted: source.qidraDisclaimerAccepted === true,
     riskAccepted: source.riskAccepted === true,
+    totalPaymentUsdt: asNumber(source.totalPaymentUsdt),
+    transferExitAccepted: source.transferExitAccepted === true,
     transferAccepted: source.transferAccepted === true,
     whatsapp: asString(source.whatsapp)
   };
