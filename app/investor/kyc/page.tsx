@@ -145,7 +145,7 @@ export default async function KycPage({ searchParams }: { searchParams?: Promise
                   options={[{ value: "", label: isRu ? "Выберите гражданство" : "Select citizenship" }, ...countries]}
                   required
                 />
-                <Input label={isRu ? "Профессия" : "Occupation"} name="occupation" defaultValue={application?.occupation ?? ""} maxLength={160} minLength={3} required />
+                <Input label={isRu ? "Профессия" : "Occupation"} name="occupation" defaultValue={application?.occupation ?? ""} maxLength={160} minLength={2} required />
                 <Select
                   label={isRu ? "Источник средств" : "Source of funds"}
                   name="sourceOfFunds"

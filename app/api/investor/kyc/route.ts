@@ -88,11 +88,11 @@ function kycFieldLabels(localeRu: boolean) {
     address: localeRu ? "Укажите полный адрес проживания: город, район/улица, дом или ориентир." : "Enter a full residential address: city, area/street and building or landmark.",
     addressProof: localeRu ? "Прикрепите подтверждение адреса в PDF, JPG или PNG." : "Attach proof of address as PDF, JPG or PNG.",
     citizenship: localeRu ? "Выберите гражданство из списка." : "Select citizenship from the list.",
-    city: localeRu ? "Укажите реальный город буквами, без набора символов или цифр." : "Enter a real city name with letters, not random symbols or numbers.",
+    city: localeRu ? "Укажите реальный город или район проживания, можно с дефисом, цифрой или уточнением." : "Enter a real city or district name; hyphens, digits and clarifying words are allowed.",
     country: localeRu ? "Выберите страну проживания из списка." : "Select country of residence from the list.",
     dateOfBirth: localeRu ? "Укажите корректную дату рождения. Участнику должно быть не меньше 18 лет." : "Enter a valid date of birth. The participant must be at least 18.",
     identityDocument: localeRu ? "Прикрепите документ личности в PDF, JPG или PNG." : "Attach an identity document as PDF, JPG or PNG.",
-    occupation: localeRu ? "Укажите профессию словами, без набора букв или цифр." : "Enter an occupation in words, not random letters or numbers.",
+    occupation: localeRu ? "Укажите профессию или должность понятным текстом. Допустимы сокращения вроде IT, CEO, 3D." : "Enter your occupation or role in clear text. Abbreviations such as IT, CEO or 3D are allowed.",
     phone: localeRu ? "Укажите корректный номер телефона." : "Enter a valid phone number.",
     phoneDialCode: localeRu ? "Выберите телефонный код страны." : "Select a country phone code.",
     sourceOfFunds: localeRu ? "Выберите источник средств." : "Select source of funds."

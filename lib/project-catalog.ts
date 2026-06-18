@@ -26,6 +26,7 @@ export type CatalogProject = {
   organization: {
     displayName: string;
     id: string;
+    legalName: string;
     publicSlug: string;
   } | null;
   location: string;
@@ -123,6 +124,7 @@ type ProjectWithPublicRelations = DbProject & {
   organization?: {
     displayName: string;
     id: string;
+    legalName: string;
     publicSlug: string;
   } | null;
   projectSubmissions?: {
@@ -199,6 +201,7 @@ export function mapProject(project: ProjectWithPublicRelations): CatalogProject 
       ? {
           displayName: project.organization.displayName,
           id: project.organization.id,
+          legalName: project.organization.legalName,
           publicSlug: project.organization.publicSlug
         }
       : null,
@@ -225,10 +228,7 @@ function mapPublicRealEstateData(projectId: string, realEstate: RealEstateProjec
     href: `/api/projects/${projectId}/assets/${index}`,
     name: realEstateAssetDisplayName(asset, "en", index)
   }));
-  const coverAsset =
-    documents?.find((asset) => asset.href === realEstate.coverImage) ??
-    documents?.find((asset) => asset.category === "gallery") ??
-    documents?.find((asset) => asset.category === "render");
+  const coverAsset = documents?.find((asset) => asset.category === "gallery") ?? documents?.find((asset) => asset.category === "render");
   const galleryAssets = documents?.filter((asset) => asset.category === "gallery" || asset.category === "render") ?? [];
 
   return {
@@ -353,7 +353,7 @@ export async function getAdminProjects() {
   await ensureBaseProjects();
 
     const projects = await prisma.project.findMany({
-      include: { documents: true, organization: { select: { displayName: true, id: true, publicSlug: true } }, projectSubmissions: publicInitiatorInclude() },
+      include: { documents: true, organization: { select: { displayName: true, id: true, legalName: true, publicSlug: true } }, projectSubmissions: publicInitiatorInclude() },
       orderBy: { createdAt: "desc" }
     });
 
@@ -369,7 +369,7 @@ export async function getPublicProjects() {
         status: { in: [ProjectStatus.ACTIVE, ProjectStatus.FUNDED] },
         documents: { some: {} }
       },
-      include: { documents: true, organization: { select: { displayName: true, id: true, publicSlug: true } }, projectSubmissions: publicInitiatorInclude() },
+      include: { documents: true, organization: { select: { displayName: true, id: true, legalName: true, publicSlug: true } }, projectSubmissions: publicInitiatorInclude() },
       orderBy: { createdAt: "desc" }
     });
 
@@ -389,7 +389,7 @@ export async function getProjectBySlug(slug: string) {
 
     const project = await prisma.project.findUnique({
       where: { slug },
-      include: { documents: true, organization: { select: { displayName: true, id: true, publicSlug: true } }, projectSubmissions: publicInitiatorInclude() }
+      include: { documents: true, organization: { select: { displayName: true, id: true, legalName: true, publicSlug: true } }, projectSubmissions: publicInitiatorInclude() }
     });
 
     return project ? mapProject(project) : null;

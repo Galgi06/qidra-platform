@@ -8,6 +8,7 @@ import { requireAuth } from "@/lib/access";
 import { dictionary, getLocale, type SearchParams, withLocale } from "@/lib/i18n";
 import { prisma } from "@/lib/prisma";
 import { acceptsApplications, getProjectBySlug } from "@/lib/project-catalog";
+import { isAmCapitalPropertyFundProject } from "@/lib/real-estate";
 
 export const dynamic = "force-dynamic";
 
@@ -50,6 +51,14 @@ export default async function InvestPage({ params, searchParams }: { params: Pro
   const activeReservedUsdt = Number(activeApplication?.reservedUsdt?.toString() ?? 0);
   const freeUsdt = Math.max(availableUsdt + activeReservedUsdt, 0);
   const kycApproved = latestKyc?.status === "APPROVED";
+  const isAmCapitalProject = isAmCapitalPropertyFundProject({
+    sector: project.sector,
+    organizationDisplayName: project.organization?.displayName,
+    organizationLegalName: project.organization?.legalName,
+    partnerName: project.realEstate?.partnerName,
+    managerName: project.realEstate?.managerName,
+    initiatorName: project.initiator?.name
+  });
 
   return (
     <>
@@ -74,6 +83,7 @@ export default async function InvestPage({ params, searchParams }: { params: Pro
             projectSlug={project.slug}
             projectTitle={project.title[locale]}
             realEstate={project.realEstate}
+            useAmCapitalFlow={isAmCapitalProject}
           />
         ) : (
           <div className="container-qidra grid max-w-2xl gap-5">

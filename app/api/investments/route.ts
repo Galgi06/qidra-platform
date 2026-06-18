@@ -7,7 +7,7 @@ import { authOptions } from "@/lib/next-auth";
 import { ensureBaseProjects } from "@/lib/project-catalog";
 import { prisma } from "@/lib/prisma";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
-import { parseRealEstateData } from "@/lib/real-estate";
+import { AM_CAPITAL_MANAGER_FEE_PERCENT, isAmCapitalPropertyFundProject, parseRealEstateData } from "@/lib/real-estate";
 
 const amountSchema = z
   .string()
@@ -17,23 +17,32 @@ const amountSchema = z
   .refine((value) => new Prisma.Decimal(value).gte(100), "minimum");
 
 const applicationSchema = z.object({
+  amAgreementAccepted: z.literal("on").optional(),
+  amAgreementViewed: z.literal("yes").optional(),
+  amBuyerDependencyAccepted: z.literal("on").optional(),
+  amCapitalNotGuaranteedAccepted: z.literal("on").optional(),
+  amDirectRelationshipAccepted: z.literal("on").optional(),
+  amExitAfterHoldingAccepted: z.literal("on").optional(),
+  amExitWindowsAccepted: z.literal("on").optional(),
+  amMarketValueAccepted: z.literal("on").optional(),
+  amMinimumHoldingAccepted: z.literal("on").optional(),
+  amNoOnDemandReturnAccepted: z.literal("on").optional(),
+  amNotDepositAccepted: z.literal("on").optional(),
+  amProjectTermsAccepted: z.literal("on").optional(),
+  amQidraPlatformAccepted: z.literal("on").optional(),
+  amYieldNotGuaranteedAccepted: z.literal("on").optional(),
   projectSlug: z.string().trim().min(2).max(120),
   amount: amountSchema,
-  termsAccepted: z.literal("on"),
-  contractAccepted: z.literal("on"),
+  termsAccepted: z.literal("on").optional(),
+  contractAccepted: z.literal("on").optional(),
   comment: z.string().trim().max(1200).optional(),
   contactCountry: z.string().trim().max(120).optional(),
   email: z.string().trim().email().optional(),
-  exitWindowAccepted: z.literal("on").optional(),
   firstName: z.string().trim().max(120).optional(),
   lastName: z.string().trim().max(120).optional(),
-  managementFeePercent: z.string().trim().max(40).optional(),
-  marketPriceAccepted: z.literal("on").optional(),
-  minHoldAccepted: z.literal("on").optional(),
   phone: z.string().trim().max(120).optional(),
   qidraDisclaimerAccepted: z.literal("on").optional(),
   riskAccepted: z.literal("on").optional(),
-  transferExitAccepted: z.literal("on").optional(),
   transferAccepted: z.literal("on").optional(),
   whatsapp: z.string().trim().max(120).optional()
 });
@@ -50,6 +59,15 @@ function isRu(request: NextRequest) {
 
 function formatUsdt(value: Prisma.Decimal) {
   return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 6 }).format(value.toNumber())} USDT`;
+}
+
+function clientIp(request: NextRequest) {
+  const forwarded = request.headers.get("x-forwarded-for");
+  if (forwarded) {
+    return forwarded.split(",")[0]?.trim() || undefined;
+  }
+
+  return request.headers.get("x-real-ip") || undefined;
 }
 
 export async function POST(request: NextRequest) {
@@ -95,7 +113,15 @@ export async function POST(request: NextRequest) {
 
   await ensureBaseProjects();
   const project = await prisma.project.findUnique({
-    where: { slug: parsed.data.projectSlug }
+    where: { slug: parsed.data.projectSlug },
+    include: {
+      organization: {
+        select: {
+          displayName: true,
+          legalName: true
+        }
+      }
+    }
   });
 
   if (!project) {
@@ -122,29 +148,69 @@ export async function POST(request: NextRequest) {
   }
 
   const realEstate = parseRealEstateData(project.propertyData);
+  const useAmCapitalFlow = isAmCapitalPropertyFundProject({
+    sector: realEstate ? "real-estate" : null,
+    organizationDisplayName: project.organization?.displayName,
+    organizationLegalName: project.organization?.legalName,
+    partnerName: realEstate?.partnerName,
+    managerName: realEstate?.managerName,
+    initiatorName: null
+  });
+
+  if (!useAmCapitalFlow && (!parsed.data.termsAccepted || !parsed.data.contractAccepted)) {
+    return NextResponse.json(
+      {
+        title: localeRu ? "Проверьте заявку" : "Check the application",
+        message:
+          localeRu
+            ? "Подтвердите, что изучили условия проекта и договорную структуру."
+            : "Confirm that you reviewed the project terms and contractual structure."
+      },
+      { status: 400 }
+    );
+  }
   if (realEstate) {
     const missingLeadFields = ["firstName", "lastName", "email", "phone", "contactCountry"].filter((field) => {
       const value = parsed.data[field as keyof typeof parsed.data];
       return typeof value !== "string" || !value.trim();
     });
 
+    const missingAmCapitalAcknowledgements = useAmCapitalFlow
+      ? [
+          parsed.data.amProjectTermsAccepted,
+          parsed.data.amQidraPlatformAccepted,
+          parsed.data.amDirectRelationshipAccepted,
+          parsed.data.amYieldNotGuaranteedAccepted,
+          parsed.data.amCapitalNotGuaranteedAccepted,
+          parsed.data.amNotDepositAccepted,
+          parsed.data.amNoOnDemandReturnAccepted,
+          parsed.data.amMinimumHoldingAccepted,
+          parsed.data.amExitAfterHoldingAccepted,
+          parsed.data.amExitWindowsAccepted,
+          parsed.data.amMarketValueAccepted,
+          parsed.data.amBuyerDependencyAccepted,
+          parsed.data.amAgreementAccepted,
+          parsed.data.amAgreementViewed
+        ].some((value) => value !== "on" && value !== "yes")
+      : false;
+
     if (
       missingLeadFields.length ||
-      !parsed.data.riskAccepted ||
-      !parsed.data.qidraDisclaimerAccepted ||
-      !parsed.data.transferAccepted ||
-      !parsed.data.transferExitAccepted ||
-      !parsed.data.minHoldAccepted ||
-      !parsed.data.exitWindowAccepted ||
-      !parsed.data.marketPriceAccepted
+      (useAmCapitalFlow
+        ? missingAmCapitalAcknowledgements
+        : !parsed.data.riskAccepted || !parsed.data.qidraDisclaimerAccepted || !parsed.data.transferAccepted)
     ) {
       return NextResponse.json(
         {
           title: localeRu ? "Проверьте форму" : "Check the form",
           message:
-            localeRu
-              ? "Для заявки по недвижимости заполните контактные данные и подтвердите предупреждения о рисках, роли Qidra, минимальном сроке участия и условиях выхода."
-              : "For a real estate application, complete the contact details and confirm the risk, Qidra role, holding-period, and exit-condition disclosures."
+            useAmCapitalFlow
+              ? localeRu
+                ? "Для участия в AM Capital заполните контакты, откройте договор и подтвердите все обязательные условия."
+                : "For AM Capital participation, complete the contact details, open the agreement, and confirm all required terms."
+              : localeRu
+                ? "Для заявки по недвижимости заполните контактные данные и подтвердите предупреждения о рисках и роли Qidra."
+                : "For a real estate application, complete the contact details and confirm the risk and Qidra role disclosures."
         },
         { status: 400 }
       );
@@ -189,11 +255,8 @@ export async function POST(request: NextRequest) {
   const availableUsdt = wallet?.availableUsdt ?? zeroUsdt;
   const activeReservedUsdt = activeApplication?.reservedUsdt ?? zeroUsdt;
   const requestedUsdt = new Prisma.Decimal(parsed.data.amount);
-  const managementFeePercent = realEstate?.managerFeePercent && Number.isFinite(realEstate.managerFeePercent) && realEstate.managerFeePercent > 0
-    ? new Prisma.Decimal(realEstate.managerFeePercent)
-    : zeroUsdt;
-  const managementFeeUsdt = managementFeePercent.gt(0) ? requestedUsdt.times(managementFeePercent).div(100).toDecimalPlaces(6) : zeroUsdt;
-  const totalPaymentUsdt = requestedUsdt.plus(managementFeeUsdt);
+  const managerFeeUsdt = useAmCapitalFlow ? requestedUsdt.times(AM_CAPITAL_MANAGER_FEE_PERCENT).div(100).toDecimalPlaces(6) : zeroUsdt;
+  const totalPayableUsdt = requestedUsdt.plus(managerFeeUsdt);
   const remainingTargetUsdt = project.targetUsdt.minus(project.fundedUsdt);
 
   if (remainingTargetUsdt.lte(0) || requestedUsdt.gt(remainingTargetUsdt)) {
@@ -211,16 +274,20 @@ export async function POST(request: NextRequest) {
 
   const rawFreeUsdt = availableUsdt.plus(activeReservedUsdt);
   const freeUsdt = rawFreeUsdt.gt(0) ? rawFreeUsdt : zeroUsdt;
-  if (!wallet || freeUsdt.lt(totalPaymentUsdt)) {
-    const shortfallUsdt = totalPaymentUsdt.minus(freeUsdt);
+  if (!wallet || freeUsdt.lt(totalPayableUsdt)) {
+    const shortfallUsdt = totalPayableUsdt.minus(freeUsdt);
 
     return NextResponse.json(
       {
         title: localeRu ? "Недостаточно доступного баланса" : "Insufficient available balance",
         message:
-          localeRu
-            ? `На доступном балансе ${formatUsdt(freeUsdt)}. Для участия на ${formatUsdt(requestedUsdt)}${managementFeeUsdt.gt(0) ? ` и комиссии ${formatUsdt(managementFeeUsdt)}` : ""} нужно пополнить ещё ${formatUsdt(shortfallUsdt)}.`
-            : `Your available balance is ${formatUsdt(freeUsdt)}. To participate for ${formatUsdt(requestedUsdt)}${managementFeeUsdt.gt(0) ? ` plus a ${formatUsdt(managementFeeUsdt)} fee` : ""}, top up another ${formatUsdt(shortfallUsdt)}.`,
+          useAmCapitalFlow
+            ? localeRu
+              ? `На доступном балансе ${formatUsdt(freeUsdt)}. Для участия на ${formatUsdt(requestedUsdt)} и комиссии ${formatUsdt(managerFeeUsdt)} нужно пополнить ещё ${formatUsdt(shortfallUsdt)}.`
+              : `Your available balance is ${formatUsdt(freeUsdt)}. Top up another ${formatUsdt(shortfallUsdt)} to cover the ${formatUsdt(requestedUsdt)} participation amount and the ${formatUsdt(managerFeeUsdt)} manager fee.`
+            : localeRu
+              ? `На доступном балансе ${formatUsdt(freeUsdt)}. Для этой заявки нужно пополнить ещё ${formatUsdt(shortfallUsdt)}.`
+              : `Your available balance is ${formatUsdt(freeUsdt)}. Top up another ${formatUsdt(shortfallUsdt)} for this application.`,
         availableUsdt: freeUsdt.toString(),
         shortfallUsdt: shortfallUsdt.toString()
       },
@@ -232,9 +299,11 @@ export async function POST(request: NextRequest) {
     let committedApplicationId = activeApplication?.id;
 
     await prisma.$transaction(async (tx) => {
-      const amountFromAvailableUsdt = totalPaymentUsdt.minus(activeReservedUsdt);
+      const amountFromAvailableUsdt = totalPayableUsdt.minus(activeReservedUsdt);
       const availableDebitUsdt = amountFromAvailableUsdt.gt(0) ? amountFromAvailableUsdt : zeroUsdt;
       const availableCreditUsdt = amountFromAvailableUsdt.lt(0) ? amountFromAvailableUsdt.abs() : zeroUsdt;
+      const confirmedAt = new Date();
+      const ipAddress = clientIp(request);
 
       const walletUpdate = await tx.wallet.updateMany({
         where: {
@@ -257,26 +326,43 @@ export async function POST(request: NextRequest) {
         amountUsdt: requestedUsdt,
         reservedUsdt: zeroUsdt,
         status: InvestmentStatus.CONFIRMED,
-        termsAcceptedAt: new Date(),
-        contractAcceptedAt: new Date(),
+        termsAcceptedAt: confirmedAt,
+        contractAcceptedAt: confirmedAt,
         contactDetails: realEstate
           ? {
+              amCapitalAgreementAccepted: useAmCapitalFlow ? parsed.data.amAgreementAccepted === "on" : undefined,
+              amCapitalFlow: useAmCapitalFlow,
+              amCapitalTermsVersion: useAmCapitalFlow ? "am-capital-property-fund-v1" : undefined,
+              amComplianceAcceptedIds: useAmCapitalFlow
+                ? [
+                    "amProjectTermsAccepted",
+                    "amQidraPlatformAccepted",
+                    "amDirectRelationshipAccepted",
+                    "amYieldNotGuaranteedAccepted",
+                    "amCapitalNotGuaranteedAccepted",
+                    "amNotDepositAccepted",
+                    "amNoOnDemandReturnAccepted",
+                    "amMinimumHoldingAccepted",
+                    "amExitAfterHoldingAccepted",
+                    "amExitWindowsAccepted",
+                    "amMarketValueAccepted",
+                    "amBuyerDependencyAccepted",
+                    "amAgreementAccepted"
+                  ]
+                : undefined,
               comment: parsed.data.comment || undefined,
+              confirmationIp: ipAddress,
+              confirmedAt: confirmedAt.toISOString(),
               contactCountry: parsed.data.contactCountry || undefined,
-              exitWindowAccepted: parsed.data.exitWindowAccepted === "on",
               firstName: parsed.data.firstName || undefined,
-              investmentAmountUsdt: requestedUsdt.toString(),
               lastName: parsed.data.lastName || undefined,
-              managementFeePercent: managementFeePercent.gt(0) ? managementFeePercent.toString() : undefined,
-              managementFeeUsdt: managementFeeUsdt.gt(0) ? managementFeeUsdt.toString() : undefined,
-              marketPriceAccepted: parsed.data.marketPriceAccepted === "on",
-              minHoldAccepted: parsed.data.minHoldAccepted === "on",
+              managerFeePercent: useAmCapitalFlow ? AM_CAPITAL_MANAGER_FEE_PERCENT : undefined,
+              managerFeeUsdt: useAmCapitalFlow ? managerFeeUsdt.toNumber() : undefined,
               phone: parsed.data.phone || undefined,
-              qidraDisclaimerAccepted: parsed.data.qidraDisclaimerAccepted === "on",
-              riskAccepted: parsed.data.riskAccepted === "on",
-              totalPaymentUsdt: totalPaymentUsdt.toString(),
-              transferExitAccepted: parsed.data.transferExitAccepted === "on",
-              transferAccepted: parsed.data.transferAccepted === "on",
+              qidraDisclaimerAccepted: useAmCapitalFlow ? true : parsed.data.qidraDisclaimerAccepted === "on",
+              riskAccepted: useAmCapitalFlow ? true : parsed.data.riskAccepted === "on",
+              totalPayableUsdt: useAmCapitalFlow ? totalPayableUsdt.toNumber() : undefined,
+              transferAccepted: useAmCapitalFlow ? true : parsed.data.transferAccepted === "on",
               whatsapp: parsed.data.whatsapp || undefined
             }
           : undefined
@@ -306,22 +392,12 @@ export async function POST(request: NextRequest) {
           walletId: wallet.id,
           type: TransactionType.INVESTMENT,
           status: PaymentStatus.CONFIRMED,
-          amountUsdt: requestedUsdt,
-          note: `${project.titleEn} · ${applicationId}`
+          amountUsdt: totalPayableUsdt,
+          note: useAmCapitalFlow
+            ? `${project.titleEn} · ${applicationId} · investment ${requestedUsdt.toString()} + fee ${managerFeeUsdt.toString()}`
+            : `${project.titleEn} · ${applicationId}`
         }
       });
-
-      if (managementFeeUsdt.gt(0)) {
-        await tx.walletTransaction.create({
-          data: {
-            walletId: wallet.id,
-            type: TransactionType.ADJUSTMENT,
-            status: PaymentStatus.CONFIRMED,
-            amountUsdt: managementFeeUsdt,
-            note: `${project.titleEn} · management fee ${managementFeePercent.toString()}% · ${applicationId}`
-          }
-        });
-      }
 
       const projectCapacityUpdate = await tx.project.updateMany({
         where: {
@@ -358,11 +434,11 @@ export async function POST(request: NextRequest) {
           entityId: applicationId,
           payload: {
             amountUsdt: requestedUsdt.toString(),
-            managementFeePercent: managementFeePercent.gt(0) ? managementFeePercent.toString() : null,
-            managementFeeUsdt: managementFeeUsdt.gt(0) ? managementFeeUsdt.toString() : null,
+            managerFeeUsdt: useAmCapitalFlow ? managerFeeUsdt.toString() : null,
             projectFundedUsdt: updatedProject?.fundedUsdt.toString() ?? null,
             projectId: project.id,
-            source: "verified_wallet_balance"
+            source: "verified_wallet_balance",
+            totalPayableUsdt: totalPayableUsdt.toString()
           }
         }
       });
@@ -380,22 +456,11 @@ export async function POST(request: NextRequest) {
         leadPhone: parsed.data.phone || undefined,
         leadWhatsapp: parsed.data.whatsapp || undefined,
         metadata: {
-          applicationDisplayStatus: "ACTIVE_PARTICIPANT",
-          confirmations: {
-            exitWindowAccepted: parsed.data.exitWindowAccepted === "on",
-            marketPriceAccepted: parsed.data.marketPriceAccepted === "on",
-            minHoldAccepted: parsed.data.minHoldAccepted === "on",
-            qidraDisclaimerAccepted: parsed.data.qidraDisclaimerAccepted === "on",
-            riskAccepted: parsed.data.riskAccepted === "on",
-            transferAccepted: parsed.data.transferAccepted === "on",
-            transferExitAccepted: parsed.data.transferExitAccepted === "on"
-          },
-          investmentAmountUsdt: requestedUsdt.toString(),
-          managementFeePercent: managementFeePercent.gt(0) ? managementFeePercent.toString() : null,
-          managementFeeUsdt: managementFeeUsdt.gt(0) ? managementFeeUsdt.toString() : null,
+          managerFeeUsdt: useAmCapitalFlow ? managerFeeUsdt.toString() : undefined,
           projectSlug: project.slug,
           realEstateLead: Boolean(realEstate),
-          totalPaymentUsdt: totalPaymentUsdt.toString()
+          totalPayableUsdt: useAmCapitalFlow ? totalPayableUsdt.toString() : undefined,
+          useAmCapitalFlow
         },
         note: parsed.data.comment || undefined,
         organizationId: project.organizationId,
@@ -436,8 +501,12 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({
     title: localeRu ? "Партнёрский контракт активирован" : "Partnership contract activated",
     message:
-      localeRu
-        ? `Участие в проекте «${project.titleRu}» на сумму ${formatUsdt(requestedUsdt)}${managementFeeUsdt.gt(0) ? ` и комиссия ${formatUsdt(managementFeeUsdt)}` : ""} активированы из проверенного баланса. Контракт отображается в разделе «Моё участие».`
-        : `Participation in “${project.titleEn}” for ${formatUsdt(requestedUsdt)}${managementFeeUsdt.gt(0) ? ` plus a ${formatUsdt(managementFeeUsdt)} fee` : ""} was activated from verified balance. The contract is shown in My participation.`
+      useAmCapitalFlow
+        ? localeRu
+          ? `Участие в проекте «${project.titleRu}» на сумму ${formatUsdt(requestedUsdt)} активировано. Комиссия управляющего ${formatUsdt(managerFeeUsdt)} списана сверху, всего оплачено ${formatUsdt(totalPayableUsdt)}.`
+          : `Participation in “${project.titleEn}” for ${formatUsdt(requestedUsdt)} was activated. The ${formatUsdt(managerFeeUsdt)} manager fee was charged on top, for a total of ${formatUsdt(totalPayableUsdt)}.`
+        : localeRu
+          ? `Участие в проекте «${project.titleRu}» на сумму ${formatUsdt(requestedUsdt)} активировано из проверенного баланса. Контракт отображается в разделе «Моё участие».`
+          : `Participation in “${project.titleEn}” for ${formatUsdt(requestedUsdt)} was activated from verified balance. The contract is shown in My participation.`
   });
 }

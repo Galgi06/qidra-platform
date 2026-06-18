@@ -7,6 +7,9 @@ import { getSiteContent } from "@/lib/site-content";
 export async function Footer({ locale }: { locale: Locale }) {
   const isRu = locale === "ru";
   const content = await getSiteContent();
+  const telegramHref = resolveSocialHref(content.footer.socialLinks.telegram, "https://t.me/qidra");
+  const instagramHref = resolveSocialHref(content.footer.socialLinks.instagram, "https://www.instagram.com/qidra.io?igsh=M3J1eTZsNmR2cmFr");
+  const whatsappHref = resolveSocialHref(content.footer.socialLinks.whatsapp, "#");
 
   return (
     <footer className="border-t border-qidra-grayMedium/20 bg-[#f4f4f5] text-qidra-dark">
@@ -14,9 +17,9 @@ export async function Footer({ locale }: { locale: Locale }) {
         <div className="grid content-start gap-10">
           <Image src="/assets/brand/qidra-logo-dark.png" alt="Qidra" width={190} height={76} className="h-14 w-auto object-contain" />
           <div className="flex gap-5">
-            <SocialLink kind="telegram" label="Telegram" href={content.footer.socialLinks.telegram} />
-            <SocialLink kind="instagram" label="Instagram" href={content.footer.socialLinks.instagram} />
-            <SocialLink kind="whatsapp" label="WhatsApp" href={content.footer.socialLinks.whatsapp} />
+            <SocialLink kind="telegram" label="Telegram" href={telegramHref} />
+            <SocialLink kind="instagram" label="Instagram" href={instagramHref} />
+            <SocialLink kind="whatsapp" label="WhatsApp" href={whatsappHref} />
           </div>
         </div>
         <div className="grid gap-10 sm:grid-cols-2">
@@ -101,4 +104,9 @@ function SocialIcon({ kind }: { kind: "telegram" | "instagram" | "whatsapp" }) {
 
 function localizedHref(href: string, locale: Locale) {
   return href.startsWith("http://") || href.startsWith("https://") || href.startsWith("mailto:") ? href : withLocale(href, locale);
+}
+
+function resolveSocialHref(value: string | undefined, fallback: string) {
+  if (!value || value === "#") return fallback;
+  return value;
 }

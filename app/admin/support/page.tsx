@@ -14,6 +14,7 @@ import { requireSupportDesk } from "@/lib/access";
 import { getLocale, t, type SearchParams, withLocale } from "@/lib/i18n";
 import { readKycDocuments } from "@/lib/kyc-documents";
 import { prisma } from "@/lib/prisma";
+import { readSupportAttachments } from "@/lib/support-attachments";
 
 export default async function AdminSupportPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const params = await searchParams;
@@ -312,6 +313,21 @@ export default async function AdminSupportPage({ searchParams }: { searchParams:
                               <span>{formatDateTime(message.createdAt, locale)}</span>
                             </div>
                             <p className="mt-2 whitespace-pre-wrap text-15 text-qidra-grayBlue">{message.body}</p>
+                            {readSupportAttachments(message.attachments).length ? (
+                              <div className="mt-3 grid gap-2">
+                                {readSupportAttachments(message.attachments).map((attachment, index) => (
+                                  <a
+                                    key={`${message.id}-${index}`}
+                                    className="inline-flex w-fit items-center gap-2 rounded-qidra bg-white px-3 py-2 text-13 font-medium text-qidra-dark transition-colors hover:text-qidra-accent"
+                                    href={`/api/support/guest/messages/${message.id}/attachments/${index}?lang=${locale}`}
+                                    rel="noreferrer"
+                                    target="_blank"
+                                  >
+                                    <span>{attachment.name}</span>
+                                  </a>
+                                ))}
+                              </div>
+                            ) : null}
                           </div>
                         ))}
                       </div>
@@ -459,6 +475,21 @@ export default async function AdminSupportPage({ searchParams }: { searchParams:
                               <span>{formatDateTime(message.createdAt, locale)}</span>
                             </div>
                             <p className="mt-2 whitespace-pre-wrap text-15 text-qidra-grayBlue">{message.body}</p>
+                            {readSupportAttachments(message.attachments).length ? (
+                              <div className="mt-3 grid gap-2">
+                                {readSupportAttachments(message.attachments).map((attachment, index) => (
+                                  <a
+                                    key={`${message.id}-${index}`}
+                                    className="inline-flex w-fit items-center gap-2 rounded-qidra bg-white px-3 py-2 text-13 font-medium text-qidra-dark transition-colors hover:text-qidra-accent"
+                                    href={`/api/support/messages/${message.id}/attachments/${index}?lang=${locale}`}
+                                    rel="noreferrer"
+                                    target="_blank"
+                                  >
+                                    <span>{attachment.name}</span>
+                                  </a>
+                                ))}
+                              </div>
+                            ) : null}
                           </div>
                         ))}
                       </div>

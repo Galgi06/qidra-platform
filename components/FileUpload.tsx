@@ -37,7 +37,9 @@ export function FileUpload({
   const isMultiple = Boolean(props.multiple);
   const activeSlot = fileSlots[fileSlots.length - 1] ?? { files: [], id: 0 };
   const selectedFiles = fileSlots.flatMap((slot) => slot.files);
-  const selectedText = selectedFiles.length === 1 ? selectedFiles[0]?.name ?? "" : selectedFiles.length > 1 ? `${selectedFiles.length} ${manyFilesLabel}` : singleFileName;
+  const selectedCount = selectedFiles.length;
+  const selectedText =
+    selectedCount === 1 ? selectedFiles[0]?.name ?? "" : selectedCount > 1 ? `${selectedCount} ${manyFilesLabel}` : singleFileName;
   const activeText = selectedText || existingFileName || "";
   const statusLabel = selectedText ? selectedLabel : existingLabel;
   const addMoreText = addMoreLabel ?? (selectedLabel === "Выбрано" ? "Добавить ещё документы" : "Add more documents");
@@ -86,23 +88,27 @@ export function FileUpload({
 
   return (
     <div
-      className="grid gap-3 rounded-qidra border border-dashed border-qidra-line bg-qidra-panel p-5 text-14 text-qidra-grayBlue shadow-[inset_0_1px_0_rgba(255,255,255,0.86)] transition-colors hover:border-qidra-accent"
+      className="flex h-full flex-col gap-3 rounded-qidra border border-dashed border-qidra-line bg-qidra-panel p-5 text-14 text-qidra-grayBlue shadow-[inset_0_1px_0_rgba(255,255,255,0.86)] transition-colors hover:border-qidra-accent"
       data-field-wrapper={props.name}
     >
-      <span className="flex items-center justify-between gap-3">
+      <span className="flex items-start justify-between gap-3">
         <span className="font-medium text-qidra-dark">{label}</span>
         {activeText ? <CheckIcon /> : null}
       </span>
-      <span>{hint}</span>
+      <span className="min-h-[2.5rem] text-balance">{hint}</span>
       {activeText ? (
-        <span className="grid gap-2 rounded-qidra bg-white px-3 py-2 text-13 font-medium text-qidra-green shadow-[0_0_0_1px_rgba(58,148,97,0.18)]">
-          <span>
-            {statusLabel}: <span className="text-qidra-dark">{activeText}</span>
+        <span className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden rounded-qidra bg-white px-3 py-2 text-13 font-medium shadow-[0_0_0_1px_rgba(58,148,97,0.18)]">
+          <span className="leading-6">
+            <span className="text-qidra-green">{statusLabel}:</span>{" "}
+            <span className="break-all text-qidra-dark">{activeText}</span>
           </span>
-          {isMultiple && selectedFiles.length ? (
-            <span className="grid gap-1 text-qidra-dark">
+          {isMultiple && selectedCount > 1 ? (
+            <span className="grid max-h-32 gap-1 overflow-y-auto pr-1 text-qidra-dark">
               {selectedFiles.map((file, index) => (
-                <span key={`${file.name}-${file.size}-${file.lastModified}-${index}`} className="truncate text-12 font-medium text-qidra-grayBlue">
+                <span
+                  key={`${file.name}-${file.size}-${file.lastModified}-${index}`}
+                  className="break-all text-12 font-medium leading-5 text-qidra-grayBlue"
+                >
                   {index + 1}. {file.name}
                 </span>
               ))}
@@ -111,7 +117,7 @@ export function FileUpload({
         </span>
       ) : null}
       <label
-        className="inline-flex w-fit cursor-pointer items-center gap-2 rounded-qidra bg-qidra-dark px-3 py-2 text-13 font-semibold text-white shadow-[0_10px_24px_rgba(18,20,23,0.16)] transition-colors hover:bg-qidra-accent"
+        className="mt-auto inline-flex min-h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-qidra bg-qidra-dark px-3 py-2 text-center text-13 font-semibold text-white shadow-[0_10px_24px_rgba(18,20,23,0.16)] transition-colors hover:bg-qidra-accent"
         htmlFor={isMultiple ? `${inputId}-${activeSlot.id}` : inputId}
       >
         {isMultiple ? (

@@ -1,5 +1,6 @@
 import { SupportQueue, SupportThreadStatus } from "@prisma/client";
 import { FeedbackForm } from "@/components/ActionFeedback";
+import { FileUpload } from "@/components/FileUpload";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { InvestorWorkspace } from "@/components/InvestorTabs";
@@ -11,6 +12,7 @@ import { SupportAutoRefresh } from "@/components/support/SupportAutoRefresh";
 import { requireAuth } from "@/lib/access";
 import { getLocale, type SearchParams } from "@/lib/i18n";
 import { prisma } from "@/lib/prisma";
+import { readSupportAttachments } from "@/lib/support-attachments";
 
 export default async function InvestorSupportPage({ searchParams }: { searchParams?: Promise<SearchParams> }) {
   const locale = await getLocale(searchParams);
@@ -91,6 +93,10 @@ export default async function InvestorSupportPage({ searchParams }: { searchPara
                       key={message.id}
                       align={message.senderId === userId ? "right" : "left"}
                       author={message.senderId === userId ? (isRu ? "Вы" : "You") : message.sender?.name || "Qidra"}
+                      attachments={readSupportAttachments(message.attachments).map((attachment, index) => ({
+                        href: `/api/support/messages/${message.id}/attachments/${index}?lang=${locale}`,
+                        name: attachment.name
+                      }))}
                       body={message.body}
                       date={formatDateTime(message.createdAt, locale)}
                     />
@@ -176,6 +182,7 @@ export default async function InvestorSupportPage({ searchParams }: { searchPara
                   dismissLabel: isRu ? "Закрыть уведомление" : "Close notification",
                   tone: "success"
                 }}
+                payload="form-data"
                 reloadOnSuccess
                 resetOnSubmit
                 popupPlacement="center"
@@ -202,6 +209,13 @@ export default async function InvestorSupportPage({ searchParams }: { searchPara
                     required
                   />
                 </label>
+                <FileUpload
+                  label={isRu ? "Скриншоты или документы" : "Screenshots or documents"}
+                  hint={isRu ? "До 5 файлов: PDF, DOC, DOCX, JPG, PNG, WEBP, TXT. До 12 МБ каждый." : "Up to 5 files: PDF, DOC, DOCX, JPG, PNG, WEBP, TXT. Up to 12 MB each."}
+                  name="attachments"
+                  multiple
+                  selectedLabel={isRu ? "Выбрано" : "Selected"}
+                />
                 <Button type="submit">{isRu ? "Отправить сообщение" : "Send message"}</Button>
               </FeedbackForm>
             </section>
@@ -236,7 +250,19 @@ export default async function InvestorSupportPage({ searchParams }: { searchPara
   );
 }
 
-function MessageBubble({ align, author, body, date }: { align: "left" | "right"; author: string; body: string; date: string }) {
+function MessageBubble({
+  align,
+  attachments,
+  author,
+  body,
+  date
+}: {
+  align: "left" | "right";
+  attachments: { href: string; name: string }[];
+  author: string;
+  body: string;
+  date: string;
+}) {
   const own = align === "right";
 
   return (
@@ -246,6 +272,21 @@ function MessageBubble({ align, author, body, date }: { align: "left" | "right";
         <span className={own ? "text-white/70" : "text-qidra-grayBlue"}>{date}</span>
       </div>
       <p className={`mt-2 whitespace-pre-wrap text-15 ${own ? "text-white" : "text-qidra-grayBlue"}`}>{body}</p>
+      {attachments.length ? (
+        <div className="mt-3 grid gap-2">
+          {attachments.map((attachment) => (
+            <a
+              key={attachment.href}
+              className={`inline-flex w-fit items-center gap-2 rounded-qidra px-3 py-2 text-13 font-medium transition-colors ${own ? "bg-white/12 text-white hover:bg-white/18" : "bg-white text-qidra-dark hover:text-qidra-accent"}`}
+              href={attachment.href}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <span>{attachment.name}</span>
+            </a>
+          ))}
+        </div>
+      ) : null}
     </article>
   );
 }

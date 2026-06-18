@@ -13,7 +13,7 @@ const contentSecurityPolicy = [
   "style-src 'self' 'unsafe-inline'",
   `script-src 'self' 'unsafe-inline'${isProduction ? "" : " 'unsafe-eval'"} https://telegram.org https://*.telegram.org`,
   "connect-src 'self' https://api.trongrid.io https://oauth.telegram.org",
-  "frame-src 'self' https://oauth.telegram.org https://telegram.org https://*.telegram.org",
+  "frame-src 'self' https://oauth.telegram.org https://telegram.org https://*.telegram.org https://www.google.com https://maps.google.com",
   ...(isProduction ? ["upgrade-insecure-requests"] : [])
 ].join("; ");
 
@@ -48,6 +48,9 @@ const nextConfig: NextConfig = {
   output: "standalone",
   allowedDevOrigins: ["127.0.0.1", "localhost"],
   devIndicators: false,
+  experimental: {
+    proxyClientMaxBodySize: "120mb"
+  },
   async redirects() {
     return [
       {

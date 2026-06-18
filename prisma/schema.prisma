@@ -587,6 +587,7 @@ model SupportMessage {
   threadId  String
   senderId  String?
   body      String        @db.Text
+  attachments Json?
   internal  Boolean       @default(false)
   createdAt DateTime      @default(now())
   thread    SupportThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
@@ -626,6 +627,7 @@ model GuestSupportMessage {
   senderKind  String
   senderName  String?
   body        String             @db.Text
+  attachments Json?
   createdAt   DateTime           @default(now())
   thread      GuestSupportThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
 

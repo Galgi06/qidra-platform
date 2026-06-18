@@ -59,12 +59,12 @@ export function isMeaningfulText(value: string, options: { allowDigits?: boolean
 
 export function isPlausibleCity(value: string) {
   const text = cleanText(value);
-  return /^[\p{L}\p{M} .'-]{2,120}$/u.test(text) && isMeaningfulText(text, { minLetters: 2 });
+  return /^[\p{L}\p{M}\p{N} .,'’/-]{2,120}$/u.test(text) && isMeaningfulText(text, { allowDigits: true, minLetters: 2 });
 }
 
 export function isPlausibleOccupation(value: string) {
   const text = cleanText(value);
-  return /^[\p{L}\p{M} .,'’/-]{3,160}$/u.test(text) && isMeaningfulText(text, { minLetters: 3 });
+  return /^[\p{L}\p{M}\p{N} .,'’/&()+-]{2,160}$/u.test(text) && isMeaningfulText(text, { allowDigits: true, minLetters: 2 });
 }
 
 export function isPlausibleAddress(value: string) {

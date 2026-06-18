@@ -4,7 +4,8 @@ import { DocumentItem } from "@/components/DocumentItem";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { getLocale, type SearchParams, withLocale } from "@/lib/i18n";
-import { getProjectBySlug } from "@/lib/project-catalog";
+import { getProjectBySlug, type CatalogProject } from "@/lib/project-catalog";
+import { realEstateAssetCategoryLabel, realEstateAssetDisplayName } from "@/lib/real-estate";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,7 @@ export default async function ProjectDocumentsPage({ params, searchParams }: { p
   const project = await getProjectBySlug(slug);
   if (!project) notFound();
   const isRu = locale === "ru";
+  const documents = buildPublicDocuments(project, locale);
 
   return (
     <>
@@ -45,8 +47,8 @@ export default async function ProjectDocumentsPage({ params, searchParams }: { p
         <section className="px-5 py-12 sm:px-8 lg:px-11 lg:py-16">
           <div className="mx-auto grid max-w-[1840px] gap-5">
             <div className="grid gap-3 lg:grid-cols-2">
-              {project.documents.length ? (
-                project.documents.map((document) => (
+              {documents.length ? (
+                documents.map((document) => (
                   <DocumentItem key={document.href} title={document.title[locale]} href={document.href} meta={document.kind} actionLabel={isRu ? "Открыть" : "Open"} />
                 ))
               ) : (
@@ -61,4 +63,34 @@ export default async function ProjectDocumentsPage({ params, searchParams }: { p
       <Footer locale={locale} />
     </>
   );
+}
+
+function buildPublicDocuments(project: CatalogProject, locale: "ru" | "en") {
+  const projectDocuments = project.documents.map((document) => ({
+    href: document.href,
+    kind: document.kind,
+    title: document.title
+  }));
+  const realEstateDocuments =
+    project.realEstate?.documents
+      ?.filter((document) => document.category !== "gallery" && document.category !== "render")
+      .map((document, index) => ({
+        href: document.href,
+        kind: realEstateAssetCategoryLabel(document.category, locale),
+        title: {
+          ru: realEstateAssetDisplayName(document, "ru", index),
+          en: realEstateAssetDisplayName(document, "en", index)
+        }
+      })) ?? [];
+
+  const deduped = new Map<string, { href: string; kind: string; title: { ru: string; en: string } }>();
+
+  for (const document of [...projectDocuments, ...realEstateDocuments]) {
+    const key = `${document.title.ru.toLowerCase()}::${document.kind.toLowerCase()}`;
+    if (!deduped.has(key)) {
+      deduped.set(key, document);
+    }
+  }
+
+  return Array.from(deduped.values());
 }

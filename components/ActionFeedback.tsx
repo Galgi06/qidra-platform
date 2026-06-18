@@ -144,6 +144,7 @@ type FeedbackFormProps = {
   children: ReactNode;
   className?: string;
   confirm?: ConfirmMessage;
+  draftKey?: string;
   endpoint?: string;
   feedback: FeedbackMessage;
   formId?: string;
@@ -158,6 +159,7 @@ export function FeedbackForm({
   children,
   className = "",
   confirm,
+  draftKey,
   endpoint,
   feedback,
   formId,
@@ -175,6 +177,64 @@ export function FeedbackForm({
   const [submitting, setSubmitting] = useState(false);
   const pendingFormRef = useState(() => ({ current: null as HTMLFormElement | null }))[0];
   const pendingSubmitterRef = useState(() => ({ current: null as { name: string; value: string } | null }))[0];
+  const formRef = useState(() => ({ current: null as HTMLFormElement | null }))[0];
+
+  useEffect(() => {
+    const form = formRef.current;
+
+    if (!form || !draftKey) return;
+
+    const snapshot = readDraftSnapshot(draftKey);
+
+    if (!snapshot) return;
+
+    applyDraftSnapshot(form, snapshot);
+    const rafId = window.requestAnimationFrame(() => applyDraftSnapshot(form, snapshot));
+    const timeoutId = window.setTimeout(() => applyDraftSnapshot(form, snapshot), 120);
+    return () => {
+      window.cancelAnimationFrame(rafId);
+      window.clearTimeout(timeoutId);
+    };
+  }, [draftKey]);
+
+  useEffect(() => {
+    const form = formRef.current;
+
+    if (!form || !draftKey) return;
+
+    const persistDraft = () => {
+      writeDraftSnapshot(draftKey, collectDraftSnapshot(form));
+    };
+
+    form.addEventListener("input", persistDraft);
+    form.addEventListener("change", persistDraft);
+    persistDraft();
+
+    return () => {
+      form.removeEventListener("input", persistDraft);
+      form.removeEventListener("change", persistDraft);
+    };
+  }, [draftKey]);
+
+  useEffect(() => {
+    const form = formRef.current;
+
+    if (!form) return;
+
+    const clearFieldState = (event: Event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement)) return;
+      clearSingleFieldError(target);
+    };
+
+    form.addEventListener("input", clearFieldState);
+    form.addEventListener("change", clearFieldState);
+
+    return () => {
+      form.removeEventListener("input", clearFieldState);
+      form.removeEventListener("change", clearFieldState);
+    };
+  }, []);
 
   useEffect(() => {
     const storedFeedback = readStoredFeedback(storedFeedbackFallback);
@@ -240,6 +300,10 @@ export function FeedbackForm({
           applyFieldErrors(form, data.fieldErrors);
           setOpen(true);
           return;
+        }
+
+        if (draftKey) {
+          clearDraftSnapshot(draftKey);
         }
 
         if (data.redirectTo) {
@@ -332,7 +396,15 @@ export function FeedbackForm({
 
   return (
     <>
-      <form aria-busy={submitting} className={className} id={formId} onSubmit={handleSubmit}>
+      <form
+        aria-busy={submitting}
+        className={className}
+        id={formId}
+        onSubmit={handleSubmit}
+        ref={(node) => {
+          formRef.current = node;
+        }}
+      >
         {children}
       </form>
       {confirmOpen && confirm ? <ConfirmationPopup confirmation={confirm} onCancel={() => setConfirmOpen(false)} onConfirm={handleConfirm} /> : null}
@@ -379,6 +451,14 @@ function clearFieldErrors(form: HTMLFormElement) {
     element.removeAttribute("aria-describedby");
   });
   form.querySelectorAll("[data-field-error-message]").forEach((element) => element.remove());
+}
+
+function clearSingleFieldError(field: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement) {
+  field.setAttribute("aria-invalid", "false");
+  field.removeAttribute("aria-describedby");
+  const wrapper = field.closest<HTMLElement>("[data-field-wrapper]") ?? field.closest<HTMLElement>("label") ?? field.parentElement;
+  wrapper?.setAttribute("aria-invalid", "false");
+  wrapper?.querySelectorAll(`[data-field-error-message='${field.name}']`).forEach((element) => element.remove());
 }
 
 function markInvalidField(field: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement, message: string | undefined) {
@@ -444,6 +524,106 @@ function storeFeedback(feedback: FeedbackMessage) {
   } catch {
     return false;
   }
+}
+
+type DraftFieldValue =
+  | { type: "checkbox"; checked: boolean }
+  | { type: "radio"; checked: boolean }
+  | { type: "value"; value: string };
+
+type DraftSnapshot = Record<string, DraftFieldValue>;
+
+function readDraftSnapshot(key: string) {
+  try {
+    const raw = window.localStorage?.getItem(key);
+    if (!raw) return null;
+    return JSON.parse(raw) as DraftSnapshot;
+  } catch {
+    return null;
+  }
+}
+
+function writeDraftSnapshot(key: string, snapshot: DraftSnapshot) {
+  try {
+    window.localStorage?.setItem(key, JSON.stringify(snapshot));
+  } catch {
+    return false;
+  }
+
+  return true;
+}
+
+function clearDraftSnapshot(key: string) {
+  try {
+    window.localStorage?.removeItem(key);
+  } catch {
+    return false;
+  }
+
+  return true;
+}
+
+function collectDraftSnapshot(form: HTMLFormElement) {
+  const snapshot: DraftSnapshot = {};
+
+  for (const element of Array.from(form.elements)) {
+    if (!(element instanceof HTMLInputElement || element instanceof HTMLSelectElement || element instanceof HTMLTextAreaElement)) continue;
+    if (!element.name) continue;
+    if (element instanceof HTMLInputElement && ["file", "password", "submit", "button", "reset"].includes(element.type)) continue;
+
+    const key = draftFieldKey(element);
+
+    if (element instanceof HTMLInputElement && element.type === "checkbox") {
+      snapshot[key] = { type: "checkbox", checked: element.checked };
+      continue;
+    }
+
+    if (element instanceof HTMLInputElement && element.type === "radio") {
+      snapshot[key] = { type: "radio", checked: element.checked };
+      continue;
+    }
+
+    snapshot[key] = { type: "value", value: element.value };
+  }
+
+  return snapshot;
+}
+
+function applyDraftSnapshot(form: HTMLFormElement, snapshot: DraftSnapshot) {
+  for (const element of Array.from(form.elements)) {
+    if (!(element instanceof HTMLInputElement || element instanceof HTMLSelectElement || element instanceof HTMLTextAreaElement)) continue;
+    if (!element.name) continue;
+    if (element instanceof HTMLInputElement && ["file", "password", "submit", "button", "reset"].includes(element.type)) continue;
+
+    const saved = snapshot[draftFieldKey(element)];
+    if (!saved) continue;
+
+    if (saved.type === "checkbox" && element instanceof HTMLInputElement && element.type === "checkbox") {
+      element.checked = saved.checked;
+      element.dispatchEvent(new Event("change", { bubbles: true }));
+      continue;
+    }
+
+    if (saved.type === "radio" && element instanceof HTMLInputElement && element.type === "radio") {
+      element.checked = saved.checked;
+      element.dispatchEvent(new Event("change", { bubbles: true }));
+      continue;
+    }
+
+    if (saved.type === "value") {
+      element.value = saved.value;
+      element.dispatchEvent(new Event("input", { bubbles: true }));
+      element.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+  }
+}
+
+function draftFieldKey(element: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement) {
+  if (element instanceof HTMLInputElement && (element.type === "checkbox" || element.type === "radio")) {
+    return `${element.name}::${element.value}`;
+  }
+
+  return element.name;
 }
 
 type FeedbackButtonProps = ComponentProps<typeof Button> & {
