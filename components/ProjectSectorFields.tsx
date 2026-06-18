@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ChangeEvent } from "react";
+import { useState, type ChangeEvent } from "react";
 import { FileUpload } from "@/components/FileUpload";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
@@ -56,10 +56,6 @@ export function ProjectSectorFields({
 }) {
   const isRu = locale === "ru";
   const [sector, setSector] = useState(initialValues?.sector ?? "");
-
-  useEffect(() => {
-    setSector(initialValues?.sector ?? "");
-  }, [initialValues?.sector]);
 
   function handleSectorChange(event: ChangeEvent<HTMLSelectElement>) {
     setSector(event.currentTarget.value);
