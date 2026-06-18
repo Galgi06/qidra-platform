@@ -66,11 +66,11 @@ export function ProjectCard({ project, locale }: { project: CatalogProject; loca
           <div className="mt-4 min-h-0 min-w-0">
             {realEstate?.objectName ? <p className="truncate text-14 font-medium text-qidra-accent">{realEstate.objectName}</p> : null}
             <a className="mt-2 block" href={detailHref}>
-              <h3 className="line-clamp-2 max-w-full overflow-hidden text-[24px] font-medium leading-[1.18] tracking-[0] text-qidra-dark sm:text-[28px]">
+              <h3 className="line-clamp-2 max-h-[4.2rem] max-w-full overflow-hidden text-[24px] font-medium leading-[1.18] tracking-[0] text-qidra-dark sm:text-[28px]">
                 {project.title[locale]}
               </h3>
             </a>
-            <p className="mt-3 line-clamp-3 max-w-full overflow-hidden text-[16px] leading-6 text-qidra-grayBlue">{summary}</p>
+            <p className="mt-3 line-clamp-3 max-h-[4.5rem] max-w-full overflow-hidden text-[16px] leading-6 text-qidra-grayBlue">{summary}</p>
           </div>
 
           <dl className="mt-5 grid grid-cols-2 gap-3 text-13 xl:grid-cols-3">
