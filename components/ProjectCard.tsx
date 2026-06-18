@@ -46,30 +46,31 @@ function RealEstateProjectCard({ project, locale }: { project: CatalogProject; l
     realEstate.managerFeePercent !== undefined ? { label: isRu ? "Единоразовая комиссия управляющего" : "One-time management fee", value: `${realEstate.managerFeePercent}%` } : null,
     realEstate.incomeSources?.length ? { label: isRu ? "Источник дохода" : "Income source", value: incomeSource } : null
   ].filter(Boolean) as { label: string; value: string }[];
+  const previewItems = overviewItems.slice(0, 8);
 
   return (
-    <article className="overflow-hidden rounded-[28px] border border-qidra-grayMedium/15 bg-white shadow-[0_30px_80px_rgba(18,20,23,0.08)]">
-      <div className="grid xl:grid-cols-[minmax(0,1.12fr)_minmax(0,0.88fr)]">
-        <div className="relative min-h-[300px] overflow-hidden bg-qidra-dark sm:min-h-[360px]">
+    <article className="overflow-hidden rounded-[28px] border border-qidra-grayMedium/15 bg-white shadow-[0_30px_80px_rgba(18,20,23,0.08)] lg:h-[430px]">
+      <div className="grid lg:h-full lg:grid-cols-[minmax(280px,34%)_minmax(0,1fr)]">
+        <div className="relative aspect-[16/10] overflow-hidden bg-qidra-dark lg:h-full lg:aspect-auto">
           <Image
             alt={realEstate.objectName || project.title[locale]}
             src={realEstate.coverImage || project.coverImage || "/assets/hero/qidra-hero-blue.png"}
             fill
-            sizes="(min-width: 1280px) 45vw, 100vw"
+            sizes="(min-width: 1024px) 35vw, 100vw"
             className="object-cover"
           />
           <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(11,30,41,0.05)_0%,rgba(11,30,41,0.82)_100%)]" />
-          <div className="relative z-10 flex h-full flex-col justify-between p-6 sm:p-8">
+          <div className="relative z-10 flex h-full flex-col justify-between p-5 sm:p-6">
             <div className="flex items-start justify-between gap-4">
               <ProjectStatusBadge status={project.status} locale={locale} />
               <span className="rounded-full bg-white/12 px-4 py-2 text-13 font-semibold text-white backdrop-blur">{project.structure}</span>
             </div>
-            <div className="max-w-2xl">
+            <div className="max-w-xl">
               <p className="text-14 font-medium uppercase tracking-[0.18em] text-white/72">{isRu ? "Недвижимость" : "Real estate"}</p>
-              <h3 className="mt-3 text-[32px] font-medium leading-[1.05] text-white sm:text-[42px]">{realEstate.objectName || project.title[locale]}</h3>
-              {realEstate.titleComplex ? <p className="mt-3 text-17 text-white/82">{realEstate.titleComplex}</p> : null}
+              <h3 className="mt-3 text-[28px] font-medium leading-[1.05] text-white sm:text-[34px]">{realEstate.objectName || project.title[locale]}</h3>
+              {realEstate.titleComplex ? <p className="mt-2 text-16 text-white/82">{realEstate.titleComplex}</p> : null}
               {[realEstate.city, realEstate.district, realEstate.propertyType ? propertyTypeLabel(realEstate.propertyType, locale) : null].filter(Boolean).length ? (
-                <p className="mt-4 text-15 text-white/78">
+                <p className="mt-3 text-14 text-white/78">
                   {[realEstate.city, realEstate.district, realEstate.propertyType ? propertyTypeLabel(realEstate.propertyType, locale) : null].filter(Boolean).join(" · ")}
                 </p>
               ) : null}
@@ -77,38 +78,47 @@ function RealEstateProjectCard({ project, locale }: { project: CatalogProject; l
           </div>
         </div>
 
-        <div className="grid gap-6 p-6 sm:p-8">
+        <div className="flex min-w-0 flex-col gap-4 p-5 sm:p-6 lg:h-full lg:p-7">
           <div className="grid gap-3">
-            <p className="text-14 font-medium uppercase tracking-[0.18em] text-qidra-accent">{project.title[locale]}</p>
-            <p className="text-18 leading-8 text-qidra-grayBlue">{realEstate.descriptionShort || project.summary[locale]}</p>
+            <p className="text-14 font-medium uppercase tracking-[0.16em] text-qidra-accent">{project.title[locale]}</p>
+            <p
+              className="overflow-hidden text-17 leading-7 text-qidra-grayBlue"
+              style={{
+                WebkitBoxOrient: "vertical",
+                WebkitLineClamp: 4,
+                display: "-webkit-box"
+              }}
+            >
+              {realEstate.descriptionShort || project.summary[locale]}
+            </p>
           </div>
 
-          <dl className="grid gap-3 sm:grid-cols-2">
-            {overviewItems.map((item) => (
+          <dl className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {previewItems.map((item) => (
               <MetricTile key={item.label} label={item.label} value={item.value} />
             ))}
           </dl>
 
-          <div className="grid gap-3 rounded-[22px] bg-qidra-grayLight p-5">
+          <div className="grid gap-3 rounded-[22px] bg-qidra-grayLight p-4">
             <div className="flex items-center justify-between gap-3">
               <p className="text-15 font-medium text-qidra-dark">{isRu ? "Прогресс сбора" : "Raise progress"}</p>
               <p className="text-14 text-qidra-grayBlue">{fundingPercent}%</p>
             </div>
             <ProgressBar value={fundingPercent} />
-            <div className="grid gap-2 text-14 text-qidra-grayBlue sm:grid-cols-3">
+            <div className="grid gap-2 text-14 text-qidra-grayBlue lg:grid-cols-3">
               <span>{isRu ? "Собрано" : "Raised"}: <strong className="font-medium text-qidra-dark">{(realEstate.gatheredAmount || project.fundedUsdt).toLocaleString()} {participationCurrency}</strong></span>
               <span>{isRu ? "Целевой объём" : "Target"}: <strong className="font-medium text-qidra-dark">{(realEstate.targetRaise || project.targetUsdt).toLocaleString()} {participationCurrency}</strong></span>
               <span>{isRu ? "Осталось" : "Remaining"}: <strong className="font-medium text-qidra-dark">{remaining.toLocaleString()} {participationCurrency}</strong></span>
             </div>
           </div>
 
-          <div className="rounded-[20px] border border-amber-200 bg-amber-50 px-4 py-4 text-14 leading-6 text-amber-950">
+          <div className="rounded-[20px] border border-amber-200 bg-amber-50 px-4 py-3 text-13 leading-5 text-amber-950">
             {isRu
               ? "Выход из проекта не является мгновенным. Средства связаны с объектом недвижимости и возвращаются только согласно условиям проекта и договора."
               : "Project exit is not immediate. Funds remain tied to the real estate asset and return only under the project terms and contract."}
           </div>
 
-          <div className="flex flex-wrap gap-3">
+          <div className="mt-auto flex flex-wrap gap-3">
             <ButtonLink href={withLocale(`/projects/${project.slug}`, locale)} variant="dark" className="min-w-44 flex-1">
               {isRu ? "Подробнее" : "Details"}
             </ButtonLink>
@@ -256,9 +266,9 @@ function projectAvailability(project: CatalogProject, locale: Locale) {
 
 function MetricTile({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[18px] bg-qidra-grayLight p-4">
+    <div className="rounded-[18px] bg-qidra-grayLight p-3">
       <dt className="text-13 text-qidra-grayBlue">{label}</dt>
-      <dd className="mt-2 text-16 font-medium leading-snug text-qidra-dark">{value}</dd>
+      <dd className="mt-2 text-15 font-medium leading-snug text-qidra-dark">{value}</dd>
     </div>
   );
 }
