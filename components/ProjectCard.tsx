@@ -44,7 +44,7 @@ export function ProjectCard({ project, locale }: { project: CatalogProject; loca
 
   return (
     <article className="premium-card overflow-hidden transition-transform duration-150 hover:-translate-y-0.5">
-      <div className="flex h-full flex-col lg:grid lg:h-[360px] lg:grid-cols-[38%_62%]">
+      <div className="flex h-full flex-col lg:grid lg:h-[360px] lg:grid-cols-[minmax(280px,38%)_minmax(0,1fr)]">
         <a className="relative block h-[240px] overflow-hidden lg:h-full" href={detailHref}>
           <Image
             alt={project.title[locale]}
@@ -55,7 +55,7 @@ export function ProjectCard({ project, locale }: { project: CatalogProject; loca
           />
           <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(17,24,39,0.12)_0%,rgba(17,24,39,0.56)_100%)]" />
         </a>
-        <div className="flex min-h-0 flex-1 flex-col p-5 sm:p-6">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col p-5 sm:p-6">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <ProjectStatusBadge status={project.status} locale={locale} />
             <span className="max-w-full truncate rounded-full bg-qidra-accent8 px-3 py-1.5 text-13 font-semibold text-qidra-accent shadow-[inset_0_0_0_1px_rgba(79,70,229,0.14)]">
@@ -63,19 +63,19 @@ export function ProjectCard({ project, locale }: { project: CatalogProject; loca
             </span>
           </div>
 
-          <div className="mt-4 min-h-0">
+          <div className="mt-4 min-h-0 min-w-0">
             {realEstate?.objectName ? <p className="truncate text-14 font-medium text-qidra-accent">{realEstate.objectName}</p> : null}
             <a className="mt-2 block" href={detailHref}>
-              <h3 className="line-clamp-2 text-[24px] font-medium leading-[1.18] tracking-[0] text-qidra-dark sm:text-[28px]">
+              <h3 className="line-clamp-2 max-w-full overflow-hidden text-[24px] font-medium leading-[1.18] tracking-[0] text-qidra-dark sm:text-[28px]">
                 {project.title[locale]}
               </h3>
             </a>
-            <p className="mt-3 line-clamp-3 text-[16px] leading-6 text-qidra-grayBlue">{summary}</p>
+            <p className="mt-3 line-clamp-3 max-w-full overflow-hidden text-[16px] leading-6 text-qidra-grayBlue">{summary}</p>
           </div>
 
           <dl className="mt-5 grid grid-cols-2 gap-3 text-13 xl:grid-cols-3">
             {visibleFacts.map((fact) => (
-              <div key={`${fact.label}-${fact.value}`} className="min-w-0 rounded-qidra bg-qidra-grayLight px-3 py-2.5">
+              <div key={`${fact.label}-${fact.value}`} className="min-w-0 overflow-hidden rounded-qidra bg-qidra-grayLight px-3 py-2.5">
                 <dt className="truncate text-qidra-grayBlue">{fact.label}</dt>
                 <dd className="mt-1 truncate font-medium text-qidra-dark" title={fact.value}>
                   {fact.value}
