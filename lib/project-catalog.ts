@@ -3,7 +3,7 @@ import type { BadgeStatus } from "@/components/ui/ProjectStatusBadge";
 import { projects as baseProjects, type Project as ContentProject } from "@/lib/content";
 import type { Locale } from "@/lib/i18n";
 import { prisma } from "@/lib/prisma";
-import { parseRealEstateData, type RealEstateProjectData } from "@/lib/real-estate";
+import { parseRealEstateData, realEstateAssetDisplayName, type RealEstateProjectData } from "@/lib/real-estate";
 
 export type CatalogProject = {
   coverImage: string | null;
@@ -152,8 +152,10 @@ export function mapProject(project: ProjectWithPublicRelations): CatalogProject 
       }
     : null;
 
+  const realEstate = mapPublicRealEstateData(project.id, parseRealEstateData(project.propertyData));
+
   return {
-    coverImage: project.coverImage ?? null,
+    coverImage: realEstate?.coverImage ?? project.coverImage ?? null,
     id: project.id,
     slug: project.slug,
     title: { ru: project.titleRu, en: project.titleEn },
@@ -204,7 +206,7 @@ export function mapProject(project: ProjectWithPublicRelations): CatalogProject 
     structure: project.structure,
     riskLevel: project.riskLevel ?? "Moderate",
     initiator,
-    realEstate: parseRealEstateData(project.propertyData),
+    realEstate,
     sector: inferProjectSectorValue(project.propertyData, project.titleRu, project.titleEn, project.summaryRu, project.summaryEn, project.descriptionRu, project.descriptionEn),
     documents:
       project.documents?.map((document) => ({
@@ -212,6 +214,29 @@ export function mapProject(project: ProjectWithPublicRelations): CatalogProject 
         href: document.fileUrl,
         kind: document.kind.toLowerCase()
       })) ?? []
+  };
+}
+
+function mapPublicRealEstateData(projectId: string, realEstate: RealEstateProjectData | null) {
+  if (!realEstate) return null;
+
+  const documents = realEstate.documents?.map((asset, index) => ({
+    ...asset,
+    href: `/api/projects/${projectId}/assets/${index}`,
+    name: realEstateAssetDisplayName(asset, "en", index)
+  }));
+  const coverAsset =
+    documents?.find((asset) => asset.href === realEstate.coverImage) ??
+    documents?.find((asset) => asset.category === "gallery") ??
+    documents?.find((asset) => asset.category === "render");
+  const galleryAssets = documents?.filter((asset) => asset.category === "gallery" || asset.category === "render") ?? [];
+
+  return {
+    ...realEstate,
+    coverImage: coverAsset?.href ?? realEstate.coverImage,
+    documents,
+    gallery: galleryAssets.map((asset) => asset.href),
+    visuals: documents?.filter((asset) => asset.category === "render").map((asset) => asset.href) ?? realEstate.visuals
   };
 }
 
