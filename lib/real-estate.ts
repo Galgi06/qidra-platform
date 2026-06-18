@@ -29,6 +29,7 @@ export type RealEstateProjectData = {
   developer?: string;
   district?: string;
   documents?: RealEstateDocumentAsset[];
+  estimatedAssetValue?: number;
   fundingPercent?: number;
   fundraisingCurrency?: string;
   gallery?: string[];
@@ -53,28 +54,37 @@ export type RealEstateProjectData = {
   targetRaise?: number;
   titleComplex?: string;
   totalAssetValue?: number;
+  vehicleName?: string;
   visuals?: string[];
 };
 
 export type RealEstateLeadData = {
+  amCapitalAgreementAccepted?: boolean;
   comment?: string;
+  confirmationIp?: string;
+  confirmedAt?: string;
   contactCountry?: string;
-  firstName?: string;
   exitWindowAccepted?: boolean;
+  firstName?: string;
   investmentAmountUsdt?: number;
+  managerFeePercent?: number;
+  managerFeeUsdt?: number;
   lastName?: string;
-  managementFeePercent?: number;
-  managementFeeUsdt?: number;
   marketPriceAccepted?: boolean;
   minHoldAccepted?: boolean;
   phone?: string;
   qidraDisclaimerAccepted?: boolean;
   riskAccepted?: boolean;
-  totalPaymentUsdt?: number;
-  transferExitAccepted?: boolean;
+  totalPayableUsdt?: number;
   transferAccepted?: boolean;
+  transferExitAccepted?: boolean;
   whatsapp?: string;
 };
+
+export const AM_CAPITAL_MANAGER_FEE_PERCENT = 5;
+
+const amCapitalCompanyMarkers = ["am capital llc-fz", "am capital property fund"];
+const amCapitalManagerMarkers = ["adam miziev"];
 
 function asString(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
@@ -132,6 +142,7 @@ export function parseRealEstateData(value: unknown): RealEstateProjectData | nul
     developer: asString(source.developer),
     district: asString(source.district),
     documents,
+    estimatedAssetValue: asNumber(source.estimatedAssetValue),
     fundingPercent: asNumber(source.fundingPercent),
     fundraisingCurrency: asString(source.fundraisingCurrency),
     gallery: asStringArray(source.gallery),
@@ -155,6 +166,7 @@ export function parseRealEstateData(value: unknown): RealEstateProjectData | nul
     targetRaise: asNumber(source.targetRaise),
     titleComplex: asString(source.titleComplex),
     totalAssetValue: asNumber(source.totalAssetValue),
+    vehicleName: asString(source.vehicleName),
     visuals: asStringArray(source.visuals)
   };
 }
@@ -163,24 +175,57 @@ export function parseRealEstateLeadData(value: unknown): RealEstateLeadData | nu
   if (!value || typeof value !== "object") return null;
   const source = value as Record<string, unknown>;
   return {
+    amCapitalAgreementAccepted: source.amCapitalAgreementAccepted === true,
     comment: asString(source.comment),
+    confirmationIp: asString(source.confirmationIp),
+    confirmedAt: asString(source.confirmedAt),
     contactCountry: asString(source.contactCountry),
     exitWindowAccepted: source.exitWindowAccepted === true,
     firstName: asString(source.firstName),
     investmentAmountUsdt: asNumber(source.investmentAmountUsdt),
     lastName: asString(source.lastName),
-    managementFeePercent: asNumber(source.managementFeePercent),
-    managementFeeUsdt: asNumber(source.managementFeeUsdt),
+    managerFeePercent: asNumber(source.managerFeePercent),
+    managerFeeUsdt: asNumber(source.managerFeeUsdt),
     marketPriceAccepted: source.marketPriceAccepted === true,
     minHoldAccepted: source.minHoldAccepted === true,
     phone: asString(source.phone),
     qidraDisclaimerAccepted: source.qidraDisclaimerAccepted === true,
     riskAccepted: source.riskAccepted === true,
-    totalPaymentUsdt: asNumber(source.totalPaymentUsdt),
-    transferExitAccepted: source.transferExitAccepted === true,
+    totalPayableUsdt: asNumber(source.totalPayableUsdt),
     transferAccepted: source.transferAccepted === true,
+    transferExitAccepted: source.transferExitAccepted === true,
     whatsapp: asString(source.whatsapp)
   };
+}
+
+function normalizeEntity(value: string | null | undefined) {
+  return (value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function includesAnyMarker(value: string, markers: string[]) {
+  return markers.some((marker) => value.includes(marker));
+}
+
+export function isAmCapitalPropertyFundProject(input: {
+  initiatorName?: string | null;
+  managerName?: string | null;
+  organizationDisplayName?: string | null;
+  organizationLegalName?: string | null;
+  partnerName?: string | null;
+  sector?: string | null;
+}) {
+  if (input.sector !== "real-estate") {
+    return false;
+  }
+
+  const companyText = normalizeEntity([input.organizationDisplayName, input.organizationLegalName, input.partnerName].filter(Boolean).join(" "));
+  const managerText = normalizeEntity([input.managerName, input.initiatorName].filter(Boolean).join(" "));
+
+  return includesAnyMarker(companyText, amCapitalCompanyMarkers) || includesAnyMarker(managerText, amCapitalManagerMarkers);
 }
 
 export function propertyTypeLabel(value: PropertyTypeValue | undefined, locale: Locale) {
@@ -213,4 +258,40 @@ export function incomeSourceLabel(value: IncomeSourceValue, locale: Locale) {
     hybrid: { ru: "Комбинированная модель", en: "Combined model" }
   };
   return map[value][locale];
+}
+
+export function realEstateAssetCategoryLabel(category: RealEstateDocumentAsset["category"], locale: Locale) {
+  const map: Record<RealEstateDocumentAsset["category"], Record<Locale, string>> = {
+    brochure: { ru: "Брошюра", en: "Brochure" },
+    document: { ru: "Документ", en: "Document" },
+    "floor-plan": { ru: "Планировка", en: "Floor plan" },
+    gallery: { ru: "Галерея", en: "Gallery" },
+    render: { ru: "Визуализация", en: "Rendering" }
+  };
+
+  return map[category][locale];
+}
+
+export function realEstateAssetDisplayName(asset: RealEstateDocumentAsset, locale: Locale, index = 0) {
+  const normalized = asset.name.trim();
+
+  if (looksLikeStorageHashName(normalized)) {
+    const extension = fileExtension(normalized);
+    const baseLabel = realEstateAssetCategoryLabel(asset.category, locale);
+    const numbered = `${baseLabel} ${index + 1}`;
+    return extension ? `${numbered}.${extension}` : numbered;
+  }
+
+  return normalized;
+}
+
+function looksLikeStorageHashName(value: string) {
+  const fileName = value.split("/").pop() ?? value;
+  const base = fileName.replace(/\.[a-z0-9]+$/i, "");
+  return /^[a-f0-9]{24,}$/i.test(base);
+}
+
+function fileExtension(value: string) {
+  const match = value.match(/\.([a-z0-9]+)$/i);
+  return match?.[1]?.toLowerCase() ?? "";
 }

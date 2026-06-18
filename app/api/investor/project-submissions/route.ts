@@ -10,7 +10,7 @@ import { isDetailedText, isMeaningfulText, zodFieldErrors } from "@/lib/form-val
 import { getPrimaryOrganizationForUser } from "@/lib/organizations";
 import { prisma } from "@/lib/prisma";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
-import { incomeSourceOptions, propertyStatusOptions, propertyTypeOptions, type RealEstateDocumentAsset } from "@/lib/real-estate";
+import { incomeSourceOptions, parseRealEstateData, propertyStatusOptions, propertyTypeOptions, type RealEstateDocumentAsset } from "@/lib/real-estate";
 
 export const runtime = "nodejs";
 
@@ -21,7 +21,8 @@ const optionalText = z.preprocess((value) => {
 }, z.string().max(180).optional());
 
 const meaningfulText = (min = 2, max = 5000, minLetters = min) => z.string().trim().min(min).max(max).refine((value) => isMeaningfulText(value, { allowDigits: true, minLetters }));
-const detailedText = (min = 20, max = 5000, minLetters = 12, minWords = 6) => z.string().trim().min(min).max(max).refine((value) => isDetailedText(value, { minLetters, minWords }));
+const detailedText = (min = 20, max = 100000, minLetters = 12, minWords = 6) => z.string().trim().min(min).max(max).refine((value) => isDetailedText(value, { minLetters, minWords }));
+const plainText = (min = 2, max = 5000) => z.string().trim().min(min).max(max);
 
 const dateSchema = z.preprocess((value) => {
   if (typeof value !== "string" || !value.trim()) return value;
@@ -33,25 +34,25 @@ const projectSubmissionSchema = z.object({
   title: meaningfulText(5, 180, 4),
   sector: z.enum(["real-estate", "trade", "production", "technology", "logistics", "other"]),
   sectorOther: optionalText.refine((value) => !value || isMeaningfulText(value, { minLetters: 3 })),
-  location: optionalText.refine((value) => !value || isMeaningfulText(value, { allowDigits: true, minLetters: 3, minWords: 2 })),
+  location: z.string().trim().max(180).optional(),
   targetUsdt: z.preprocess((value) => {
     if (typeof value !== "string" || !value.trim()) return undefined;
     const normalized = Number(value.replace(",", "."));
     return Number.isFinite(normalized) ? normalized : value;
   }, z.number().positive().max(100000000).optional()),
   structure: optionalText,
-  expectedReturn: meaningfulText(8, 180, 6),
-  expectedYield: meaningfulText(5, 180, 3),
-  stage: meaningfulText(5, 180, 4),
+  expectedReturn: plainText(8, 180),
+  expectedYield: plainText(5, 180),
+  stage: plainText(5, 180),
   currentProgress: detailedText(30, 2500, 18, 8),
   fundraisingStartAt: dateSchema,
   fundraisingEndAt: dateSchema,
   plannedLaunchAt: dateSchema,
   plannedDividendAt: dateSchema,
   payoutFrequency: z.nativeEnum(PayoutFrequency).default(PayoutFrequency.CUSTOM),
-  participationTerm: meaningfulText(5, 180, 3),
-  raisePlan: z.string().trim().max(2500).optional().refine((value) => !value || isDetailedText(value, { minLetters: 12, minWords: 5 })),
-  summary: detailedText(120, 5000, 70, 25),
+  participationTerm: plainText(3, 180),
+  raisePlan: z.string().trim().max(2500).optional(),
+  summary: detailedText(120, 100000, 70, 25),
   propertyObjectName: optionalText,
   propertyComplexName: optionalText,
   propertyDeveloper: optionalText,
@@ -62,19 +63,16 @@ const projectSubmissionSchema = z.object({
   propertyType: z.enum(propertyTypeOptions).optional(),
   propertyStatus: z.enum(propertyStatusOptions).optional(),
   propertyShortDescription: z.string().trim().max(300).optional(),
-  propertyFullDescription: z.string().trim().max(6000).optional(),
+  propertyFullDescription: z.string().trim().max(100000).optional(),
   propertyVehicleName: optionalText,
   propertyManagerName: optionalText,
+  propertyEstimatedAssetValue: moneyField(),
   propertyTotalAssetValue: moneyField(),
-  propertyStatsMode: z.enum(["auto", "manual"]).default("auto"),
-  propertyAppraisedValue: moneyField(),
   propertyCurrency: optionalText,
   propertyMinimumParticipation: moneyField(),
   propertyTargetRaise: moneyField(),
   propertyGatheredAmount: moneyField(),
   propertyRemainingAmount: moneyField(),
-  propertyFundingPercent: percentField(),
-  propertyInvestorCount: integerField(),
   propertyTermMonths: integerField(),
   propertyPlannedStartDate: optionalDateSchema(),
   propertyCompletionDate: optionalDateSchema(),
@@ -106,6 +104,7 @@ const projectSubmissionSchema = z.object({
       "propertyStatus",
       "propertyShortDescription",
       "propertyFullDescription",
+      "propertyEstimatedAssetValue",
       "propertyTotalAssetValue",
       "propertyCurrency",
       "propertyMinimumParticipation",
@@ -135,6 +134,13 @@ type SessionUser = {
   user?: {
     id?: string;
   };
+};
+
+type StoredSubmissionDocument = {
+  name: string;
+  size: number;
+  storagePath: string;
+  type: string;
 };
 
 const maxProjectFileSize = 20 * 1024 * 1024;
@@ -174,7 +180,6 @@ function projectFieldLabels(localeRu: boolean) {
     plannedLaunchAt: localeRu ? "Укажите дату планируемого запуска." : "Enter planned launch date.",
     raisePlan: localeRu ? "Опишите этапы сбора понятным текстом или оставьте поле пустым." : "Describe raise phases clearly or leave this field empty.",
     propertyAddress: localeRu ? "Укажите адрес объекта." : "Enter the property address.",
-    propertyAppraisedValue: localeRu ? "Укажите оценочную стоимость объекта или оставьте поле пустым." : "Enter the appraised value or leave the field empty.",
     propertyCity: localeRu ? "Укажите город объекта." : "Enter the property city.",
     propertyComplexName: localeRu ? "Укажите название комплекса." : "Enter the complex name.",
     propertyCompletionDate: localeRu ? "Укажите планируемую дату завершения." : "Enter planned completion date.",
@@ -184,9 +189,8 @@ function projectFieldLabels(localeRu: boolean) {
     propertyFloorPlans: localeRu ? "Добавьте хотя бы один файл объекта: план, брошюру или изображение." : "Add at least one property asset such as a floor plan, brochure or image.",
     propertyFullDescription: localeRu ? "Добавьте развёрнутое описание объекта." : "Add a full property description.",
     propertyFundraisingCurrency: localeRu ? "Укажите валюту участия." : "Enter the participation currency.",
-    propertyFundingPercent: localeRu ? "Укажите процент финансирования или оставьте поле пустым для авторасчёта." : "Enter funding percent or leave blank for automatic calculation.",
     propertyIncomeSources: localeRu ? "Выберите хотя бы один источник дохода." : "Select at least one income source.",
-    propertyInvestorCount: localeRu ? "Укажите количество инвесторов или оставьте поле пустым." : "Enter investor count or leave blank.",
+    propertyEstimatedAssetValue: localeRu ? "Укажите оценочную стоимость объекта." : "Enter estimated asset value.",
     propertyInvestorSharePercent: localeRu ? "Укажите долю инвесторов." : "Enter investor share.",
     propertyManagerFeePercent: localeRu ? "Укажите комиссию управляющего." : "Enter manager fee.",
     propertyManagerSharePercent: localeRu ? "Укажите долю управляющего." : "Enter manager share.",
@@ -194,7 +198,6 @@ function projectFieldLabels(localeRu: boolean) {
     propertyObjectName: localeRu ? "Укажите название объекта." : "Enter the property name.",
     propertyPlannedStartDate: localeRu ? "Укажите дату начала проекта." : "Enter the project start date.",
     propertyShortDescription: localeRu ? "Добавьте краткое описание объекта." : "Add a short property summary.",
-    propertyStatsMode: localeRu ? "Выберите режим статистики объекта." : "Choose object stats mode.",
     propertyStatus: localeRu ? "Выберите статус объекта." : "Select property status.",
     propertyTargetRaise: localeRu ? "Укажите целевой объём привлечения." : "Enter target raise.",
     propertyTermMonths: localeRu ? "Укажите срок проекта в месяцах." : "Enter project term in months.",
@@ -245,6 +248,43 @@ function sanitizeFileName(fileName: string) {
 function resolveSector(sector?: string, sectorOther?: string) {
   if (sector !== "other") return sector;
   return sectorOther;
+}
+
+function readSubmissionDocuments(value: unknown): StoredSubmissionDocument[] {
+  if (!value || typeof value !== "object" || !("files" in value)) return [];
+  const files = (value as { files?: unknown }).files;
+  return Array.isArray(files) ? files.filter(isStoredSubmissionDocument) : [];
+}
+
+function readSubmissionPropertyAssets(value: unknown) {
+  if (!value || typeof value !== "object" || !("propertyAssets" in value)) return [];
+  const assets = (value as { propertyAssets?: unknown }).propertyAssets;
+  return Array.isArray(assets) ? assets.filter(isRealEstateDocumentAsset) : [];
+}
+
+function isStoredSubmissionDocument(value: unknown): value is StoredSubmissionDocument {
+  if (!value || typeof value !== "object") return false;
+  const document = value as Partial<StoredSubmissionDocument>;
+  return typeof document.name === "string" && typeof document.storagePath === "string" && typeof document.size === "number" && typeof document.type === "string";
+}
+
+function isRealEstateDocumentAsset(value: unknown): value is RealEstateDocumentAsset {
+  if (!value || typeof value !== "object") return false;
+  const asset = value as Partial<RealEstateDocumentAsset>;
+  return typeof asset.category === "string" && typeof asset.href === "string" && typeof asset.name === "string";
+}
+
+function splitExistingPropertyAssets(assets: RealEstateDocumentAsset[], coverHref?: string) {
+  const galleryAssets = assets.filter((asset) => asset.category === "gallery");
+  const coverAsset = galleryAssets.find((asset) => asset.href === coverHref) ?? galleryAssets[0];
+
+  return {
+    brochures: assets.filter((asset) => asset.category === "brochure"),
+    cover: coverAsset ? [coverAsset] : [],
+    floorPlans: assets.filter((asset) => asset.category === "floor-plan"),
+    gallery: galleryAssets.filter((asset) => asset.href !== coverAsset?.href),
+    visuals: assets.filter((asset) => asset.category === "render")
+  };
 }
 
 async function saveProjectFile(file: File, userId: string, submissionFolder: string) {
@@ -346,6 +386,24 @@ export async function POST(request: NextRequest) {
   }
 
   const formData = await request.formData();
+  const sourceSubmissionId = readText(formData, "sourceSubmissionId");
+  const sourceSubmission = sourceSubmissionId
+    ? await prisma.projectSubmission.findFirst({
+        where: {
+          id: sourceSubmissionId,
+          projectId: { not: null },
+          status: "APPROVED",
+          userId
+        },
+        select: {
+          documents: true,
+          organizationId: true,
+          projectId: true,
+          propertyData: true,
+          sector: true
+        }
+      })
+    : null;
   const parsed = projectSubmissionSchema.safeParse({
     title: readText(formData, "title"),
     sector: readText(formData, "sector"),
@@ -378,16 +436,13 @@ export async function POST(request: NextRequest) {
     propertyFullDescription: readText(formData, "propertyFullDescription"),
     propertyVehicleName: readText(formData, "propertyVehicleName"),
     propertyManagerName: readText(formData, "propertyManagerName"),
+    propertyEstimatedAssetValue: readText(formData, "propertyEstimatedAssetValue"),
     propertyTotalAssetValue: readText(formData, "propertyTotalAssetValue"),
-    propertyStatsMode: readText(formData, "propertyStatsMode"),
-    propertyAppraisedValue: readText(formData, "propertyAppraisedValue"),
     propertyCurrency: readText(formData, "propertyCurrency"),
     propertyMinimumParticipation: readText(formData, "propertyMinimumParticipation"),
     propertyTargetRaise: readText(formData, "propertyTargetRaise"),
     propertyGatheredAmount: readText(formData, "propertyGatheredAmount"),
     propertyRemainingAmount: readText(formData, "propertyRemainingAmount"),
-    propertyFundingPercent: readText(formData, "propertyFundingPercent"),
-    propertyInvestorCount: readText(formData, "propertyInvestorCount"),
     propertyTermMonths: readText(formData, "propertyTermMonths"),
     propertyPlannedStartDate: readText(formData, "propertyPlannedStartDate"),
     propertyCompletionDate: readText(formData, "propertyCompletionDate"),
@@ -407,6 +462,19 @@ export async function POST(request: NextRequest) {
   };
   const extraFiles = Object.values(propertyAssetFiles).flat();
 
+  if (sourceSubmissionId && !sourceSubmission) {
+    return NextResponse.json(
+      {
+        title: localeRu ? "Проект для редактирования не найден" : "Project to edit not found",
+        message:
+          localeRu
+            ? "Откройте опубликованный проект из раздела «Мои проекты» и повторите попытку."
+            : "Open the published project from My projects and try again."
+      },
+      { status: 404 }
+    );
+  }
+
   if (!parsed.success) {
     const fieldErrors = zodFieldErrors(parsed.error, projectFieldLabels(localeRu));
 
@@ -423,7 +491,27 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (!documents.length && !(parsed.success && parsed.data.sector === "real-estate" && extraFiles.length)) {
+  const data = parsed.data;
+  const sector = resolveSector(data.sector, data.sectorOther);
+  const editingPublishedProject = Boolean(sourceSubmission?.projectId);
+  const existingSubmissionDocuments = readSubmissionDocuments(sourceSubmission?.documents);
+  const existingPropertyAssets = readSubmissionPropertyAssets(sourceSubmission?.documents);
+  const existingRealEstate = parseRealEstateData(sourceSubmission?.propertyData);
+
+  if (editingPublishedProject && sector !== sourceSubmission?.sector) {
+    return NextResponse.json(
+      {
+        title: localeRu ? "Нельзя менять категорию" : "Sector change is not allowed",
+        message:
+          localeRu
+            ? "Для опубликованного проекта можно обновлять данные, но нельзя менять категорию листинга."
+            : "You can update listing details, but you cannot change the published project's sector."
+      },
+      { status: 400 }
+    );
+  }
+
+  if (!documents.length && !existingSubmissionDocuments.length && !(data.sector === "real-estate" && (extraFiles.length || existingPropertyAssets.length))) {
     return NextResponse.json(
       {
         title: localeRu ? "Прикрепите документы" : "Attach documents",
@@ -491,17 +579,24 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const data = parsed.data;
-  const sector = resolveSector(data.sector, data.sectorOther);
   const submissionFolder = randomUUID();
-  const savedDocuments = await Promise.all(documents.map((file) => saveProjectFile(file, userId, submissionFolder)));
-  const savedPropertyAssets = await Promise.all([
+  const uploadedDocuments = await Promise.all(documents.map((file) => saveProjectFile(file, userId, submissionFolder)));
+  const uploadedPropertyAssets = await Promise.all([
     saveAssetGroup(propertyAssetFiles.coverImage, "gallery", userId, submissionFolder),
     saveAssetGroup(propertyAssetFiles.gallery, "gallery", userId, submissionFolder),
     saveAssetGroup(propertyAssetFiles.floorPlans, "floor-plan", userId, submissionFolder),
     saveAssetGroup(propertyAssetFiles.brochures, "brochure", userId, submissionFolder),
     saveAssetGroup(propertyAssetFiles.visuals, "render", userId, submissionFolder)
   ]).then((groups) => groups.flat());
+  const existingAssetGroups = splitExistingPropertyAssets(existingPropertyAssets, existingRealEstate?.coverImage);
+  const uploadedAssetGroups = splitExistingPropertyAssets(uploadedPropertyAssets, uploadedPropertyAssets.find((asset) => asset.category === "gallery")?.href);
+  const savedDocuments = uploadedDocuments.length ? uploadedDocuments : existingSubmissionDocuments;
+  const coverAssets = uploadedAssetGroups.cover.length ? uploadedAssetGroups.cover : existingAssetGroups.cover;
+  const galleryAssets = uploadedAssetGroups.gallery.length ? uploadedAssetGroups.gallery : existingAssetGroups.gallery;
+  const floorPlanAssets = uploadedAssetGroups.floorPlans.length ? uploadedAssetGroups.floorPlans : existingAssetGroups.floorPlans;
+  const brochureAssets = uploadedAssetGroups.brochures.length ? uploadedAssetGroups.brochures : existingAssetGroups.brochures;
+  const visualAssets = uploadedAssetGroups.visuals.length ? uploadedAssetGroups.visuals : existingAssetGroups.visuals;
+  const savedPropertyAssets = [...coverAssets, ...galleryAssets, ...floorPlanAssets, ...brochureAssets, ...visualAssets];
 
   if (data.sector === "other" && !sector) {
     return NextResponse.json(
@@ -519,7 +614,8 @@ export async function POST(request: NextRequest) {
   const submission = await prisma.$transaction(async (tx) => {
     const created = await tx.projectSubmission.create({
       data: {
-        organizationId: organization?.id,
+        organizationId: sourceSubmission?.organizationId ?? organization?.id,
+        projectId: sourceSubmission?.projectId ?? undefined,
         userId,
         title: data.title,
         sector,
@@ -542,23 +638,21 @@ export async function POST(request: NextRequest) {
           data.sector === "real-estate"
             ? {
                 address: data.propertyAddress,
-                appraisedValue: data.propertyAppraisedValue,
                 city: data.propertyCity,
                 completionDate: data.propertyCompletionDate?.toISOString(),
                 country: data.propertyCountry,
-                coverImage: savedPropertyAssets.find((asset) => asset.category === "gallery")?.href,
+                coverImage: coverAssets[0]?.href,
                 currency: data.propertyCurrency,
                 descriptionFull: data.propertyFullDescription,
                 descriptionShort: data.propertyShortDescription,
                 developer: data.propertyDeveloper,
                 district: data.propertyDistrict,
                 documents: savedPropertyAssets,
-                fundingPercent: data.propertyFundingPercent,
                 fundraisingCurrency: data.propertyFundraisingCurrency,
-                gallery: savedPropertyAssets.filter((asset) => asset.category === "gallery").map((asset) => asset.href),
+                gallery: [...coverAssets, ...galleryAssets].map((asset) => asset.href),
                 gatheredAmount: data.propertyGatheredAmount,
                 incomeSources: data.propertyIncomeSources,
-                investorCount: data.propertyInvestorCount,
+                estimatedAssetValue: data.propertyEstimatedAssetValue,
                 investorSharePercent: data.propertyInvestorSharePercent,
                 managerFeePercent: data.propertyManagerFeePercent,
                 managerName: data.propertyManagerName,
@@ -571,12 +665,11 @@ export async function POST(request: NextRequest) {
                 projectTermMonths: data.propertyTermMonths,
                 propertyType: data.propertyType,
                 remainingAmount: data.propertyRemainingAmount,
-                statsMode: data.propertyStatsMode,
                 targetRaise: data.propertyTargetRaise,
                 titleComplex: data.propertyComplexName,
                 totalAssetValue: data.propertyTotalAssetValue,
                 vehicleName: data.propertyVehicleName,
-                visuals: savedPropertyAssets.filter((asset) => asset.category === "render").map((asset) => asset.href)
+                visuals: visualAssets.map((asset) => asset.href)
               }
             : undefined,
         documents: {
@@ -590,12 +683,14 @@ export async function POST(request: NextRequest) {
     await tx.adminAuditLog.create({
       data: {
         actorId: userId,
-        action: "project.submission.create",
+        action: editingPublishedProject ? "project.submission.revision.create" : "project.submission.create",
         entityType: "ProjectSubmission",
         entityId: created.id,
           payload: {
             sector,
-            organizationId: organization?.id ?? null,
+            organizationId: sourceSubmission?.organizationId ?? organization?.id ?? null,
+            projectId: sourceSubmission?.projectId ?? null,
+            sourceSubmissionId: sourceSubmissionId || null,
             title: data.title,
           expectedReturn: data.expectedReturn,
           expectedYield: data.expectedYield,
@@ -618,11 +713,15 @@ export async function POST(request: NextRequest) {
   });
 
   return NextResponse.json({
-    title: localeRu ? "Проект отправлен" : "Project submitted",
+    title: editingPublishedProject ? (localeRu ? "Изменения отправлены" : "Changes submitted") : localeRu ? "Проект отправлен" : "Project submitted",
     message:
-      localeRu
-        ? "Заявка на размещение проекта отправлена команде Qidra. После первичной проверки статус появится в профиле."
-        : "Your project listing application was sent to the Qidra team. Its status will appear in your profile after initial review.",
+      editingPublishedProject
+        ? localeRu
+          ? "Правки по опубликованному проекту отправлены на повторную модерацию."
+          : "Changes to the published project were sent for moderation."
+        : localeRu
+          ? "Заявка на размещение проекта отправлена команде Qidra. После первичной проверки статус появится в профиле."
+          : "Your project listing application was sent to the Qidra team. Its status will appear in your profile after initial review.",
     submissionId: submission.id
   });
 }

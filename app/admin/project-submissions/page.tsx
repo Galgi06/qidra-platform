@@ -337,10 +337,11 @@ function SubmissionActions({
   const endpoint = `/api/admin/project-submissions/${submission.id}?lang=${locale}`;
   const canReview = submission.status === "SUBMITTED";
   const canReject = submission.status !== "REJECTED" && submission.status !== "APPROVED";
-  const canPrepare = submission.status !== "APPROVED" && submission.status !== "REJECTED" && !submission.projectId && documentsCount > 0;
+  const canPrepare = submission.status !== "APPROVED" && submission.status !== "REJECTED" && documentsCount > 0;
   const preparedSlug = slugFromTitle(submission.title);
   const summary = compactText(submission.summary, 240);
   const structure = submission.structure === "Musharaka" ? "Musharaka" : "Mudaraba";
+  const isRevision = Boolean(submission.projectId);
 
   return (
     <section className="grid gap-5 border-t border-qidra-grayLight pt-6">
@@ -419,17 +420,21 @@ function SubmissionActions({
       {canPrepare ? (
         <details className="rounded-[14px] bg-white p-4 shadow-[0_0_0_1px_rgba(18,20,23,0.08)]" open={submission.status === "REVIEW"}>
           <summary className="cursor-pointer list-none text-18 font-medium text-qidra-dark">
-            {isRu ? "Финальное решение: разрешить листинг" : "Final decision: approve listing"}
+            {isRevision ? (isRu ? "Финальное решение: применить правки" : "Final decision: apply changes") : isRu ? "Финальное решение: разрешить листинг" : "Final decision: approve listing"}
           </summary>
           <FeedbackForm
             className="mt-5 grid gap-4"
             endpoint={endpoint}
             feedback={{
-              title: isRu ? "Проект создан для каталога" : "Catalog project created",
+              title: isRevision ? (isRu ? "Изменения применены" : "Changes applied") : isRu ? "Проект создан для каталога" : "Catalog project created",
               text:
-                isRu
-                  ? "Заявка одобрена, проект создан в админке. Статус проекта можно менять в управлении проектами."
-                  : "The submission was approved and a project was created in admin. Project status can be changed in project management.",
+                isRevision
+                  ? isRu
+                    ? "Правки по опубликованному проекту одобрены и применены к действующему листингу."
+                    : "Changes to the published project were approved and applied to the existing listing."
+                  : isRu
+                    ? "Заявка одобрена, проект создан в админке. Статус проекта можно менять в управлении проектами."
+                    : "The submission was approved and a project was created in admin. Project status can be changed in project management.",
               buttonLabel: isRu ? "Понятно" : "Got it",
               dismissLabel: isRu ? "Закрыть уведомление" : "Close notification",
               tone: "success"
@@ -443,7 +448,7 @@ function SubmissionActions({
               <Input
                 label={isRu ? "Адрес проекта на сайте" : "Project page address"}
                 name="slug"
-                defaultValue={preparedSlug}
+                defaultValue={submission.projectSlug ?? preparedSlug}
                 hint={
                   isRu
                     ? "Это часть ссылки после /projects/. Используйте только латинские буквы, цифры и дефисы, без пробелов."
@@ -467,7 +472,7 @@ function SubmissionActions({
               <Select
                 label={isRu ? "Статус после листинга" : "Status after listing"}
                 name="status"
-                defaultValue="ACTIVE"
+                defaultValue={submission.projectStatus ?? "ACTIVE"}
                 options={[
                   { value: "ACTIVE", label: isRu ? "Сбор открыт / опубликован" : "Published / raise open" },
                   { value: "REVIEW", label: isRu ? "Проверен, готовится к публикации" : "Reviewed, preparing to publish" },
@@ -546,11 +551,15 @@ function SubmissionActions({
             <Input label={isRu ? "Подтверждение" : "Confirmation"} name="confirmation" placeholder="CONFIRM" required />
             <p className="text-13 text-qidra-grayBlue">
               {isRu
-                ? "После подтверждения заявка станет проектом каталога. Проверенные файлы участника будут опубликованы как документы проекта; при необходимости статус можно изменить в управлении проектами."
-                : "After confirmation, the submission becomes a catalog project. Reviewed participant files will be published as project documents; status can be changed later in project management."}
+                ? isRevision
+                  ? "После подтверждения правки будут применены к уже существующему проекту. Проверенные файлы участника заменят текущие документы проекта только в рамках этой одобренной ревизии."
+                  : "После подтверждения заявка станет проектом каталога. Проверенные файлы участника будут опубликованы как документы проекта; при необходимости статус можно изменить в управлении проектами."
+                : isRevision
+                  ? "After confirmation, the changes will be applied to the existing project. Reviewed participant files will replace the current project documents only within this approved revision."
+                  : "After confirmation, the submission becomes a catalog project. Reviewed participant files will be published as project documents; status can be changed later in project management."}
             </p>
             <Button className="w-full sm:w-fit" type="submit">
-              {isRu ? "Разрешить листинг и создать проект" : "Approve listing and create project"}
+              {isRevision ? (isRu ? "Одобрить правки и обновить проект" : "Approve changes and update project") : isRu ? "Разрешить листинг и создать проект" : "Approve listing and create project"}
             </Button>
           </FeedbackForm>
         </details>
