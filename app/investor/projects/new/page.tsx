@@ -121,6 +121,7 @@ export default async function NewProjectSubmissionPage({ searchParams }: { searc
         <section className="px-5 py-12 sm:px-8 lg:px-11 lg:py-16">
           <InvestorWorkspace activePath="/investor/projects/new" locale={locale}>
           <div className="grid gap-8 xl:grid-cols-[1fr_0.48fr]">
+            <div id="project-form">
             <FeedbackForm
               className="premium-card grid gap-6 p-6 sm:p-8"
               endpoint={`/api/investor/project-submissions?lang=${locale}`}
@@ -273,6 +274,7 @@ export default async function NewProjectSubmissionPage({ searchParams }: { searc
                 </Button>
               </fieldset>
             </FeedbackForm>
+            </div>
 
             <aside className="grid content-start gap-5">
               {!approved ? (
@@ -295,7 +297,7 @@ export default async function NewProjectSubmissionPage({ searchParams }: { searc
                         <p className="font-medium text-qidra-dark">{submission.title}</p>
                         <p className="mt-1 text-14 text-qidra-grayBlue">{submissionStatusLabel(submission.status, locale)}</p>
                         {submission.status === "APPROVED" && submission.projectId ? (
-                          <ButtonLink className="mt-3 h-10" href={withLocale(`/investor/projects/new?edit=${submission.id}`, locale)} size="sm" variant="outline">
+                          <ButtonLink className="mt-3 h-10" href={withLocale(`/investor/projects/new?edit=${submission.id}#project-form`, locale)} size="sm" variant="outline">
                             {isRu ? "Редактировать опубликованный проект" : "Edit published project"}
                           </ButtonLink>
                         ) : null}
