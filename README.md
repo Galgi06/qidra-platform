@@ -39,3 +39,23 @@ For TRC20 deposits, set `TRONGRID_API_KEY` and `QIDRA_WALLET_KEY_ENCRYPTION_SECR
 - Keep KYC, contracts and risk disclosures visible in project flows.
 
 Production infrastructure notes are stored in `docs/qidra-infrastructure-inventory.md`. The self-hosted launch, backup, restore and healthcheck runbook is stored in `docs/production-launch-runbook.md`.
+
+## Change Control
+
+Qidra uses mandatory Git-based change history.
+
+- Change-control policy: `docs/change-control.md`
+- Changelog: `CHANGELOG.md`
+- Last 24 hours report:
+
+```bash
+npm run changes:last-day
+```
+
+Before schema or structural changes, create a commit and backup first:
+
+```bash
+npm run backup:database
+# or
+npm run backup:postgres
+```
