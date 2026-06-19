@@ -5,7 +5,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { countryCodes, dialCodes } from "@/lib/countries";
 import { saveUploadedFile } from "@/lib/file-storage";
-import { isPlausibleAddress, isPlausibleCity, isPlausibleOccupation, isPlausiblePhone, zodFieldErrors } from "@/lib/form-validation";
+import { cleanText, isPlausibleAddress, isPlausibleCity, isPlausibleOccupation, isPlausiblePhone, zodFieldErrors } from "@/lib/form-validation";
 import { readKycDocuments, type KycDocumentKind, type KycDocuments, type KycFileMeta } from "@/lib/kyc-documents";
 import { authOptions } from "@/lib/next-auth";
 import { prisma } from "@/lib/prisma";
@@ -17,12 +17,12 @@ const kycSchema = z.object({
   phone: z.string().trim().min(1).max(32).refine(isPlausiblePhone),
   phoneDialCode: z.string().trim().refine((value) => dialCodes.has(value)).optional(),
   country: z.string().trim().refine((value) => countryCodes.has(value)),
-  city: z.string().trim().min(2).max(120).refine(isPlausibleCity),
+  city: z.preprocess((value) => (typeof value === "string" ? cleanText(value) : value), z.string().min(2).max(120).refine(isPlausibleCity)),
   citizenship: z.string().trim().refine((value) => countryCodes.has(value)),
   dateOfBirth: z.string().trim().min(1).refine(isValidAdultBirthDate),
-  address: z.string().trim().min(12).max(240).refine(isPlausibleAddress),
+  address: z.preprocess((value) => (typeof value === "string" ? cleanText(value) : value), z.string().min(12).max(240).refine(isPlausibleAddress)),
   sourceOfFunds: z.enum(["salary", "business", "savings", "family", "other"]),
-  occupation: z.string().trim().min(3).max(160).refine(isPlausibleOccupation)
+  occupation: z.preprocess((value) => (typeof value === "string" ? cleanText(value) : value), z.string().min(2).max(160).refine(isPlausibleOccupation))
 });
 
 type SessionUser = {

@@ -26,6 +26,8 @@ const letterPattern = /\p{L}/u;
 const digitPattern = /\p{N}/u;
 const repeatedCharactersPattern = /(.)\1{4,}/u;
 const repeatedShortWordsPattern = /\b([\p{L}\p{N}]{2,})\b(?:[\s,.-]+\1\b){2,}/iu;
+const freeTextPattern = /^[\p{L}\p{M}\p{N} .,'’"\/&()#+-]+$/u;
+const addressTextPattern = /^[\p{L}\p{M}\p{N} .,'’"\/&()#+:-]+$/u;
 
 export function cleanText(value: string) {
   return value
@@ -52,34 +54,24 @@ export function isMeaningfulText(value: string, options: { allowDigits?: boolean
   if (suspiciousWords.has(normalized) || suspiciousWords.has(compact)) return false;
   if (repeatedCharactersPattern.test(compact)) return false;
   if (repeatedShortWordsPattern.test(normalized)) return false;
-  if (/^[\p{N}\W_]+$/u.test(text)) return false;
+  if (!letterPattern.test(text) && !digitPattern.test(text)) return false;
 
   return true;
 }
 
 export function isPlausibleCity(value: string) {
   const text = cleanText(value);
-  return /^[\p{L}\p{M}\p{N} .,'’/-]{2,120}$/u.test(text) && isMeaningfulText(text, { allowDigits: true, minLetters: 2 });
+  return isSafeFreeText(text, { minLetters: 1, pattern: freeTextPattern });
 }
 
 export function isPlausibleOccupation(value: string) {
   const text = cleanText(value);
-  return /^[\p{L}\p{M}\p{N} .,'’/&()+-]{2,160}$/u.test(text) && isMeaningfulText(text, { allowDigits: true, minLetters: 2 });
+  return isSafeFreeText(text, { minLetters: 1, pattern: freeTextPattern });
 }
 
 export function isPlausibleAddress(value: string) {
   const text = cleanText(value);
-  const words = text.match(/[\p{L}\p{N}]+/gu) ?? [];
-  const letters = countMatches(text, /\p{L}/gu);
-
-  if (text.length < 12 || text.length > 240) return false;
-  if (!letterPattern.test(text)) return false;
-  if (repeatedCharactersPattern.test(text.replace(/[^\p{L}\p{N}]+/gu, "").toLowerCase())) return false;
-  if (words.length < 2 && !digitPattern.test(text)) return false;
-  if (letters < 5) return false;
-  if (!/^[\p{L}\p{M}\p{N} .,'’/#-]+$/u.test(text)) return false;
-
-  return true;
+  return isSafeFreeText(text, { minLetters: 1, pattern: addressTextPattern });
 }
 
 export function isPlausiblePhone(value: string | undefined) {
@@ -111,4 +103,22 @@ export function zodFieldErrors(error: z.ZodError, labels: Record<string, string>
 
 function countMatches(value: string, pattern: RegExp) {
   return value.match(pattern)?.length ?? 0;
+}
+
+function isSafeFreeText(value: string, options: { minLetters: number; pattern: RegExp }) {
+  const text = cleanText(value);
+  const letters = countMatches(text, /\p{L}/gu);
+  const compact = text.replace(/[^\p{L}\p{N}]+/gu, "").toLowerCase();
+
+  if (!text) return false;
+  if (letters < options.minLetters) return false;
+  if (!options.pattern.test(text)) return false;
+  if (/[<>]/.test(text)) return false;
+  if (/(?:javascript|vbscript|data)\s*:/iu.test(text)) return false;
+  if (/<\/?[a-z][^>]*>/iu.test(text)) return false;
+  if (/\bon[a-z]+\s*=/iu.test(text)) return false;
+  if (!letterPattern.test(text) && !digitPattern.test(text)) return false;
+  if (compact && repeatedCharactersPattern.test(compact)) return false;
+
+  return true;
 }

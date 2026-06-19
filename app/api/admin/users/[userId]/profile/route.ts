@@ -4,22 +4,27 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { canEditParticipantCards } from "@/lib/auth";
 import { countryCodes, dialCodes } from "@/lib/countries";
-import { isPlausibleAddress, isPlausibleCity, isPlausibleOccupation, isPlausiblePhone, zodFieldErrors } from "@/lib/form-validation";
+import { cleanText, isPlausibleAddress, isPlausibleCity, isPlausibleOccupation, isPlausiblePhone, zodFieldErrors } from "@/lib/form-validation";
 import { authOptions } from "@/lib/next-auth";
 import { prisma } from "@/lib/prisma";
 
 const sourceOfFundsValues = ["salary", "business", "savings", "family", "other"] as const;
+const normalizedOptionalText = (max: number, validator: (value: string) => boolean) =>
+  z.preprocess(
+    (value) => (typeof value === "string" ? cleanText(value) : value),
+    z.string().max(max).refine((value) => !value || validator(value))
+  );
 
 const profileUpdateSchema = z.object({
-  address: z.string().trim().max(240).refine((value) => !value || isPlausibleAddress(value)),
+  address: normalizedOptionalText(240, isPlausibleAddress),
   citizenship: z.string().trim().refine((value) => !value || countryCodes.has(value)),
-  city: z.string().trim().max(120).refine((value) => !value || isPlausibleCity(value)),
+  city: normalizedOptionalText(120, isPlausibleCity),
   confirmation: z.string().trim(),
   country: z.string().trim().refine((value) => !value || countryCodes.has(value)),
   dateOfBirth: z.string().trim().refine((value) => !value || isValidAdultBirthDate(value)),
   email: z.string().trim().email().max(180).transform((value) => value.toLowerCase()),
   name: z.string().trim().min(2).max(120).refine((value) => isPlausibleName(value)),
-  occupation: z.string().trim().max(160).refine((value) => !value || isPlausibleOccupation(value)),
+  occupation: normalizedOptionalText(160, isPlausibleOccupation),
   phone: z.string().trim().max(32).refine((value) => !value || isPlausiblePhone(value)),
   phoneDialCode: z.string().trim().refine((value) => !value || dialCodes.has(value)),
   reason: z.string().trim().min(12).max(800),
