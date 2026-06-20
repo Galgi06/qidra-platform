@@ -10,7 +10,9 @@ type FileUploadProps = InputHTMLAttributes<HTMLInputElement> & {
   hint?: string;
   label: string;
   manyFilesLabel?: string;
+  requiredMessage?: string;
   selectedLabel?: string;
+  suppressNativeRequired?: boolean;
 };
 
 type FileSlot = {
@@ -28,7 +30,10 @@ export function FileUpload({
   label,
   manyFilesLabel = "files",
   onChange,
+  required = false,
+  requiredMessage,
   selectedLabel = "Selected",
+  suppressNativeRequired = false,
   ...props
 }: FileUploadProps) {
   const inputId = useId();
@@ -90,6 +95,7 @@ export function FileUpload({
     <div
       className="flex h-full flex-col gap-3 rounded-qidra border border-dashed border-qidra-line bg-qidra-panel p-5 text-14 text-qidra-grayBlue shadow-[inset_0_1px_0_rgba(255,255,255,0.86)] transition-colors hover:border-qidra-accent"
       data-field-wrapper={props.name}
+      data-has-file={activeText ? "true" : "false"}
     >
       <span className="flex items-start justify-between gap-3">
         <span className="font-medium text-qidra-dark">{label}</span>
@@ -134,17 +140,29 @@ export function FileUpload({
               key={slot.id}
               accept={accept}
               className="sr-only"
+              data-required-file={required && suppressNativeRequired ? "true" : undefined}
+              data-required-message={requiredMessage}
               id={`${inputId}-${slot.id}`}
               name={props.name}
               onChange={(event) => handleChange(event, slot.id)}
               type="file"
               multiple
-              required={false}
+              required={required && !suppressNativeRequired}
             />
           ))}
         </>
       ) : (
-        <input accept={accept} type="file" className="sr-only" id={inputId} onChange={(event) => handleChange(event)} {...props} />
+        <input
+          {...props}
+          accept={accept}
+          className="sr-only"
+          data-required-file={required && suppressNativeRequired ? "true" : undefined}
+          data-required-message={requiredMessage}
+          id={inputId}
+          onChange={(event) => handleChange(event)}
+          required={required && !suppressNativeRequired}
+          type="file"
+        />
       )}
     </div>
   );

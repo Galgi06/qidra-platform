@@ -356,9 +356,20 @@ export function FeedbackForm({
     event.preventDefault();
     const form = event.currentTarget;
 
-    if (!form.checkValidity()) {
+    clearFieldErrors(form);
+    const browserValid = form.checkValidity();
+
+    if (!browserValid) {
       markBrowserInvalidFields(form);
-      form.reportValidity();
+    }
+
+    const customFilesValid = validateCustomRequiredFiles(form);
+
+    if (!browserValid || !customFilesValid) {
+      focusFirstInvalidField(form);
+      if (!browserValid) {
+        form.reportValidity();
+      }
       return;
     }
 
@@ -422,6 +433,37 @@ function markBrowserInvalidFields(form: HTMLFormElement) {
   }
 }
 
+function validateCustomRequiredFiles(form: HTMLFormElement) {
+  const fileInputs = Array.from(form.querySelectorAll<HTMLInputElement>("input[type='file'][data-required-file='true']"));
+
+  if (!fileInputs.length) {
+    return true;
+  }
+
+  const processed = new Set<string>();
+  let valid = true;
+
+  for (const input of fileInputs) {
+    const key = input.name || input.id;
+
+    if (!key || processed.has(key)) continue;
+    processed.add(key);
+
+    const group = fileInputs.filter((candidate) => (candidate.name || candidate.id) === key);
+    const referenceInput = group[0] ?? input;
+    const wrapper = referenceInput.closest<HTMLElement>("[data-field-wrapper]");
+    const hasUploadedFile = wrapper?.dataset.hasFile === "true";
+    const hasSelectedFile = group.some((candidate) => (candidate.files?.length ?? 0) > 0);
+
+    if (hasUploadedFile || hasSelectedFile) continue;
+
+    markInvalidField(referenceInput, referenceInput.dataset.requiredMessage || referenceInput.validationMessage);
+    valid = false;
+  }
+
+  return valid;
+}
+
 function applyFieldErrors(form: HTMLFormElement, fieldErrors: FieldErrors | undefined) {
   if (!fieldErrors) return;
 
@@ -440,9 +482,7 @@ function applyFieldErrors(form: HTMLFormElement, fieldErrors: FieldErrors | unde
     }
   }
 
-  const firstInvalid = form.querySelector<HTMLElement>("[aria-invalid='true']");
-  firstInvalid?.scrollIntoView({ behavior: "smooth", block: "center" });
-  firstInvalid?.focus({ preventScroll: true });
+  focusFirstInvalidField(form);
 }
 
 function clearFieldErrors(form: HTMLFormElement) {
@@ -461,6 +501,21 @@ function clearSingleFieldError(field: HTMLInputElement | HTMLSelectElement | HTM
   wrapper?.querySelectorAll(`[data-field-error-message='${field.name}']`).forEach((element) => element.remove());
 }
 
+function focusFirstInvalidField(form: HTMLFormElement) {
+  const firstInvalid = form.querySelector<HTMLElement>("[aria-invalid='true']");
+
+  if (!firstInvalid) return;
+
+  firstInvalid.scrollIntoView({ behavior: "smooth", block: "center" });
+
+  if (firstInvalid instanceof HTMLInputElement || firstInvalid instanceof HTMLSelectElement || firstInvalid instanceof HTMLTextAreaElement) {
+    firstInvalid.focus({ preventScroll: true });
+    return;
+  }
+
+  const nestedField = firstInvalid.querySelector<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>("input, select, textarea");
+  nestedField?.focus({ preventScroll: true });
+}
 function markInvalidField(field: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement, message: string | undefined) {
   const wrapper = field.closest<HTMLElement>("[data-field-wrapper]") ?? field.closest<HTMLElement>("label") ?? field.parentElement;
   const target = wrapper ?? field;
