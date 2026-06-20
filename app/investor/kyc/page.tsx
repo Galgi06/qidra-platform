@@ -145,7 +145,7 @@ export default async function KycPage({ searchParams }: { searchParams?: Promise
                   options={[{ value: "", label: isRu ? "Выберите гражданство" : "Select citizenship" }, ...countries]}
                   required
                 />
-                <Input label={isRu ? "Профессия" : "Occupation"} name="occupation" defaultValue={application?.occupation ?? ""} maxLength={160} minLength={3} required />
+                <Input label={isRu ? "Профессия" : "Occupation"} name="occupation" defaultValue={application?.occupation ?? ""} maxLength={160} minLength={2} required />
                 <Select
                   label={isRu ? "Источник средств" : "Source of funds"}
                   name="sourceOfFunds"
@@ -178,7 +178,9 @@ export default async function KycPage({ searchParams }: { searchParams?: Promise
                   hint={isRu ? "Паспорт или ID, PDF/JPG/PNG" : "Passport or ID, PDF/JPG/PNG"}
                   name="identityDocument"
                   required={!documents.identityDocument && !submitted && !approved}
+                  requiredMessage={isRu ? "Прикрепите документ личности в PDF, JPG или PNG." : "Attach an identity document as PDF, JPG or PNG."}
                   selectedLabel={isRu ? "Выбрано" : "Selected"}
+                  suppressNativeRequired
                 />
                 <FileUpload
                   existingFileName={documents.addressProof?.name}
@@ -187,7 +189,9 @@ export default async function KycPage({ searchParams }: { searchParams?: Promise
                   hint={isRu ? "Счёт или справка, PDF/JPG/PNG" : "Bill or statement, PDF/JPG/PNG"}
                   name="addressProof"
                   required={!documents.addressProof && !submitted && !approved}
+                  requiredMessage={isRu ? "Прикрепите подтверждение адреса в PDF, JPG или PNG." : "Attach proof of address as PDF, JPG or PNG."}
                   selectedLabel={isRu ? "Выбрано" : "Selected"}
+                  suppressNativeRequired
                 />
               </div>
               <Button type="submit" className="w-full sm:w-auto">
