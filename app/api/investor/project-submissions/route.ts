@@ -10,7 +10,7 @@ import { isDetailedText, isMeaningfulText, zodFieldErrors } from "@/lib/form-val
 import { getPrimaryOrganizationForUser } from "@/lib/organizations";
 import { prisma } from "@/lib/prisma";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
-import { incomeSourceOptions, propertyStatusOptions, propertyTypeOptions, type RealEstateDocumentAsset } from "@/lib/real-estate";
+import { incomeSourceOptions, parseRealEstateData, propertyStatusOptions, propertyTypeOptions, type RealEstateDocumentAsset } from "@/lib/real-estate";
 
 export const runtime = "nodejs";
 
@@ -21,7 +21,8 @@ const optionalText = z.preprocess((value) => {
 }, z.string().max(180).optional());
 
 const meaningfulText = (min = 2, max = 5000, minLetters = min) => z.string().trim().min(min).max(max).refine((value) => isMeaningfulText(value, { allowDigits: true, minLetters }));
-const detailedText = (min = 20, max = 5000, minLetters = 12, minWords = 6) => z.string().trim().min(min).max(max).refine((value) => isDetailedText(value, { minLetters, minWords }));
+const detailedText = (min = 20, max = 100000, minLetters = 12, minWords = 6) => z.string().trim().min(min).max(max).refine((value) => isDetailedText(value, { minLetters, minWords }));
+const plainText = (min = 2, max = 5000) => z.string().trim().min(min).max(max);
 
 const dateSchema = z.preprocess((value) => {
   if (typeof value !== "string" || !value.trim()) return value;
@@ -33,25 +34,25 @@ const projectSubmissionSchema = z.object({
   title: meaningfulText(5, 180, 4),
   sector: z.enum(["real-estate", "trade", "production", "technology", "logistics", "other"]),
   sectorOther: optionalText.refine((value) => !value || isMeaningfulText(value, { minLetters: 3 })),
-  location: optionalText.refine((value) => !value || isMeaningfulText(value, { allowDigits: true, minLetters: 3, minWords: 2 })),
+  location: z.string().trim().max(180).optional(),
   targetUsdt: z.preprocess((value) => {
     if (typeof value !== "string" || !value.trim()) return undefined;
     const normalized = Number(value.replace(",", "."));
     return Number.isFinite(normalized) ? normalized : value;
   }, z.number().positive().max(100000000).optional()),
   structure: optionalText,
-  expectedReturn: meaningfulText(8, 180, 6),
-  expectedYield: meaningfulText(5, 180, 3),
-  stage: meaningfulText(5, 180, 4),
+  expectedReturn: plainText(8, 180),
+  expectedYield: plainText(5, 180),
+  stage: plainText(5, 180),
   currentProgress: detailedText(30, 2500, 18, 8),
   fundraisingStartAt: dateSchema,
   fundraisingEndAt: dateSchema,
   plannedLaunchAt: dateSchema,
   plannedDividendAt: dateSchema,
   payoutFrequency: z.nativeEnum(PayoutFrequency).default(PayoutFrequency.CUSTOM),
-  participationTerm: meaningfulText(5, 180, 3),
-  raisePlan: z.string().trim().max(2500).optional().refine((value) => !value || isDetailedText(value, { minLetters: 12, minWords: 5 })),
-  summary: detailedText(120, 5000, 70, 25),
+  participationTerm: plainText(3, 180),
+  raisePlan: z.string().trim().max(2500).optional(),
+  summary: detailedText(120, 100000, 70, 25),
   propertyObjectName: optionalText,
   propertyComplexName: optionalText,
   propertyDeveloper: optionalText,
@@ -62,9 +63,10 @@ const projectSubmissionSchema = z.object({
   propertyType: z.enum(propertyTypeOptions).optional(),
   propertyStatus: z.enum(propertyStatusOptions).optional(),
   propertyShortDescription: z.string().trim().max(300).optional(),
-  propertyFullDescription: z.string().trim().max(6000).optional(),
+  propertyFullDescription: z.string().trim().max(100000).optional(),
   propertyVehicleName: optionalText,
   propertyManagerName: optionalText,
+  propertyEstimatedAssetValue: moneyField(),
   propertyTotalAssetValue: moneyField(),
   propertyCurrency: optionalText,
   propertyMinimumParticipation: moneyField(),
@@ -102,6 +104,7 @@ const projectSubmissionSchema = z.object({
       "propertyStatus",
       "propertyShortDescription",
       "propertyFullDescription",
+      "propertyEstimatedAssetValue",
       "propertyTotalAssetValue",
       "propertyCurrency",
       "propertyMinimumParticipation",
@@ -133,6 +136,13 @@ type SessionUser = {
   };
 };
 
+type StoredSubmissionDocument = {
+  name: string;
+  size: number;
+  storagePath: string;
+  type: string;
+};
+
 const maxProjectFileSize = 20 * 1024 * 1024;
 const maxProjectFiles = 20;
 const maxProjectTotalSize = 100 * 1024 * 1024;
@@ -147,9 +157,13 @@ const allowedMimeTypes = new Set([
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   "image/jpeg",
   "image/png",
-  "image/webp"
+  "image/webp",
+  "video/mp4",
+  "video/quicktime",
+  "video/webm",
+  "video/x-m4v"
 ]);
-const allowedExtensions = new Set([".doc", ".docx", ".pdf", ".jpg", ".jpeg", ".png", ".ppt", ".pptx", ".xls", ".xlsx", ".zip", ".webp"]);
+const allowedExtensions = new Set([".doc", ".docx", ".pdf", ".jpg", ".jpeg", ".png", ".ppt", ".pptx", ".xls", ".xlsx", ".zip", ".webp", ".mp4", ".mov", ".webm", ".m4v"]);
 
 function isRu(request: NextRequest) {
   return request.nextUrl.searchParams.get("lang") !== "en";
@@ -180,6 +194,7 @@ function projectFieldLabels(localeRu: boolean) {
     propertyFullDescription: localeRu ? "Добавьте развёрнутое описание объекта." : "Add a full property description.",
     propertyFundraisingCurrency: localeRu ? "Укажите валюту участия." : "Enter the participation currency.",
     propertyIncomeSources: localeRu ? "Выберите хотя бы один источник дохода." : "Select at least one income source.",
+    propertyEstimatedAssetValue: localeRu ? "Укажите оценочную стоимость объекта." : "Enter estimated asset value.",
     propertyInvestorSharePercent: localeRu ? "Укажите долю инвесторов." : "Enter investor share.",
     propertyManagerFeePercent: localeRu ? "Укажите комиссию управляющего." : "Enter manager fee.",
     propertyManagerSharePercent: localeRu ? "Укажите долю управляющего." : "Enter manager share.",
@@ -214,6 +229,12 @@ function readTexts(formData: FormData, key: string) {
   return formData.getAll(key).filter((value): value is string => typeof value === "string" && value.trim().length > 0);
 }
 
+function keepExistingFiles(formData: FormData, key: string, fallback: boolean) {
+  const value = readText(formData, `${key}__keepExisting`);
+  if (!value) return fallback;
+  return value === "1";
+}
+
 function validateProjectFile(file: File) {
   if (file.size > maxProjectFileSize) return "size";
 
@@ -237,6 +258,43 @@ function sanitizeFileName(fileName: string) {
 function resolveSector(sector?: string, sectorOther?: string) {
   if (sector !== "other") return sector;
   return sectorOther;
+}
+
+function readSubmissionDocuments(value: unknown): StoredSubmissionDocument[] {
+  if (!value || typeof value !== "object" || !("files" in value)) return [];
+  const files = (value as { files?: unknown }).files;
+  return Array.isArray(files) ? files.filter(isStoredSubmissionDocument) : [];
+}
+
+function readSubmissionPropertyAssets(value: unknown) {
+  if (!value || typeof value !== "object" || !("propertyAssets" in value)) return [];
+  const assets = (value as { propertyAssets?: unknown }).propertyAssets;
+  return Array.isArray(assets) ? assets.filter(isRealEstateDocumentAsset) : [];
+}
+
+function isStoredSubmissionDocument(value: unknown): value is StoredSubmissionDocument {
+  if (!value || typeof value !== "object") return false;
+  const document = value as Partial<StoredSubmissionDocument>;
+  return typeof document.name === "string" && typeof document.storagePath === "string" && typeof document.size === "number" && typeof document.type === "string";
+}
+
+function isRealEstateDocumentAsset(value: unknown): value is RealEstateDocumentAsset {
+  if (!value || typeof value !== "object") return false;
+  const asset = value as Partial<RealEstateDocumentAsset>;
+  return typeof asset.category === "string" && typeof asset.href === "string" && typeof asset.name === "string";
+}
+
+function splitExistingPropertyAssets(assets: RealEstateDocumentAsset[], coverHref?: string) {
+  const galleryAssets = assets.filter((asset) => asset.category === "gallery");
+  const coverAsset = galleryAssets.find((asset) => asset.href === coverHref) ?? galleryAssets[0];
+
+  return {
+    brochures: assets.filter((asset) => asset.category === "brochure"),
+    cover: coverAsset ? [coverAsset] : [],
+    floorPlans: assets.filter((asset) => asset.category === "floor-plan"),
+    gallery: galleryAssets.filter((asset) => asset.href !== coverAsset?.href),
+    visuals: assets.filter((asset) => asset.category === "render")
+  };
 }
 
 async function saveProjectFile(file: File, userId: string, submissionFolder: string) {
@@ -338,6 +396,24 @@ export async function POST(request: NextRequest) {
   }
 
   const formData = await request.formData();
+  const sourceSubmissionId = readText(formData, "sourceSubmissionId");
+  const sourceSubmission = sourceSubmissionId
+    ? await prisma.projectSubmission.findFirst({
+        where: {
+          id: sourceSubmissionId,
+          projectId: { not: null },
+          status: "APPROVED",
+          userId
+        },
+        select: {
+          documents: true,
+          organizationId: true,
+          projectId: true,
+          propertyData: true,
+          sector: true
+        }
+      })
+    : null;
   const parsed = projectSubmissionSchema.safeParse({
     title: readText(formData, "title"),
     sector: readText(formData, "sector"),
@@ -370,6 +446,7 @@ export async function POST(request: NextRequest) {
     propertyFullDescription: readText(formData, "propertyFullDescription"),
     propertyVehicleName: readText(formData, "propertyVehicleName"),
     propertyManagerName: readText(formData, "propertyManagerName"),
+    propertyEstimatedAssetValue: readText(formData, "propertyEstimatedAssetValue"),
     propertyTotalAssetValue: readText(formData, "propertyTotalAssetValue"),
     propertyCurrency: readText(formData, "propertyCurrency"),
     propertyMinimumParticipation: readText(formData, "propertyMinimumParticipation"),
@@ -395,6 +472,19 @@ export async function POST(request: NextRequest) {
   };
   const extraFiles = Object.values(propertyAssetFiles).flat();
 
+  if (sourceSubmissionId && !sourceSubmission) {
+    return NextResponse.json(
+      {
+        title: localeRu ? "Проект для редактирования не найден" : "Project to edit not found",
+        message:
+          localeRu
+            ? "Откройте опубликованный проект из раздела «Мои проекты» и повторите попытку."
+            : "Open the published project from My projects and try again."
+      },
+      { status: 404 }
+    );
+  }
+
   if (!parsed.success) {
     const fieldErrors = zodFieldErrors(parsed.error, projectFieldLabels(localeRu));
 
@@ -411,7 +501,50 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (!documents.length && !(parsed.success && parsed.data.sector === "real-estate" && extraFiles.length)) {
+  const data = parsed.data;
+  const sector = resolveSector(data.sector, data.sectorOther);
+  const editingPublishedProject = Boolean(sourceSubmission?.projectId);
+  const existingSubmissionDocuments = readSubmissionDocuments(sourceSubmission?.documents);
+  const existingPropertyAssets = readSubmissionPropertyAssets(sourceSubmission?.documents);
+  const existingRealEstate = parseRealEstateData(sourceSubmission?.propertyData);
+  const keepDocuments = keepExistingFiles(formData, "documents", existingSubmissionDocuments.length > 0);
+  const keepCoverImage = keepExistingFiles(formData, "propertyCoverImage", true);
+  const keepGalleryImages = keepExistingFiles(formData, "propertyGalleryImages", true);
+  const keepFloorPlans = keepExistingFiles(formData, "propertyFloorPlans", true);
+  const keepBrochures = keepExistingFiles(formData, "propertyBrochures", true);
+  const keepVisuals = keepExistingFiles(formData, "propertyVisuals", true);
+
+  if (editingPublishedProject && sector !== sourceSubmission?.sector) {
+    return NextResponse.json(
+      {
+        title: localeRu ? "Нельзя менять категорию" : "Sector change is not allowed",
+        message:
+          localeRu
+            ? "Для опубликованного проекта можно обновлять данные, но нельзя менять категорию листинга."
+            : "You can update listing details, but you cannot change the published project's sector."
+      },
+      { status: 400 }
+    );
+  }
+
+  const existingAssetGroups = splitExistingPropertyAssets(existingPropertyAssets, existingRealEstate?.coverImage);
+  const keptExistingDocuments = keepDocuments ? existingSubmissionDocuments : [];
+  const keptExistingAssetGroups = {
+    brochures: keepBrochures ? existingAssetGroups.brochures : [],
+    cover: keepCoverImage ? existingAssetGroups.cover : [],
+    floorPlans: keepFloorPlans ? existingAssetGroups.floorPlans : [],
+    gallery: keepGalleryImages ? existingAssetGroups.gallery : [],
+    visuals: keepVisuals ? existingAssetGroups.visuals : []
+  };
+  const keptExistingPropertyAssets = [
+    ...keptExistingAssetGroups.cover,
+    ...keptExistingAssetGroups.gallery,
+    ...keptExistingAssetGroups.floorPlans,
+    ...keptExistingAssetGroups.brochures,
+    ...keptExistingAssetGroups.visuals
+  ];
+
+  if (!documents.length && !keptExistingDocuments.length && !(data.sector === "real-estate" && (extraFiles.length || keptExistingPropertyAssets.length))) {
     return NextResponse.json(
       {
         title: localeRu ? "Прикрепите документы" : "Attach documents",
@@ -468,8 +601,8 @@ export async function POST(request: NextRequest) {
                 ? "Каждый файл должен быть не больше 20 МБ."
                 : "Each file must be no larger than 20 MB."
               : localeRu
-                ? "Можно загрузить PDF, DOCX, XLSX, PPTX, JPG или PNG."
-                : "Upload PDF, DOCX, XLSX, PPTX, JPG or PNG files.",
+                ? "Можно загрузить PDF, DOCX, XLSX, PPTX, JPG, PNG, WEBP, MP4, MOV или WEBM."
+                : "Upload PDF, DOCX, XLSX, PPTX, JPG, PNG, WEBP, MP4, MOV or WEBM files.",
           fieldErrors: {
             documents: projectFieldLabels(localeRu).documents
           }
@@ -479,17 +612,23 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const data = parsed.data;
-  const sector = resolveSector(data.sector, data.sectorOther);
   const submissionFolder = randomUUID();
-  const savedDocuments = await Promise.all(documents.map((file) => saveProjectFile(file, userId, submissionFolder)));
-  const savedPropertyAssets = await Promise.all([
+  const uploadedDocuments = await Promise.all(documents.map((file) => saveProjectFile(file, userId, submissionFolder)));
+  const uploadedPropertyAssets = await Promise.all([
     saveAssetGroup(propertyAssetFiles.coverImage, "gallery", userId, submissionFolder),
     saveAssetGroup(propertyAssetFiles.gallery, "gallery", userId, submissionFolder),
     saveAssetGroup(propertyAssetFiles.floorPlans, "floor-plan", userId, submissionFolder),
     saveAssetGroup(propertyAssetFiles.brochures, "brochure", userId, submissionFolder),
     saveAssetGroup(propertyAssetFiles.visuals, "render", userId, submissionFolder)
   ]).then((groups) => groups.flat());
+  const uploadedAssetGroups = splitExistingPropertyAssets(uploadedPropertyAssets, uploadedPropertyAssets.find((asset) => asset.category === "gallery")?.href);
+  const savedDocuments = uploadedDocuments.length ? uploadedDocuments : keptExistingDocuments;
+  const coverAssets = uploadedAssetGroups.cover.length ? uploadedAssetGroups.cover : keptExistingAssetGroups.cover;
+  const galleryAssets = uploadedAssetGroups.gallery.length ? uploadedAssetGroups.gallery : keptExistingAssetGroups.gallery;
+  const floorPlanAssets = uploadedAssetGroups.floorPlans.length ? uploadedAssetGroups.floorPlans : keptExistingAssetGroups.floorPlans;
+  const brochureAssets = uploadedAssetGroups.brochures.length ? uploadedAssetGroups.brochures : keptExistingAssetGroups.brochures;
+  const visualAssets = uploadedAssetGroups.visuals.length ? uploadedAssetGroups.visuals : keptExistingAssetGroups.visuals;
+  const savedPropertyAssets = [...coverAssets, ...galleryAssets, ...floorPlanAssets, ...brochureAssets, ...visualAssets];
 
   if (data.sector === "other" && !sector) {
     return NextResponse.json(
@@ -507,7 +646,8 @@ export async function POST(request: NextRequest) {
   const submission = await prisma.$transaction(async (tx) => {
     const created = await tx.projectSubmission.create({
       data: {
-        organizationId: organization?.id,
+        organizationId: sourceSubmission?.organizationId ?? organization?.id,
+        projectId: sourceSubmission?.projectId ?? undefined,
         userId,
         title: data.title,
         sector,
@@ -533,7 +673,7 @@ export async function POST(request: NextRequest) {
                 city: data.propertyCity,
                 completionDate: data.propertyCompletionDate?.toISOString(),
                 country: data.propertyCountry,
-                coverImage: savedPropertyAssets.find((asset) => asset.category === "gallery")?.href,
+                coverImage: coverAssets[0]?.href,
                 currency: data.propertyCurrency,
                 descriptionFull: data.propertyFullDescription,
                 descriptionShort: data.propertyShortDescription,
@@ -541,9 +681,11 @@ export async function POST(request: NextRequest) {
                 district: data.propertyDistrict,
                 documents: savedPropertyAssets,
                 fundraisingCurrency: data.propertyFundraisingCurrency,
-                gallery: savedPropertyAssets.filter((asset) => asset.category === "gallery").map((asset) => asset.href),
+                gallery: [...coverAssets, ...galleryAssets].map((asset) => asset.href),
                 gatheredAmount: data.propertyGatheredAmount,
                 incomeSources: data.propertyIncomeSources,
+                estimatedAssetValue: data.propertyEstimatedAssetValue,
+                investorSharePercent: data.propertyInvestorSharePercent,
                 managerFeePercent: data.propertyManagerFeePercent,
                 managerName: data.propertyManagerName,
                 managerSharePercent: data.propertyManagerSharePercent,
@@ -559,7 +701,7 @@ export async function POST(request: NextRequest) {
                 titleComplex: data.propertyComplexName,
                 totalAssetValue: data.propertyTotalAssetValue,
                 vehicleName: data.propertyVehicleName,
-                visuals: savedPropertyAssets.filter((asset) => asset.category === "render").map((asset) => asset.href)
+                visuals: visualAssets.map((asset) => asset.href)
               }
             : undefined,
         documents: {
@@ -573,12 +715,14 @@ export async function POST(request: NextRequest) {
     await tx.adminAuditLog.create({
       data: {
         actorId: userId,
-        action: "project.submission.create",
+        action: editingPublishedProject ? "project.submission.revision.create" : "project.submission.create",
         entityType: "ProjectSubmission",
         entityId: created.id,
           payload: {
             sector,
-            organizationId: organization?.id ?? null,
+            organizationId: sourceSubmission?.organizationId ?? organization?.id ?? null,
+            projectId: sourceSubmission?.projectId ?? null,
+            sourceSubmissionId: sourceSubmissionId || null,
             title: data.title,
           expectedReturn: data.expectedReturn,
           expectedYield: data.expectedYield,
@@ -601,11 +745,15 @@ export async function POST(request: NextRequest) {
   });
 
   return NextResponse.json({
-    title: localeRu ? "Проект отправлен" : "Project submitted",
+    title: editingPublishedProject ? (localeRu ? "Изменения отправлены" : "Changes submitted") : localeRu ? "Проект отправлен" : "Project submitted",
     message:
-      localeRu
-        ? "Заявка на размещение проекта отправлена команде Qidra. После первичной проверки статус появится в профиле."
-        : "Your project listing application was sent to the Qidra team. Its status will appear in your profile after initial review.",
+      editingPublishedProject
+        ? localeRu
+          ? "Правки по опубликованному проекту отправлены на повторную модерацию."
+          : "Changes to the published project were sent for moderation."
+        : localeRu
+          ? "Заявка на размещение проекта отправлена команде Qidra. После первичной проверки статус появится в профиле."
+          : "Your project listing application was sent to the Qidra team. Its status will appear in your profile after initial review.",
     submissionId: submission.id
   });
 }
