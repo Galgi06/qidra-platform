@@ -157,6 +157,11 @@ export default async function NewProjectSubmissionPage({ searchParams }: { searc
                         ? "Чем подробнее описание и документы, тем быстрее команда сможет провести первичный отбор."
                         : "The more complete the description and documents, the faster the team can complete initial screening."}
                   </p>
+                  <p className="mt-2 max-w-2xl text-14 text-qidra-grayBlue">
+                    {isRu
+                      ? "Черновик сохраняется автоматически в этом браузере по мере заполнения полей. Если вы обновите страницу или вернётесь позже, текстовые данные восстановятся."
+                      : "The draft is saved automatically in this browser while you fill in the form. If you refresh the page or return later, text fields will be restored."}
+                  </p>
                 </div>
                 <div className="grid gap-4 md:grid-cols-2">
                   <Input label={isRu ? "Название проекта" : "Project title"} name="title" maxLength={180} minLength={5} defaultValue={initialValues?.title ?? ""} placeholder={isRu ? "Например: Производство халяльной продукции" : "Example: Halal product manufacturing"} required />
