@@ -211,8 +211,8 @@ export function ProjectSectorFields({
             />
             <div className="lg:col-span-2">
               <FileUpload
-                accept=".jpg,.jpeg,.png,.webp"
-                hint={isRu ? "Визуализации: JPG, PNG, WEBP" : "Renderings: JPG, PNG, WEBP"}
+                accept=".jpg,.jpeg,.png,.webp,.mp4,.mov,.webm,.m4v"
+                hint={isRu ? "Визуализации: JPG, PNG, WEBP, MP4, MOV, WEBM" : "Renderings: JPG, PNG, WEBP, MP4, MOV, WEBM"}
                 label={isRu ? "Визуализации" : "Visuals"}
                 existingFileName={initialValues?.existingUploads?.visuals ?? undefined}
                 existingLabel={isRu ? "Текущие" : "Current"}

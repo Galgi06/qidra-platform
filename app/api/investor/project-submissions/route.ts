@@ -157,9 +157,13 @@ const allowedMimeTypes = new Set([
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   "image/jpeg",
   "image/png",
-  "image/webp"
+  "image/webp",
+  "video/mp4",
+  "video/quicktime",
+  "video/webm",
+  "video/x-m4v"
 ]);
-const allowedExtensions = new Set([".doc", ".docx", ".pdf", ".jpg", ".jpeg", ".png", ".ppt", ".pptx", ".xls", ".xlsx", ".zip", ".webp"]);
+const allowedExtensions = new Set([".doc", ".docx", ".pdf", ".jpg", ".jpeg", ".png", ".ppt", ".pptx", ".xls", ".xlsx", ".zip", ".webp", ".mp4", ".mov", ".webm", ".m4v"]);
 
 function isRu(request: NextRequest) {
   return request.nextUrl.searchParams.get("lang") !== "en";
@@ -223,6 +227,12 @@ function readFiles(formData: FormData, key: string) {
 
 function readTexts(formData: FormData, key: string) {
   return formData.getAll(key).filter((value): value is string => typeof value === "string" && value.trim().length > 0);
+}
+
+function keepExistingFiles(formData: FormData, key: string, fallback: boolean) {
+  const value = readText(formData, `${key}__keepExisting`);
+  if (!value) return fallback;
+  return value === "1";
 }
 
 function validateProjectFile(file: File) {
@@ -497,6 +507,12 @@ export async function POST(request: NextRequest) {
   const existingSubmissionDocuments = readSubmissionDocuments(sourceSubmission?.documents);
   const existingPropertyAssets = readSubmissionPropertyAssets(sourceSubmission?.documents);
   const existingRealEstate = parseRealEstateData(sourceSubmission?.propertyData);
+  const keepDocuments = keepExistingFiles(formData, "documents", existingSubmissionDocuments.length > 0);
+  const keepCoverImage = keepExistingFiles(formData, "propertyCoverImage", true);
+  const keepGalleryImages = keepExistingFiles(formData, "propertyGalleryImages", true);
+  const keepFloorPlans = keepExistingFiles(formData, "propertyFloorPlans", true);
+  const keepBrochures = keepExistingFiles(formData, "propertyBrochures", true);
+  const keepVisuals = keepExistingFiles(formData, "propertyVisuals", true);
 
   if (editingPublishedProject && sector !== sourceSubmission?.sector) {
     return NextResponse.json(
@@ -511,7 +527,24 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (!documents.length && !existingSubmissionDocuments.length && !(data.sector === "real-estate" && (extraFiles.length || existingPropertyAssets.length))) {
+  const existingAssetGroups = splitExistingPropertyAssets(existingPropertyAssets, existingRealEstate?.coverImage);
+  const keptExistingDocuments = keepDocuments ? existingSubmissionDocuments : [];
+  const keptExistingAssetGroups = {
+    brochures: keepBrochures ? existingAssetGroups.brochures : [],
+    cover: keepCoverImage ? existingAssetGroups.cover : [],
+    floorPlans: keepFloorPlans ? existingAssetGroups.floorPlans : [],
+    gallery: keepGalleryImages ? existingAssetGroups.gallery : [],
+    visuals: keepVisuals ? existingAssetGroups.visuals : []
+  };
+  const keptExistingPropertyAssets = [
+    ...keptExistingAssetGroups.cover,
+    ...keptExistingAssetGroups.gallery,
+    ...keptExistingAssetGroups.floorPlans,
+    ...keptExistingAssetGroups.brochures,
+    ...keptExistingAssetGroups.visuals
+  ];
+
+  if (!documents.length && !keptExistingDocuments.length && !(data.sector === "real-estate" && (extraFiles.length || keptExistingPropertyAssets.length))) {
     return NextResponse.json(
       {
         title: localeRu ? "Прикрепите документы" : "Attach documents",
@@ -568,8 +601,8 @@ export async function POST(request: NextRequest) {
                 ? "Каждый файл должен быть не больше 20 МБ."
                 : "Each file must be no larger than 20 MB."
               : localeRu
-                ? "Можно загрузить PDF, DOCX, XLSX, PPTX, JPG или PNG."
-                : "Upload PDF, DOCX, XLSX, PPTX, JPG or PNG files.",
+                ? "Можно загрузить PDF, DOCX, XLSX, PPTX, JPG, PNG, WEBP, MP4, MOV или WEBM."
+                : "Upload PDF, DOCX, XLSX, PPTX, JPG, PNG, WEBP, MP4, MOV or WEBM files.",
           fieldErrors: {
             documents: projectFieldLabels(localeRu).documents
           }
@@ -588,14 +621,13 @@ export async function POST(request: NextRequest) {
     saveAssetGroup(propertyAssetFiles.brochures, "brochure", userId, submissionFolder),
     saveAssetGroup(propertyAssetFiles.visuals, "render", userId, submissionFolder)
   ]).then((groups) => groups.flat());
-  const existingAssetGroups = splitExistingPropertyAssets(existingPropertyAssets, existingRealEstate?.coverImage);
   const uploadedAssetGroups = splitExistingPropertyAssets(uploadedPropertyAssets, uploadedPropertyAssets.find((asset) => asset.category === "gallery")?.href);
-  const savedDocuments = uploadedDocuments.length ? uploadedDocuments : existingSubmissionDocuments;
-  const coverAssets = uploadedAssetGroups.cover.length ? uploadedAssetGroups.cover : existingAssetGroups.cover;
-  const galleryAssets = uploadedAssetGroups.gallery.length ? uploadedAssetGroups.gallery : existingAssetGroups.gallery;
-  const floorPlanAssets = uploadedAssetGroups.floorPlans.length ? uploadedAssetGroups.floorPlans : existingAssetGroups.floorPlans;
-  const brochureAssets = uploadedAssetGroups.brochures.length ? uploadedAssetGroups.brochures : existingAssetGroups.brochures;
-  const visualAssets = uploadedAssetGroups.visuals.length ? uploadedAssetGroups.visuals : existingAssetGroups.visuals;
+  const savedDocuments = uploadedDocuments.length ? uploadedDocuments : keptExistingDocuments;
+  const coverAssets = uploadedAssetGroups.cover.length ? uploadedAssetGroups.cover : keptExistingAssetGroups.cover;
+  const galleryAssets = uploadedAssetGroups.gallery.length ? uploadedAssetGroups.gallery : keptExistingAssetGroups.gallery;
+  const floorPlanAssets = uploadedAssetGroups.floorPlans.length ? uploadedAssetGroups.floorPlans : keptExistingAssetGroups.floorPlans;
+  const brochureAssets = uploadedAssetGroups.brochures.length ? uploadedAssetGroups.brochures : keptExistingAssetGroups.brochures;
+  const visualAssets = uploadedAssetGroups.visuals.length ? uploadedAssetGroups.visuals : keptExistingAssetGroups.visuals;
   const savedPropertyAssets = [...coverAssets, ...galleryAssets, ...floorPlanAssets, ...brochureAssets, ...visualAssets];
 
   if (data.sector === "other" && !sector) {

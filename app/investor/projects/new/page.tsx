@@ -124,6 +124,7 @@ export default async function NewProjectSubmissionPage({ searchParams }: { searc
             <div id="project-form">
             <FeedbackForm
               className="premium-card grid gap-6 p-6 sm:p-8"
+              draftKey={`qidra:project-submission:${userId}:${editSubmissionId ?? "new"}`}
               endpoint={`/api/investor/project-submissions?lang=${locale}`}
               feedback={submitFeedback}
               payload="form-data"
@@ -257,9 +258,10 @@ export default async function NewProjectSubmissionPage({ searchParams }: { searc
                 <FileUpload
                   hint={
                     isRu
-                      ? "Можно выбрать несколько файлов: презентация, регистрационные документы, финмодель, договоры, фото. PDF/DOCX/XLSX/PPTX/JPG/PNG"
-                      : "You can select multiple files: presentation, registration documents, financial model, contracts, photos. PDF/DOCX/XLSX/PPTX/JPG/PNG"
+                      ? "Можно выбрать несколько файлов: презентация, регистрационные документы, финмодель, договоры, фото или видео. PDF/DOCX/XLSX/PPTX/JPG/PNG/WEBP/MP4/MOV/WEBM"
+                      : "You can select multiple files: presentation, registration documents, financial model, contracts, photos or video. PDF/DOCX/XLSX/PPTX/JPG/PNG/WEBP/MP4/MOV/WEBM"
                   }
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.webp,.mp4,.mov,.webm,.m4v"
                   existingFileName={initialValues?.documentsSummary ?? undefined}
                   existingLabel={isRu ? "Текущие" : "Current"}
                   label={isRu ? "Документы проекта" : "Project documents"}

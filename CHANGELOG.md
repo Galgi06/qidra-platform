@@ -25,3 +25,14 @@ Format for each release entry:
 
 ### Fixes
 - Fixed the participant KYC form to surface explicit file-field errors instead of behaving like an inactive submit button on Safari/mobile flows.
+
+## [0.1.2] - 2026-06-24
+
+### Changes
+- Added draft autosave for the investor project submission form so text fields persist between sessions.
+- Rebuilt the project file upload component to support removing and replacing selected files before submission.
+- Added support for project videos in listing attachments and real-estate visuals.
+
+### Fixes
+- Fixed the real-estate submission flow so uploaded files are appended reliably during form submission instead of being lost in the browser state.
+- Fixed edit-mode handling of existing uploaded files by explicitly keeping or clearing current file groups per field.
