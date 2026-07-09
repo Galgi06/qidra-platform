@@ -26,6 +26,7 @@ export type CatalogProject = {
   organization: {
     displayName: string;
     id: string;
+    legalName?: string | null;
     publicSlug: string;
   } | null;
   location: string;
@@ -123,6 +124,7 @@ type ProjectWithPublicRelations = DbProject & {
   organization?: {
     displayName: string;
     id: string;
+    legalName?: string | null;
     publicSlug: string;
   } | null;
   projectSubmissions?: {
@@ -139,9 +141,9 @@ type ProjectWithPublicRelations = DbProject & {
 };
 
 export function mapProject(project: ProjectWithPublicRelations): CatalogProject {
-  const fundedUsdt = Number(project.fundedUsdt.toString());
+  const rawFundedUsdt = Number(project.fundedUsdt.toString());
   const targetUsdt = Number(project.targetUsdt.toString());
-  const effectiveStatus = project.status === ProjectStatus.ACTIVE && fundedUsdt >= targetUsdt ? ProjectStatus.FUNDED : project.status;
+  const effectiveStatus = project.status === ProjectStatus.ACTIVE && rawFundedUsdt >= targetUsdt ? ProjectStatus.FUNDED : project.status;
   const initiatorSubmission = project.projectSubmissions?.find((submission) => submission.status === "APPROVED" && submission.user);
   const initiator = initiatorSubmission?.user
     ? {
@@ -151,6 +153,21 @@ export function mapProject(project: ProjectWithPublicRelations): CatalogProject 
         city: initiatorSubmission.user.investorProfile?.city ?? null
       }
     : null;
+
+  const realEstate = parseRealEstateData(project.propertyData);
+  const shouldShowTargetAsFunded =
+    Boolean(realEstate) &&
+    (effectiveStatus === ProjectStatus.FUNDED || effectiveStatus === ProjectStatus.CLOSED) &&
+    rawFundedUsdt <= 0;
+  const fundedUsdt = shouldShowTargetAsFunded ? realEstate?.targetRaise || targetUsdt : rawFundedUsdt;
+  const normalizedRealEstate =
+    shouldShowTargetAsFunded && realEstate
+      ? {
+          ...realEstate,
+          gatheredAmount: realEstate.gatheredAmount && realEstate.gatheredAmount > 0 ? realEstate.gatheredAmount : fundedUsdt,
+          remainingAmount: 0
+        }
+      : realEstate;
 
   return {
     coverImage: project.coverImage ?? null,
@@ -197,6 +214,7 @@ export function mapProject(project: ProjectWithPublicRelations): CatalogProject 
       ? {
           displayName: project.organization.displayName,
           id: project.organization.id,
+          legalName: project.organization.legalName ?? null,
           publicSlug: project.organization.publicSlug
         }
       : null,
@@ -204,7 +222,7 @@ export function mapProject(project: ProjectWithPublicRelations): CatalogProject 
     structure: project.structure,
     riskLevel: project.riskLevel ?? "Moderate",
     initiator,
-    realEstate: parseRealEstateData(project.propertyData),
+    realEstate: normalizedRealEstate,
     sector: inferProjectSectorValue(project.propertyData, project.titleRu, project.titleEn, project.summaryRu, project.summaryEn, project.descriptionRu, project.descriptionEn),
     documents:
       project.documents?.map((document) => ({
@@ -328,7 +346,7 @@ export async function getAdminProjects() {
   await ensureBaseProjects();
 
     const projects = await prisma.project.findMany({
-      include: { documents: true, organization: { select: { displayName: true, id: true, publicSlug: true } }, projectSubmissions: publicInitiatorInclude() },
+      include: { documents: true, organization: { select: { displayName: true, id: true, legalName: true, publicSlug: true } }, projectSubmissions: publicInitiatorInclude() },
       orderBy: { createdAt: "desc" }
     });
 
@@ -344,7 +362,7 @@ export async function getPublicProjects() {
         status: { in: [ProjectStatus.ACTIVE, ProjectStatus.FUNDED] },
         documents: { some: {} }
       },
-      include: { documents: true, organization: { select: { displayName: true, id: true, publicSlug: true } }, projectSubmissions: publicInitiatorInclude() },
+      include: { documents: true, organization: { select: { displayName: true, id: true, legalName: true, publicSlug: true } }, projectSubmissions: publicInitiatorInclude() },
       orderBy: { createdAt: "desc" }
     });
 
@@ -364,7 +382,7 @@ export async function getProjectBySlug(slug: string) {
 
     const project = await prisma.project.findUnique({
       where: { slug },
-      include: { documents: true, organization: { select: { displayName: true, id: true, publicSlug: true } }, projectSubmissions: publicInitiatorInclude() }
+      include: { documents: true, organization: { select: { displayName: true, id: true, legalName: true, publicSlug: true } }, projectSubmissions: publicInitiatorInclude() }
     });
 
     return project ? mapProject(project) : null;
