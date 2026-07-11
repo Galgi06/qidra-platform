@@ -97,12 +97,33 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const existingUser = await prisma.user.findUnique({
+    where: { email },
+    select: {
+      emailVerified: true,
+      id: true
+    }
+  });
+
+  if (!existingUser) {
+    return NextResponse.json(
+      {
+        title: localeRu ? "Аккаунт не найден" : "Account not found",
+        message: localeRu ? "Запросите новую ссылку восстановления для существующего аккаунта." : "Request a new reset link for an existing account."
+      },
+      { status: 400 }
+    );
+  }
+
   const passwordHash = await bcrypt.hash(parsed.data.password, 12);
 
   await prisma.$transaction([
     prisma.user.update({
       where: { email },
-      data: { passwordHash }
+      data: {
+        passwordHash,
+        emailVerified: existingUser.emailVerified ?? new Date()
+      }
     }),
     prisma.verificationToken.delete({
       where: { token: tokenHash }
