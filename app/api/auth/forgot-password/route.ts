@@ -41,36 +41,44 @@ export async function POST(request: NextRequest) {
 
   const user = await prisma.user.findUnique({ where: { email } });
 
-  if (user) {
-    const rawToken = createRawToken();
-    const identifier = `password-reset:${email}`;
-    const resetUrl = new URL("/auth/reset-password", getAppBaseUrl());
-    resetUrl.searchParams.set("email", email);
-    resetUrl.searchParams.set("token", rawToken);
-    resetUrl.searchParams.set("lang", localeRu ? "ru" : "en");
-
-    await prisma.$transaction([
-      prisma.verificationToken.deleteMany({ where: { identifier } }),
-      prisma.verificationToken.create({
-        data: {
-          identifier,
-          token: hashToken(rawToken),
-          expires: expiresIn(2)
-        }
-      })
-    ]);
-
-    await sendEmail({
-      to: email,
-      subject: localeRu ? "Восстановление пароля Qidra" : "Reset your Qidra password",
-      text: localeRu
-        ? `Вы запросили восстановление пароля для аккаунта на платформе Qidra.io.\n\nЧтобы задать новый пароль, перейдите по ссылке:\n${resetUrl.toString()}\n\nСсылка действует 2 часа и работает только для последнего запроса на восстановление пароля.\n\nЕсли вы не запрашивали восстановление пароля, не переходите по ссылке. Просто удалите это письмо. Если у вас есть основания полагать, что кто-то пытался получить доступ к аккаунту, свяжитесь со службой поддержки Qidra.io.`
-        : `You requested a password reset for your account on Qidra.io.\n\nTo set a new password, follow this link:\n${resetUrl.toString()}\n\nThe link is valid for 2 hours and only works for the latest password reset request.\n\nIf you did not request a password reset, do not use this link. You can safely delete this email. If you believe someone tried to access your account, contact Qidra.io support.`,
-      html: localeRu
-        ? `<p>Вы запросили восстановление пароля для аккаунта на платформе <a href="https://qidra.io"><strong>Qidra.io</strong></a>.</p><p><a href="${resetUrl.toString()}">Перейти к восстановлению пароля</a></p><p>Ссылка действует 2 часа и работает только для последнего запроса на восстановление пароля.</p><p>Если вы не запрашивали восстановление пароля, не переходите по ссылке. Просто удалите это письмо. Если есть основания полагать, что кто-то пытался получить доступ к вашему аккаунту, свяжитесь со службой поддержки Qidra.io.</p>`
-        : `<p>You requested a password reset for your account on <a href="https://qidra.io"><strong>Qidra.io</strong></a>.</p><p><a href="${resetUrl.toString()}">Reset password</a></p><p>The link is valid for 2 hours and only works for the latest password reset request.</p><p>If you did not request a password reset, do not use this link. You can safely delete this email. If you believe someone tried to access your account, contact Qidra.io support.</p>`
-    });
+  if (!user) {
+    return NextResponse.json(
+      {
+        title: localeRu ? "Аккаунт не найден" : "Account not found",
+        message: localeRu ? "Аккаунт с таким email не найден. Проверьте адрес или зарегистрируйтесь." : "No account with this email was found. Check the address or sign up."
+      },
+      { status: 404 }
+    );
   }
+
+  const rawToken = createRawToken();
+  const identifier = `password-reset:${email}`;
+  const resetUrl = new URL("/auth/reset-password", getAppBaseUrl());
+  resetUrl.searchParams.set("email", email);
+  resetUrl.searchParams.set("token", rawToken);
+  resetUrl.searchParams.set("lang", localeRu ? "ru" : "en");
+
+  await prisma.$transaction([
+    prisma.verificationToken.deleteMany({ where: { identifier } }),
+    prisma.verificationToken.create({
+      data: {
+        identifier,
+        token: hashToken(rawToken),
+        expires: expiresIn(2)
+      }
+    })
+  ]);
+
+  await sendEmail({
+    to: email,
+    subject: localeRu ? "Восстановление пароля Qidra" : "Reset your Qidra password",
+    text: localeRu
+      ? `Вы запросили восстановление пароля для аккаунта на платформе Qidra.io.\n\nЧтобы задать новый пароль, перейдите по ссылке:\n${resetUrl.toString()}\n\nСсылка действует 2 часа и работает только для последнего запроса на восстановление пароля.\n\nЕсли вы не запрашивали восстановление пароля, не переходите по ссылке. Просто удалите это письмо. Если у вас есть основания полагать, что кто-то пытался получить доступ к аккаунту, свяжитесь со службой поддержки Qidra.io.`
+      : `You requested a password reset for your account on Qidra.io.\n\nTo set a new password, follow this link:\n${resetUrl.toString()}\n\nThe link is valid for 2 hours and only works for the latest password reset request.\n\nIf you did not request a password reset, do not use this link. You can safely delete this email. If you believe someone tried to access your account, contact Qidra.io support.`,
+    html: localeRu
+      ? `<p>Вы запросили восстановление пароля для аккаунта на платформе <a href="https://qidra.io"><strong>Qidra.io</strong></a>.</p><p><a href="${resetUrl.toString()}">Перейти к восстановлению пароля</a></p><p>Ссылка действует 2 часа и работает только для последнего запроса на восстановление пароля.</p><p>Если вы не запрашивали восстановление пароля, не переходите по ссылке. Просто удалите это письмо. Если есть основания полагать, что кто-то пытался получить доступ к вашему аккаунту, свяжитесь со службой поддержки Qidra.io.</p>`
+      : `<p>You requested a password reset for your account on <a href="https://qidra.io"><strong>Qidra.io</strong></a>.</p><p><a href="${resetUrl.toString()}">Reset password</a></p><p>The link is valid for 2 hours and only works for the latest password reset request.</p><p>If you did not request a password reset, do not use this link. You can safely delete this email. If you believe someone tried to access your account, contact Qidra.io support.</p>`
+  });
 
   return NextResponse.json({
     title: localeRu ? "Ссылка отправлена" : "Reset link sent",
