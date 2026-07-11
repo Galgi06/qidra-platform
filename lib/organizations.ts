@@ -46,6 +46,10 @@ export function canManageCompanyLeads(role: OrganizationMemberRole) {
   return role === OrganizationMemberRole.OWNER || role === OrganizationMemberRole.ADMIN || role === OrganizationMemberRole.EDITOR;
 }
 
+export function canManageCompanyDividends(role: OrganizationMemberRole) {
+  return role === OrganizationMemberRole.OWNER || role === OrganizationMemberRole.ADMIN;
+}
+
 export function isOrganizationSchemaUnavailable(error: unknown) {
   return (
     error instanceof Prisma.PrismaClientInitializationError ||
