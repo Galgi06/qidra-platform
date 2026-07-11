@@ -61,30 +61,15 @@ export function productionDiagnostics(): DiagnosticGroup[] {
       key: "storage",
       title: { en: "Private file storage", ru: "Приватное хранение файлов" },
       description: {
-        en: "KYC and project files must be stored in a private S3-compatible bucket.",
-        ru: "KYC и документы проектов должны храниться в приватном S3-compatible bucket."
+        en: "KYC and project files must be stored in private remote storage.",
+        ru: "KYC и документы проектов должны храниться в приватном удалённом хранилище."
       },
       checks: [
-        fixedCheck("FILE_STORAGE_DRIVER", process.env.FILE_STORAGE_DRIVER === "s3", {
-          en: "Production must use FILE_STORAGE_DRIVER=s3.",
-          ru: "Production должен использовать FILE_STORAGE_DRIVER=s3."
+        fixedCheck("FILE_STORAGE_DRIVER", ["s3", "gcs"].includes((process.env.FILE_STORAGE_DRIVER || "").trim().toLowerCase()), {
+          en: "Production must use FILE_STORAGE_DRIVER=s3 or gcs.",
+          ru: "Production должен использовать FILE_STORAGE_DRIVER=s3 или gcs."
         }),
-        envCheck("FILE_STORAGE_S3_BUCKET", "FILE_STORAGE_S3_BUCKET", {
-          en: "Private bucket name.",
-          ru: "Название приватного bucket."
-        }),
-        envCheck("FILE_STORAGE_S3_REGION", "FILE_STORAGE_S3_REGION", {
-          en: "Bucket region.",
-          ru: "Регион bucket."
-        }),
-        envCheck("FILE_STORAGE_S3_ACCESS_KEY_ID", "FILE_STORAGE_S3_ACCESS_KEY_ID", {
-          en: "Storage access key ID.",
-          ru: "Access key ID для хранилища."
-        }),
-        envCheck("FILE_STORAGE_S3_SECRET_ACCESS_KEY", "FILE_STORAGE_S3_SECRET_ACCESS_KEY", {
-          en: "Storage secret access key.",
-          ru: "Secret access key для хранилища."
-        })
+        ...storageChecks()
       ]
     },
     {
@@ -163,10 +148,7 @@ export function productionDiagnostics(): DiagnosticGroup[] {
           en: "USDT TRC20 contract address.",
           ru: "Адрес USDT TRC20 contract."
         }),
-        envCheck("QIDRA_TRON_WALLET_ADDRESS", "QIDRA_TRON_WALLET_ADDRESS", {
-          en: "Main outgoing TRON wallet address.",
-          ru: "Основной исходящий TRON-кошелек."
-        }),
+        walletAddressCheck(),
         envCheck("QIDRA_WALLET_KEY_ENCRYPTION_SECRET", "QIDRA_WALLET_KEY_ENCRYPTION_SECRET", {
           en: "Separate encryption secret for generated wallet private keys.",
           ru: "Отдельный секрет шифрования приватных ключей кошельков."
@@ -181,30 +163,15 @@ export function productionDiagnostics(): DiagnosticGroup[] {
         ru: "Ежедневные внешние резервные копии базы обязательны перед работой с реальными клиентами и платежами."
       },
       checks: [
-        fixedCheck("DATABASE_BACKUP_REQUIRE_S3", process.env.DATABASE_BACKUP_REQUIRE_S3 === "true", {
-          en: "Production backups must require upload to private S3/R2 storage.",
-          ru: "Production-бэкапы должны обязательно выгружаться в приватное S3/R2-хранилище."
+        fixedCheck("DATABASE_BACKUP_DRIVER", ["s3", "gcs"].includes((process.env.DATABASE_BACKUP_DRIVER || (process.env.DATABASE_BACKUP_REQUIRE_S3 === "true" ? "s3" : "")).trim().toLowerCase()), {
+          en: "Production backups must use private S3/R2 or GCS storage.",
+          ru: "Production-бэкапы должны использовать приватное S3/R2 или GCS-хранилище."
         }),
         envCheck("DATABASE_BACKUP_RETENTION_DAYS", "DATABASE_BACKUP_RETENTION_DAYS", {
           en: "Keep backups for at least 7 days.",
           ru: "Хранить резервные копии минимум 7 дней."
         }, (value) => Number.parseInt(value, 10) >= 7),
-        envCheck("DATABASE_BACKUP_S3_BUCKET", "DATABASE_BACKUP_S3_BUCKET", {
-          en: "Private backup bucket.",
-          ru: "Приватный bucket для бэкапов."
-        }),
-        envCheck("DATABASE_BACKUP_S3_REGION", "DATABASE_BACKUP_S3_REGION", {
-          en: "Backup bucket region.",
-          ru: "Регион backup bucket."
-        }),
-        envCheck("DATABASE_BACKUP_S3_ACCESS_KEY_ID", "DATABASE_BACKUP_S3_ACCESS_KEY_ID", {
-          en: "Backup storage access key ID.",
-          ru: "Access key ID для backup-хранилища."
-        }),
-        envCheck("DATABASE_BACKUP_S3_SECRET_ACCESS_KEY", "DATABASE_BACKUP_S3_SECRET_ACCESS_KEY", {
-          en: "Backup storage secret access key.",
-          ru: "Secret access key для backup-хранилища."
-        })
+        ...backupChecks()
       ]
     }
   ];
@@ -253,5 +220,97 @@ function fixedCheck(label: string, passed: boolean, description: DiagnosticCheck
     key: label,
     label,
     status: passed ? "ready" : "blocked"
+  };
+}
+
+function storageChecks(): DiagnosticCheck[] {
+  const driver = (process.env.FILE_STORAGE_DRIVER || "").trim().toLowerCase();
+
+  if (driver === "gcs") {
+    return [
+      envCheck("GCS_BUCKET_NAME", "GCS_BUCKET_NAME", {
+        en: "Private GCS bucket name.",
+        ru: "Название приватного GCS bucket."
+      })
+    ];
+  }
+
+  return [
+    envCheck("FILE_STORAGE_S3_BUCKET", "FILE_STORAGE_S3_BUCKET", {
+      en: "Private bucket name.",
+      ru: "Название приватного bucket."
+    }),
+    envCheck("FILE_STORAGE_S3_REGION", "FILE_STORAGE_S3_REGION", {
+      en: "Bucket region.",
+      ru: "Регион bucket."
+    }),
+    envCheck("FILE_STORAGE_S3_ACCESS_KEY_ID", "FILE_STORAGE_S3_ACCESS_KEY_ID", {
+      en: "Storage access key ID.",
+      ru: "Access key ID для хранилища."
+    }),
+    envCheck("FILE_STORAGE_S3_SECRET_ACCESS_KEY", "FILE_STORAGE_S3_SECRET_ACCESS_KEY", {
+      en: "Storage secret access key.",
+      ru: "Secret access key для хранилища."
+    })
+  ];
+}
+
+function backupChecks(): DiagnosticCheck[] {
+  const driver = (process.env.DATABASE_BACKUP_DRIVER || (process.env.DATABASE_BACKUP_REQUIRE_S3 === "true" ? "s3" : "")).trim().toLowerCase();
+
+  if (driver === "gcs") {
+    return [
+      envCheck("GCS_BUCKET_NAME", "GCS_BUCKET_NAME", {
+        en: "Private GCS bucket used for backups.",
+        ru: "Приватный GCS bucket для бэкапов."
+      })
+    ];
+  }
+
+  return [
+    envCheck("DATABASE_BACKUP_S3_BUCKET", "DATABASE_BACKUP_S3_BUCKET", {
+      en: "Private backup bucket.",
+      ru: "Приватный bucket для бэкапов."
+    }),
+    envCheck("DATABASE_BACKUP_S3_REGION", "DATABASE_BACKUP_S3_REGION", {
+      en: "Backup bucket region.",
+      ru: "Регион backup bucket."
+    }),
+    envCheck("DATABASE_BACKUP_S3_ACCESS_KEY_ID", "DATABASE_BACKUP_S3_ACCESS_KEY_ID", {
+      en: "Backup storage access key ID.",
+      ru: "Access key ID для backup-хранилища."
+    }),
+    envCheck("DATABASE_BACKUP_S3_SECRET_ACCESS_KEY", "DATABASE_BACKUP_S3_SECRET_ACCESS_KEY", {
+      en: "Backup storage secret access key.",
+      ru: "Secret access key для backup-хранилища."
+    })
+  ];
+}
+
+function walletAddressCheck(): DiagnosticCheck {
+  const primary = process.env.QIDRA_TRON_WALLET_ADDRESS?.trim();
+  const treasury = process.env.QIDRA_TREASURY_TRON_WALLET_ADDRESS?.trim();
+  const value = primary || treasury;
+
+  if (!value) {
+    return {
+      description: {
+        en: "Main outgoing TRON wallet address.",
+        ru: "Основной исходящий TRON-кошелек."
+      },
+      key: "QIDRA_TRON_WALLET_ADDRESS",
+      label: "QIDRA_TRON_WALLET_ADDRESS / QIDRA_TREASURY_TRON_WALLET_ADDRESS",
+      status: "blocked"
+    };
+  }
+
+  return {
+    description: {
+      en: "Main outgoing TRON wallet address.",
+      ru: "Основной исходящий TRON-кошелек."
+    },
+    key: "QIDRA_TRON_WALLET_ADDRESS",
+    label: "QIDRA_TRON_WALLET_ADDRESS / QIDRA_TREASURY_TRON_WALLET_ADDRESS",
+    status: placeholderPatterns.some((pattern) => pattern.test(value)) ? "blocked" : "ready"
   };
 }

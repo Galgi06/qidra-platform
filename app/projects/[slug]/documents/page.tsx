@@ -5,7 +5,7 @@ import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { getLocale, type SearchParams, withLocale } from "@/lib/i18n";
 import { getProjectBySlug, type CatalogProject } from "@/lib/project-catalog";
-import { realEstateAssetCategoryLabel, realEstateAssetDisplayName } from "@/lib/real-estate";
+import { realEstateAssetCategoryLabel, realEstateAssetDisplayName, type RealEstateDocumentAsset } from "@/lib/real-estate";
 
 export const dynamic = "force-dynamic";
 
@@ -73,8 +73,8 @@ function buildPublicDocuments(project: CatalogProject, locale: "ru" | "en") {
   }));
   const realEstateDocuments =
     project.realEstate?.documents
-      ?.filter((document) => document.category !== "gallery" && document.category !== "render")
-      .map((document, index) => ({
+      ?.filter((document: RealEstateDocumentAsset) => document.category !== "gallery" && document.category !== "render")
+      .map((document: RealEstateDocumentAsset, index: number) => ({
         href: document.href,
         kind: realEstateAssetCategoryLabel(document.category, locale),
         title: {

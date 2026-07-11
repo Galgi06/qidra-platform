@@ -64,11 +64,11 @@ export async function POST(request: NextRequest) {
       to: email,
       subject: localeRu ? "Восстановление пароля Qidra" : "Reset your Qidra password",
       text: localeRu
-        ? `Для восстановления пароля перейдите по ссылке: ${resetUrl.toString()}`
-        : `To reset your password, follow this link: ${resetUrl.toString()}`,
+        ? `Вы запросили сброс пароля на платформе Qidra. Чтобы задать новый пароль, перейдите по ссылке: ${resetUrl.toString()} Ссылка действует 2 часа. Если это действие совершали не вы, срочно смените пароль после входа в аккаунт или проигнорируйте и удалите это письмо.`
+        : `You requested a password reset on the Qidra platform. To set a new password, follow this link: ${resetUrl.toString()} The link is valid for 2 hours. If you did not request this action, change your password immediately after signing in or ignore and delete this email.`,
       html: localeRu
-        ? `<p>Для восстановления пароля перейдите по ссылке:</p><p><a href="${resetUrl.toString()}">Восстановить пароль</a></p>`
-        : `<p>To reset your password, follow this link:</p><p><a href="${resetUrl.toString()}">Reset password</a></p>`
+        ? `<p>Вы запросили сброс пароля на платформе <strong>Qidra</strong>.</p><p><a href="${resetUrl.toString()}">Восстановить пароль</a></p><p>Ссылка действует 2 часа.</p><p>Если это действие совершали не вы, срочно смените пароль после входа в аккаунт или удалите это письмо.</p>`
+        : `<p>You requested a password reset on the <strong>Qidra</strong> platform.</p><p><a href="${resetUrl.toString()}">Reset password</a></p><p>The link is valid for 2 hours.</p><p>If you did not request this action, change your password immediately after signing in or delete this email.</p>`
     });
   }
 

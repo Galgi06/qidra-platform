@@ -6,10 +6,11 @@ import { withLocale } from "@/lib/i18n";
 
 const companySections = [
   { group: "overview", path: "/company", label: { ru: "Обзор", en: "Overview" }, description: { ru: "Сводка компании и воронки", en: "Company and funnel summary" } },
+  { group: "overview", path: "/company/projects", label: { ru: "Проекты компании", en: "Company projects" }, description: { ru: "Опубликованные проекты и график выплат", en: "Published projects and payout schedule" } },
   { group: "profile", path: "/company/profile", label: { ru: "Профиль компании", en: "Company profile" }, description: { ru: "Позиционирование, представитель, документы", en: "Positioning, representative, documents" } },
   { group: "profile", path: "/company/documents", label: { ru: "Документы", en: "Documents" }, description: { ru: "Загрузка юридических и product файлов", en: "Upload legal and product files" } },
   { group: "listings", path: "/investor/projects/new", label: { ru: "Новый листинг", en: "New listing" }, description: { ru: "Создание продукта или проекта", en: "Create a product or project" } },
-  { group: "listings", path: "/admin/project-submissions", label: { ru: "Статусы листингов", en: "Listing statuses" }, description: { ru: "Следите за модерацией отправленных заявок", en: "Track moderation of submitted listings" } },
+  { group: "listings", path: "/company/projects?view=submissions", label: { ru: "Статусы листингов", en: "Listing statuses" }, description: { ru: "Следите за модерацией отправленных заявок", en: "Track moderation of submitted listings" } },
   { group: "workspace", path: "/company/leads", label: { ru: "Leads inbox", en: "Leads inbox" }, description: { ru: "Входящие обращения по проектам", en: "Inbound leads for your projects" } },
   { group: "workspace", path: "/company/team", label: { ru: "Команда", en: "Team" }, description: { ru: "Многоучётность и роли внутри компании", en: "Multi-account access and roles" } },
   { group: "workspace", path: "/company/analytics", label: { ru: "Аналитика", en: "Analytics" }, description: { ru: "Просмотры, лиды и конверсия", en: "Views, leads, and conversion" } },

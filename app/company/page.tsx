@@ -45,6 +45,12 @@ export default async function CompanyPage({ searchParams }: { searchParams?: Pro
                 <ButtonLink href={withLocale(nextStep.href, locale)} className="h-12 min-w-44">
                   {nextStep.buttonLabel}
                 </ButtonLink>
+                <ButtonLink href={withLocale("/company/projects", locale)} variant="outline" className="h-12 min-w-44">
+                  {isRu ? "Проекты компании" : "Company projects"}
+                </ButtonLink>
+                <ButtonLink href={withLocale("/investor", locale)} variant="outline" className="h-12 min-w-44">
+                  {isRu ? "Профиль участника" : "Participant profile"}
+                </ButtonLink>
                 <ButtonLink href={withLocale(`/companies/${organization.publicSlug}`, locale)} variant="outline" className="h-12 min-w-44">
                   {isRu ? "Открыть публичную страницу" : "Open public page"}
                 </ButtonLink>
@@ -79,6 +85,12 @@ export default async function CompanyPage({ searchParams }: { searchParams?: Pro
                       label={documentCount.toString()}
                       text={isRu ? "Загружайте регистрационные документы, product sheets, compliance-файлы и материалы для модерации." : "Upload registration docs, product sheets, compliance files, and moderation materials."}
                       title={isRu ? "Документы компании" : "Company documents"}
+                    />
+                    <ActionRow
+                      href={withLocale("/company/projects", locale)}
+                      label={activeProjects.toString()}
+                      text={isRu ? "Смотрите опубликованные проекты компании, статусы сбора и график выплат." : "View published company projects, raise statuses and payout schedules."}
+                      title={isRu ? "Проекты компании" : "Company projects"}
                     />
                     <ActionRow
                       href={withLocale("/investor/projects/new", locale)}

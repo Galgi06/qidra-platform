@@ -41,6 +41,13 @@ export default async function ResetPasswordPage({ searchParams }: { searchParams
             <input name="email" type="hidden" value={email} />
             <input name="token" type="hidden" value={token} />
             <Input label={locale === "ru" ? "Пароль" : "Password"} name="password" type="password" placeholder="********" required />
+            <Input
+              label={locale === "ru" ? "Повторите пароль" : "Confirm password"}
+              name="passwordConfirm"
+              type="password"
+              placeholder="********"
+              required
+            />
             <p className="text-14 text-qidra-grayBlue">{locale === "ru" ? passwordPolicyDescription.ru : passwordPolicyDescription.en}</p>
             <Button type="submit">{locale === "ru" ? "Сохранить пароль" : "Save password"}</Button>
           </FeedbackForm>

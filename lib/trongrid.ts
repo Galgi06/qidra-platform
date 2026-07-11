@@ -48,7 +48,7 @@ function configuredValue(value: string | undefined) {
 }
 
 export function getTronPaymentConfig() {
-  const walletAddress = configuredValue(process.env.QIDRA_TRON_WALLET_ADDRESS);
+  const walletAddress = configuredValue(process.env.QIDRA_TRON_WALLET_ADDRESS) || configuredValue(process.env.QIDRA_TREASURY_TRON_WALLET_ADDRESS);
   const apiKey = configuredValue(process.env.TRONGRID_API_KEY);
   const baseUrl = configuredValue(process.env.TRONGRID_API_BASE_URL) || DEFAULT_TRONGRID_BASE_URL;
   const usdtContractAddress = configuredValue(process.env.QIDRA_USDT_TRC20_CONTRACT) || DEFAULT_USDT_TRC20_CONTRACT;

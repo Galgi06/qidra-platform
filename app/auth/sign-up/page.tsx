@@ -102,8 +102,17 @@ export default async function SignUpPage({ searchParams }: { searchParams?: Prom
                 <div className="grid gap-4 md:grid-cols-2">
                   <Input label={isRu ? "Имя" : "Name"} name="name" placeholder={isRu ? "Ваше имя" : "Your name"} required />
                   <Input label="Email" name="email" type="email" placeholder="name@example.com" required />
-                  <div className="md:col-span-2">
+                  <div>
                     <Input label={isRu ? "Пароль" : "Password"} name="password" type="password" placeholder="********" required />
+                  </div>
+                  <div>
+                    <Input
+                      label={isRu ? "Повторите пароль" : "Confirm password"}
+                      name="passwordConfirm"
+                      type="password"
+                      placeholder="********"
+                      required
+                    />
                   </div>
                   {!inviteMode && accountType === "company" ? (
                     <>

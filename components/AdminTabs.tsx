@@ -8,6 +8,7 @@ const adminSections = [
   { path: "/admin/users", label: { ru: "Пользователи", en: "Users" }, description: { ru: "Клиенты, роли, доступы", en: "Clients, roles, access" } },
   { path: "/admin/kyc", label: { ru: "KYC", en: "KYC" }, description: { ru: "Анкеты и документы", en: "Profiles and documents" } },
   { path: "/admin/projects", label: { ru: "Проекты", en: "Projects" }, description: { ru: "Карточки и статусы", en: "Cards and statuses" } },
+  { path: "/admin/organizations", label: { ru: "Компании", en: "Companies" }, description: { ru: "Профили компаний и модерация", en: "Company profiles and moderation" } },
   { path: "/admin/project-submissions", label: { ru: "Размещение", en: "Listings" }, description: { ru: "Инициативы клиентов", en: "Client initiatives" } },
   { path: "/admin/investments", label: { ru: "Заявки", en: "Applications" }, description: { ru: "Участие и резервы", en: "Participation and reserves" } },
   { path: "/admin/payments", label: { ru: "Платежи", en: "Payments" }, description: { ru: "Пополнения и выводы", en: "Deposits and withdrawals" } },

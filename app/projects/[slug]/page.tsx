@@ -15,6 +15,8 @@ import { authOptions } from "@/lib/next-auth";
 import { acceptsApplications, getProjectBySlug, type CatalogProject } from "@/lib/project-catalog";
 import {
   AM_CAPITAL_MANAGER_FEE_PERCENT,
+  type IncomeSourceValue,
+  type RealEstateDocumentAsset,
   incomeSourceLabel,
   isAmCapitalPropertyFundProject,
   propertyStatusLabel,
@@ -40,7 +42,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
   const locationGoogleMapsHref = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationAddress)}`;
   const locationEmbedHref = `https://www.google.com/maps?q=${encodeURIComponent(locationAddress)}&z=15&output=embed`;
   const projectTermLabel = realEstate?.projectTermMonths ? (isRu ? `${realEstate.projectTermMonths} мес.` : `${realEstate.projectTermMonths} months`) : project.lifecycle.participationTerm[locale];
-  const incomeSources = realEstate?.incomeSources?.map((item) => incomeSourceLabel(item, locale)).join(", ");
+  const incomeSources = realEstate?.incomeSources?.map((item: IncomeSourceValue) => incomeSourceLabel(item, locale)).join(", ");
   const publicDocuments = buildPublicDocuments(project, locale);
   const isAmCapitalProject = isAmCapitalPropertyFundProject({
     initiatorName: project.initiator?.name,
@@ -310,8 +312,8 @@ function buildPublicDocuments(project: CatalogProject, locale: "ru" | "en") {
   }));
   const realEstateDocuments =
     project.realEstate?.documents
-      ?.filter((document) => document.category !== "gallery" && document.category !== "render")
-      .map((document, index) => ({
+      ?.filter((document: RealEstateDocumentAsset) => document.category !== "gallery" && document.category !== "render")
+      .map((document: RealEstateDocumentAsset, index: number) => ({
         href: document.href,
         kind: realEstateAssetCategoryLabel(document.category, locale),
         title: {

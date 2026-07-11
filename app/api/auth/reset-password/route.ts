@@ -9,11 +9,42 @@ import { hashToken } from "@/lib/tokens";
 const resetPasswordSchema = z.object({
   email: z.string().trim().email().max(255),
   token: z.string().min(20),
-  password: z.string().max(128).refine(isStrongPassword)
+  password: z.string().max(128).refine(isStrongPassword),
+  passwordConfirm: z.string().max(128)
+}).superRefine((data, context) => {
+  if (data.password !== data.passwordConfirm) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "password_mismatch",
+      path: ["passwordConfirm"]
+    });
+  }
 });
 
 function isRu(request: NextRequest) {
   return request.nextUrl.searchParams.get("lang") !== "en";
+}
+
+function resetPasswordFieldErrors(localeRu: boolean, error: z.ZodError) {
+  const fieldErrors = error.flatten().fieldErrors as Record<string, string[] | undefined>;
+  const nextFieldErrors: Record<string, string> = {};
+
+  if (fieldErrors.password?.length) {
+    nextFieldErrors.password = localeRu ? passwordPolicyDescription.ru : passwordPolicyDescription.en;
+  }
+
+  if (fieldErrors.passwordConfirm?.length) {
+    nextFieldErrors.passwordConfirm =
+      fieldErrors.passwordConfirm.some((message) => message === "password_mismatch")
+        ? localeRu
+          ? "Пароли должны совпадать."
+          : "Passwords must match."
+        : localeRu
+          ? "Повторите пароль."
+          : "Confirm the password.";
+  }
+
+  return Object.keys(nextFieldErrors).length ? nextFieldErrors : undefined;
 }
 
 export async function POST(request: NextRequest) {
@@ -23,6 +54,7 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json(
       {
+        fieldErrors: resetPasswordFieldErrors(localeRu, parsed.error),
         title: localeRu ? "Проверьте данные" : "Check the details",
         message: localeRu ? passwordPolicyDescription.ru : passwordPolicyDescription.en
       },
