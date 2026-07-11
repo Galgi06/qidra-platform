@@ -1,0 +1,76 @@
+name: Ops Email Diagnostics
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        type: choice
+        required: true
+        default: production
+        options:
+          - production
+      test_recipient:
+        description: Optional explicit test recipient email
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    env:
+      DEPLOY_ENVIRONMENT: ${{ inputs.environment }}
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+      DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+      DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+      DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+      TEST_RECIPIENT: ${{ inputs.test_recipient }}
+    steps:
+      - name: Validate deploy secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          for key in DEPLOY_HOST DEPLOY_USER DEPLOY_PATH; do
+            if [[ -z "${!key:-}" ]]; then
+              echo "::error::Missing required secret ${key} for environment ${DEPLOY_ENVIRONMENT}"
+              exit 1
+            fi
+          done
+
+      - name: Start SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
+
+      - name: Trust deploy host
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+
+          port="${DEPLOY_PORT:-22}"
+          if [[ -n "${DEPLOY_KNOWN_HOSTS:-}" ]]; then
+            printf '%s\n' "$DEPLOY_KNOWN_HOSTS" >> ~/.ssh/known_hosts
+          else
+            ssh-keyscan -p "$port" -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+          fi
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Run production email diagnostics
+        shell: bash
+        run: |
+          set -euo pipefail
+          port="${DEPLOY_PORT:-22}"
+          ssh -p "$port" "${DEPLOY_USER}@${DEPLOY_HOST}" \
+            "cd '${DEPLOY_PATH}' && \
+             echo '--- ENV STATUS ---' && \
+             docker compose --env-file .env.production -f docker-compose.prod.yml run --rm --no-deps app node scripts/production-env-status.mjs && \
+             echo '--- SMTP TEST ---' && \
+             if [ -n '${TEST_RECIPIENT}' ]; then export SMTP_TEST_TO='${TEST_RECIPIENT}'; fi && \
+             docker compose --env-file .env.production -f docker-compose.prod.yml run --rm --no-deps app node scripts/test-smtp.mjs"
