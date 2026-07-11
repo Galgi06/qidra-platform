@@ -15,11 +15,13 @@ export function SignInForm({
   googleEnabled,
   locale,
   nextPath,
+  preferredAccountType,
   telegramEnabled
 }: {
   googleEnabled: boolean;
   locale: Locale;
   nextPath: string;
+  preferredAccountType: "company" | "investor";
   telegramEnabled: boolean;
 }) {
   const [feedback, setFeedback] = useState<FeedbackMessage | null>(null);
@@ -78,6 +80,28 @@ export function SignInForm({
     <>
       <form aria-busy={loading} className="container-qidra grid max-w-md gap-5" onSubmit={handleSubmit}>
         <h1 className="subtitle-28">{locale === "ru" ? "Вход" : "Sign in"}</h1>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Link
+            className={`rounded-qidra border px-4 py-3 text-center text-14 font-medium transition-colors ${
+              preferredAccountType === "investor"
+                ? "border-qidra-dark bg-qidra-dark text-white"
+                : "border-qidra-grayLight bg-white text-qidra-grayBlue hover:border-qidra-accent hover:text-qidra-accent"
+            }`}
+            href={withLocale("/auth/sign-in?account=investor", locale)}
+          >
+            {locale === "ru" ? "Вход для участника" : "Investor sign-in"}
+          </Link>
+          <Link
+            className={`rounded-qidra border px-4 py-3 text-center text-14 font-medium transition-colors ${
+              preferredAccountType === "company"
+                ? "border-qidra-dark bg-qidra-dark text-white"
+                : "border-qidra-grayLight bg-white text-qidra-grayBlue hover:border-qidra-accent hover:text-qidra-accent"
+            }`}
+            href={withLocale("/auth/sign-in?account=company", locale)}
+          >
+            {locale === "ru" ? "Вход для компании" : "Company sign-in"}
+          </Link>
+        </div>
         <Input label="Email" name="email" type="email" placeholder="name@example.com" required />
         <PasswordInput
           hideLabel={locale === "ru" ? "Скрыть пароль" : "Hide password"}
@@ -97,8 +121,8 @@ export function SignInForm({
         </div>
         <SocialAuthButtons googleEnabled={googleEnabled} locale={locale} mode="signIn" nextPath={nextPath} telegramEnabled={telegramEnabled} />
         <div className="flex justify-between gap-3 text-14 text-qidra-grayBlue">
-          <Link href={withLocale("/auth/sign-up", locale)}>{locale === "ru" ? "Регистрация" : "Create account"}</Link>
-          <Link href={withLocale("/auth/forgot-password", locale)}>{locale === "ru" ? "Забыли пароль" : "Forgot password"}</Link>
+          <Link href={withLocale(`/auth/sign-up?account=${preferredAccountType}`, locale)}>{locale === "ru" ? "Регистрация" : "Create account"}</Link>
+          <Link href={withLocale(`/auth/forgot-password?account=${preferredAccountType}`, locale)}>{locale === "ru" ? "Забыли пароль" : "Forgot password"}</Link>
         </div>
       </form>
       {feedback ? <FeedbackPopup feedback={feedback} onClose={() => setFeedback(null)} /> : null}

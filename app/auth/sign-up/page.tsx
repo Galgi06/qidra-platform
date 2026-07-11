@@ -126,7 +126,12 @@ export default async function SignUpPage({ searchParams }: { searchParams?: Prom
                   {!inviteMode && accountType === "company" ? (
                     <>
                       <Input label={isRu ? "Юридическое название компании" : "Legal company name"} name="companyName" placeholder={isRu ? "Например: AM Capital LLC-FZ" : "Example: AM Capital LLC-FZ"} required />
-                      <Input label={isRu ? "Публичный адрес компании" : "Public company slug"} name="companySlug" placeholder="am-capital" required />
+                      <Input
+                        label={isRu ? "Публичный адрес компании" : "Public company address"}
+                        name="companySlug"
+                        placeholder={isRu ? "Например: Дубай, Бизнес Бей, Даунтаун" : "Example: Dubai, Business Bay, Downtown"}
+                        required
+                      />
                       <Input label={isRu ? "Страна регистрации" : "Country of registration"} name="companyCountry" placeholder={isRu ? "ОАЭ" : "UAE"} required />
                       <Input label={isRu ? "Ваша роль в компании" : "Your role in the company"} name="companyRole" placeholder={isRu ? "Управляющий партнёр" : "Managing partner"} />
                     </>

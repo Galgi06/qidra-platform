@@ -4,6 +4,7 @@ import { z } from "zod";
 import { sendEmail, getAppBaseUrl } from "@/lib/email";
 import { isStrongPassword, passwordPolicyDescription } from "@/lib/password-policy";
 import { prisma } from "@/lib/prisma";
+import { isValidNormalizedPublicSlug, normalizePublicSlug } from "@/lib/public-slug";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { createRawToken, expiresInMinutes, hashToken } from "@/lib/tokens";
 
@@ -15,9 +16,9 @@ const registerSchema = z.object({
   companySlug: z
     .string()
     .trim()
-    .toLowerCase()
-    .max(120)
-    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
+    .max(200)
+    .transform(normalizePublicSlug)
+    .refine(isValidNormalizedPublicSlug, "company_slug_invalid")
     .optional(),
   inviteToken: z.string().trim().max(255).optional(),
   name: z.string().trim().min(2).max(120),
@@ -68,7 +69,9 @@ function registerFieldErrors(localeRu: boolean, error: z.ZodError) {
   }
 
   if (fieldErrors.companySlug?.length) {
-    nextFieldErrors.companySlug = localeRu ? "Укажите корректный публичный адрес компании." : "Enter a valid public company slug.";
+    nextFieldErrors.companySlug = localeRu
+      ? "Введите публичный адрес компании в свободной форме. Система сама подготовит ссылку."
+      : "Enter the public company address in free form. The system will prepare the public link automatically.";
   }
 
   if (fieldErrors.companyCountry?.length) {
@@ -145,7 +148,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           title: localeRu ? "Slug компании уже занят" : "Company slug is taken",
-          message: localeRu ? "Выберите другой публичный адрес компании." : "Choose another public company address."
+          message: localeRu ? "Такой публичный адрес уже используется. Укажите другой вариант." : "This public address is already in use. Enter another value."
         },
         { status: 409 }
       );

@@ -4,6 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { authOptions } from "@/lib/next-auth";
 import { prisma } from "@/lib/prisma";
+import { isValidNormalizedPublicSlug, normalizePublicSlug } from "@/lib/public-slug";
 
 const schema = z.object({
   city: z.string().trim().max(120).optional(),
@@ -19,10 +20,9 @@ const schema = z.object({
   publicSlug: z
     .string()
     .trim()
-    .toLowerCase()
-    .min(3)
-    .max(120)
-    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+    .max(200)
+    .transform(normalizePublicSlug)
+    .refine(isValidNormalizedPublicSlug),
   representativeName: z.string().trim().max(120).optional(),
   representativeRole: z.string().trim().max(120).optional(),
   submitForReview: z.string().optional(),
@@ -59,7 +59,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         title: localeRu ? "Проверьте профиль" : "Check the profile",
-        message: localeRu ? "Заполните публичное название, slug и базовые данные компании." : "Fill in the public name, slug, and basic company details."
+        message: localeRu
+          ? "Заполните публичное название, публичный адрес компании и базовые данные. Адрес можно вводить в свободной форме."
+          : "Fill in the public name, public company address, and basic details. The address can be entered in free form."
       },
       { status: 400 }
     );
@@ -92,7 +94,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         title: localeRu ? "Slug уже занят" : "Slug already taken",
-        message: localeRu ? "Выберите другой публичный адрес компании." : "Choose another public company slug."
+        message: localeRu ? "Такой публичный адрес уже используется. Укажите другой вариант." : "This public address is already in use. Enter another value."
       },
       { status: 409 }
     );

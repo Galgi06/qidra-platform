@@ -8,6 +8,7 @@ import { ButtonLink } from "@/components/ui/Button";
 import { ProjectStatusBadge } from "@/components/ui/ProjectStatusBadge";
 import { requireAuth } from "@/lib/access";
 import { getLocale, type SearchParams, withLocale } from "@/lib/i18n";
+import { getPrimaryOrganizationForUser } from "@/lib/organizations";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 
@@ -26,7 +27,8 @@ export default async function InvestorPage({ searchParams }: { searchParams?: Pr
     confirmedApplications,
     rejectedApplications,
     cancelledApplications,
-    activeContracts
+    activeContracts,
+    organization
   ] = await Promise.all([
     prisma.kycApplication.findFirst({ where: { userId }, orderBy: { createdAt: "desc" } }),
     prisma.wallet.findUnique({
@@ -51,7 +53,8 @@ export default async function InvestorPage({ searchParams }: { searchParams?: Pr
       include: { project: true },
       orderBy: { createdAt: "desc" },
       take: 4
-    })
+    }),
+    getPrimaryOrganizationForUser(userId)
   ]);
   const profileStatus = latestKyc?.status ?? "DRAFT";
   const profileStatusText = profileStatusLabel(profileStatus, locale);
@@ -87,6 +90,11 @@ export default async function InvestorPage({ searchParams }: { searchParams?: Pr
                 <ButtonLink href={withLocale("/investor/kyc", locale)} className="h-12 min-w-44">
                   {isRu ? "Заполнить профиль" : "Complete profile"}
                 </ButtonLink>
+                {organization ? (
+                  <ButtonLink href={withLocale("/company", locale)} variant="outline" className="h-12 min-w-44">
+                    {isRu ? "Открыть кабинет компании" : "Open company workspace"}
+                  </ButtonLink>
+                ) : null}
                 <ButtonLink href={withLocale("/projects", locale)} variant="outline" className="h-12 min-w-44">
                   {isRu ? "Открыть проекты" : "Open projects"}
                 </ButtonLink>
@@ -160,6 +168,21 @@ export default async function InvestorPage({ searchParams }: { searchParams?: Pr
               </section>
 
               <aside className="grid content-start gap-5">
+                {organization ? (
+                  <div className="rounded-qidra border border-qidra-accent bg-qidra-accent8 p-4">
+                    <strong className="text-16">{isRu ? "Доступен кабинет компании" : "Company workspace available"}</strong>
+                    <p className="mt-1 text-14 text-qidra-grayBlue">
+                      {isRu
+                        ? `Вы состоите в компании ${organization.displayName}. Залистенные проекты и управление ими находятся в отдельном кабинете компании.`
+                        : `You are a member of ${organization.displayName}. Listed projects and company management are available in the dedicated company workspace.`}
+                    </p>
+                    <div className="mt-4">
+                      <ButtonLink href={withLocale("/company/projects", locale)} size="sm" variant="outline">
+                        {isRu ? "Открыть проекты компании" : "Open company projects"}
+                      </ButtonLink>
+                    </div>
+                  </div>
+                ) : null}
                 <NotificationCard
                   title={profileNotice.title}
                   text={profileNotice.text}

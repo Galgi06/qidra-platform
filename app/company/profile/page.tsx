@@ -54,7 +54,13 @@ export default async function CompanyProfilePage({ searchParams }: { searchParam
                 <div className="grid gap-4 md:grid-cols-2">
                   <Input label={isRu ? "Публичное название" : "Public display name"} name="displayName" defaultValue={organization.displayName} required />
                   <Input label={isRu ? "Юридическое название" : "Legal name"} name="legalName" defaultValue={organization.legalName} required />
-                  <Input label={isRu ? "Публичный адрес" : "Public slug"} name="publicSlug" defaultValue={organization.publicSlug} required />
+                  <Input
+                    label={isRu ? "Публичный адрес" : "Public address"}
+                    name="publicSlug"
+                    defaultValue={organization.publicSlug}
+                    placeholder={isRu ? "Например: Dubai, Business Bay, Downtown" : "Example: Dubai, Business Bay, Downtown"}
+                    required
+                  />
                   <Input label={isRu ? "Тип компании" : "Company type"} name="typeLabel" defaultValue={organization.typeLabel || ""} placeholder={isRu ? "Фонд, девелопер, торговая компания..." : "Fund, developer, trading company..."} />
                   <Input label={isRu ? "Страна" : "Country"} name="country" defaultValue={organization.country || ""} />
                   <Input label={isRu ? "Город" : "City"} name="city" defaultValue={organization.city || ""} />
