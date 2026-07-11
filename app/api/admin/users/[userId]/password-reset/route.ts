@@ -137,11 +137,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     to: email,
     subject: localeRu ? "Восстановление доступа Qidra" : "Qidra access recovery",
     text: localeRu
-      ? `Команда Qidra отправила ссылку восстановления доступа после проверки личности. Чтобы задать новый пароль, перейдите по ссылке: ${resetUrl.toString()} Ссылка действует 2 часа. Если это действие совершали не вы, срочно смените пароль после входа в аккаунт или удалите это письмо.`
-      : `The Qidra team sent an access recovery link after identity verification. To set a new password, follow this link: ${resetUrl.toString()} The link is valid for 2 hours. If you did not request this action, change your password immediately after signing in or delete this email.`,
+      ? `Команда Qidra.io отправила вам ссылку для восстановления доступа после проверки личности.\n\nЧтобы задать новый пароль, перейдите по ссылке:\n${resetUrl.toString()}\n\nСсылка действует 2 часа и работает только для последнего запроса на восстановление.\n\nЕсли вы не запрашивали восстановление доступа, не переходите по ссылке. Просто удалите это письмо и при необходимости свяжитесь со службой поддержки Qidra.io.`
+      : `The Qidra.io team sent you an access recovery link after identity verification.\n\nTo set a new password, follow this link:\n${resetUrl.toString()}\n\nThe link is valid for 2 hours and only works for the latest recovery request.\n\nIf you did not request access recovery, do not use this link. You can safely delete this email and contact Qidra.io support if needed.`,
     html: localeRu
-      ? `<p>Команда Qidra отправила ссылку восстановления доступа после проверки личности.</p><p><a href="${resetUrl.toString()}">Задать новый пароль</a></p><p>Ссылка действует 2 часа.</p><p>Если это действие совершали не вы, срочно смените пароль после входа в аккаунт или удалите это письмо.</p>`
-      : `<p>The Qidra team sent an access recovery link after identity verification.</p><p><a href="${resetUrl.toString()}">Set a new password</a></p><p>The link is valid for 2 hours.</p><p>If you did not request this action, change your password immediately after signing in or delete this email.</p>`
+      ? `<p>Команда <a href="https://qidra.io"><strong>Qidra.io</strong></a> отправила вам ссылку для восстановления доступа после проверки личности.</p><p><a href="${resetUrl.toString()}">Задать новый пароль</a></p><p>Ссылка действует 2 часа и работает только для последнего запроса на восстановление.</p><p>Если вы не запрашивали восстановление доступа, не переходите по ссылке. Просто удалите это письмо и при необходимости свяжитесь со службой поддержки Qidra.io.</p>`
+      : `<p>The <a href="https://qidra.io"><strong>Qidra.io</strong></a> team sent you an access recovery link after identity verification.</p><p><a href="${resetUrl.toString()}">Set a new password</a></p><p>The link is valid for 2 hours and only works for the latest recovery request.</p><p>If you did not request access recovery, do not use this link. You can safely delete this email and contact Qidra.io support if needed.</p>`
   });
 
   await prisma.adminAuditLog.create({

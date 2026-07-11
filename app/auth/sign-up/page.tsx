@@ -5,6 +5,7 @@ import { SocialAuthButtons } from "@/components/auth/SocialAuthButtons";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 import { getLocale, type SearchParams } from "@/lib/i18n";
 import { passwordPolicyDescription } from "@/lib/password-policy";
 import { getSocialAuthConfig } from "@/lib/social-auth";
@@ -103,15 +104,23 @@ export default async function SignUpPage({ searchParams }: { searchParams?: Prom
                   <Input label={isRu ? "Имя" : "Name"} name="name" placeholder={isRu ? "Ваше имя" : "Your name"} required />
                   <Input label="Email" name="email" type="email" placeholder="name@example.com" required />
                   <div>
-                    <Input label={isRu ? "Пароль" : "Password"} name="password" type="password" placeholder="********" required />
-                  </div>
-                  <div>
-                    <Input
-                      label={isRu ? "Повторите пароль" : "Confirm password"}
-                      name="passwordConfirm"
-                      type="password"
+                    <PasswordInput
+                      hideLabel={isRu ? "Скрыть пароль" : "Hide password"}
+                      label={isRu ? "Пароль" : "Password"}
+                      name="password"
                       placeholder="********"
                       required
+                      showLabel={isRu ? "Показать пароль" : "Show password"}
+                    />
+                  </div>
+                  <div>
+                    <PasswordInput
+                      hideLabel={isRu ? "Скрыть пароль" : "Hide password"}
+                      label={isRu ? "Повторите пароль" : "Confirm password"}
+                      name="passwordConfirm"
+                      placeholder="********"
+                      required
+                      showLabel={isRu ? "Показать пароль" : "Show password"}
                     />
                   </div>
                   {!inviteMode && accountType === "company" ? (

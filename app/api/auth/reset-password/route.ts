@@ -8,7 +8,7 @@ import { hashToken } from "@/lib/tokens";
 
 const resetPasswordSchema = z.object({
   email: z.string().trim().email().max(255),
-  token: z.string().min(20),
+  token: z.string().trim().min(20),
   password: z.string().max(128).refine(isStrongPassword),
   passwordConfirm: z.string().max(128)
 }).superRefine((data, context) => {
@@ -77,14 +77,21 @@ export async function POST(request: NextRequest) {
   const tokenHash = hashToken(parsed.data.token);
   const identifier = `password-reset:${email}`;
   const verificationToken = await prisma.verificationToken.findUnique({
-    where: { token: tokenHash }
+    where: {
+      identifier_token: {
+        identifier,
+        token: tokenHash
+      }
+    }
   });
 
-  if (!verificationToken || verificationToken.identifier !== identifier || verificationToken.expires < new Date()) {
+  if (!verificationToken || verificationToken.expires < new Date()) {
     return NextResponse.json(
       {
         title: localeRu ? "Ссылка недействительна" : "Invalid link",
-        message: localeRu ? "Запросите новую ссылку восстановления пароля." : "Request a new password reset link."
+        message: localeRu
+          ? "Ссылка восстановления недействительна или уже была использована. Запросите новую ссылку и откройте только последнее письмо."
+          : "The reset link is invalid or has already been used. Request a new link and open only the latest email."
       },
       { status: 400 }
     );

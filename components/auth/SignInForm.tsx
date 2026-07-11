@@ -7,6 +7,7 @@ import { FeedbackPopup, type FeedbackMessage } from "@/components/ActionFeedback
 import { SocialAuthButtons } from "@/components/auth/SocialAuthButtons";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 import type { Locale } from "@/lib/i18n";
 import { withLocale } from "@/lib/i18n";
 
@@ -78,7 +79,14 @@ export function SignInForm({
       <form aria-busy={loading} className="container-qidra grid max-w-md gap-5" onSubmit={handleSubmit}>
         <h1 className="subtitle-28">{locale === "ru" ? "Вход" : "Sign in"}</h1>
         <Input label="Email" name="email" type="email" placeholder="name@example.com" required />
-        <Input label={locale === "ru" ? "Пароль" : "Password"} name="password" type="password" placeholder="********" required />
+        <PasswordInput
+          hideLabel={locale === "ru" ? "Скрыть пароль" : "Hide password"}
+          label={locale === "ru" ? "Пароль" : "Password"}
+          name="password"
+          placeholder="********"
+          required
+          showLabel={locale === "ru" ? "Показать пароль" : "Show password"}
+        />
         <Button loading={loading} loadingLabel={locale === "ru" ? "Входим..." : "Signing in..."} type="submit">
           {locale === "ru" ? "Войти" : "Sign in"}
         </Button>
