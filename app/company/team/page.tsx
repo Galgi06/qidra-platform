@@ -13,9 +13,11 @@ import { prisma } from "@/lib/prisma";
 const teamRoles = ["ADMIN", "EDITOR", "ANALYST"] as const;
 
 export default async function CompanyTeamPage({ searchParams }: { searchParams?: Promise<SearchParams> }) {
+  const params = await searchParams;
   const locale = await getLocale(searchParams);
   const isRu = locale === "ru";
-  const { membership } = await requireCompanyAccess(locale, "/company/team");
+  const selectedOrganizationId = Array.isArray(params?.organization) ? params.organization[0] : params?.organization;
+  const { membership, memberships } = await requireCompanyAccess(locale, "/company/team", selectedOrganizationId);
   const [members, invites] = await Promise.all([
     prisma.organizationMember.findMany({
       where: { organizationId: membership.organizationId },
@@ -47,7 +49,7 @@ export default async function CompanyTeamPage({ searchParams }: { searchParams?:
         </section>
 
         <section className="px-5 py-12 sm:px-8 lg:px-11 lg:py-16">
-          <CompanyWorkspace activePath="/company/team" locale={locale}>
+          <CompanyWorkspace activePath="/company/team" locale={locale} memberships={memberships} selectedOrganizationId={membership.organizationId}>
             <div className="grid gap-8 xl:grid-cols-[0.86fr_1.14fr]">
               <FeedbackForm
                 className="premium-card grid gap-5 p-6 sm:p-8"

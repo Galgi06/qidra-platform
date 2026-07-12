@@ -9,9 +9,11 @@ import { companyHomeNextStep, companyLeadStatusLabel, companyMemberRoleLabel, co
 import { prisma } from "@/lib/prisma";
 
 export default async function CompanyPage({ searchParams }: { searchParams?: Promise<SearchParams> }) {
+  const params = await searchParams;
   const locale = await getLocale(searchParams);
   const isRu = locale === "ru";
-  const { membership, session } = await requireCompanyAccess(locale, "/company");
+  const selectedOrganizationId = Array.isArray(params?.organization) ? params.organization[0] : params?.organization;
+  const { membership, memberships, session } = await requireCompanyAccess(locale, "/company", selectedOrganizationId);
   const organization = membership.organization;
   const userId = session.user?.id ?? "";
   const [submissionCount, activeProjects, memberCount, leadCount, newLeadCount, documentCount] = await Promise.all([
@@ -33,7 +35,17 @@ export default async function CompanyPage({ searchParams }: { searchParams?: Pro
             <div className="premium-card grid gap-7 p-6 sm:p-8 lg:grid-cols-[1fr_auto] lg:items-end">
               <div>
                 <p className="eyebrow">{isRu ? "Кабинет компании" : "Company workspace"}</p>
-                <h1 className="mt-3 text-[40px] font-medium leading-tight tracking-[0] text-qidra-dark sm:text-[54px]">{organization.displayName}</h1>
+                <h1 className="mt-3 max-w-5xl break-words text-[34px] font-medium leading-tight tracking-[0] text-qidra-dark sm:text-[46px]">
+                  {workspaceCompanyTitle(organization)}
+                </h1>
+                {organization.displayName && organization.displayName.trim() !== workspaceCompanyTitle(organization) ? (
+                  <p className="mt-3 text-16 font-medium text-qidra-accent">{organization.displayName}</p>
+                ) : null}
+                <div className="mt-4 flex flex-wrap gap-3 text-14 text-qidra-grayBlue">
+                  {organization.publicSlug ? <span className="rounded-full bg-qidra-grayLight px-3 py-1">{organization.publicSlug}</span> : null}
+                  {organization.country ? <span className="rounded-full bg-qidra-grayLight px-3 py-1">{organization.country}</span> : null}
+                  {organization.city ? <span className="rounded-full bg-qidra-grayLight px-3 py-1">{organization.city}</span> : null}
+                </div>
                 <p className="mt-3 max-w-4xl text-18 text-qidra-grayBlue">
                   {organization.valueProposition ||
                     (isRu
@@ -60,7 +72,7 @@ export default async function CompanyPage({ searchParams }: { searchParams?: Pro
         </section>
 
         <section className="px-5 py-12 sm:px-8 lg:px-11 lg:py-16">
-          <CompanyWorkspace activePath="/company" locale={locale}>
+          <CompanyWorkspace activePath="/company" locale={locale} memberships={memberships} selectedOrganizationId={membership.organizationId}>
             <div className="grid gap-8">
               <div className="grid gap-5 md:grid-cols-4">
                 <MetricCard label={isRu ? "Статус компании" : "Company status"} value={companyStatusLabel(organization.status, locale)} />
@@ -150,6 +162,15 @@ export default async function CompanyPage({ searchParams }: { searchParams?: Pro
       <Footer locale={locale} />
     </>
   );
+}
+
+function workspaceCompanyTitle(organization: { displayName: string; legalName: string; publicSlug: string }) {
+  const legalName = organization.legalName?.trim();
+  const displayName = organization.displayName?.trim();
+
+  if (legalName) return legalName;
+  if (displayName) return displayName;
+  return organization.publicSlug;
 }
 
 function MetricCard({ label, value }: { label: string; value: string }) {

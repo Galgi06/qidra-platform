@@ -7,9 +7,11 @@ import { getLocale, type SearchParams } from "@/lib/i18n";
 import { prisma } from "@/lib/prisma";
 
 export default async function CompanyAnalyticsPage({ searchParams }: { searchParams?: Promise<SearchParams> }) {
+  const params = await searchParams;
   const locale = await getLocale(searchParams);
   const isRu = locale === "ru";
-  const { membership } = await requireCompanyAccess(locale, "/company/analytics");
+  const selectedOrganizationId = Array.isArray(params?.organization) ? params.organization[0] : params?.organization;
+  const { membership, memberships } = await requireCompanyAccess(locale, "/company/analytics", selectedOrganizationId);
   const organizationId = membership.organizationId;
   const [events, leads, projects] = await Promise.all([
     prisma.organizationAnalyticsEvent.findMany({
@@ -75,7 +77,7 @@ export default async function CompanyAnalyticsPage({ searchParams }: { searchPar
         </section>
 
         <section className="px-5 py-12 sm:px-8 lg:px-11 lg:py-16">
-          <CompanyWorkspace activePath="/company/analytics" locale={locale}>
+          <CompanyWorkspace activePath="/company/analytics" locale={locale} memberships={memberships} selectedOrganizationId={membership.organizationId}>
             <div className="grid gap-8">
               <div className="grid gap-5 md:grid-cols-4">
                 <MetricCard label={isRu ? "Все просмотры" : "Total views"} value={totalViews.toString()} />

@@ -59,11 +59,24 @@ export function isOrganizationSchemaUnavailable(error: unknown) {
 
 export async function getPrimaryOrganizationForUser(userId: string) {
   try {
-    const membership = await prisma.organizationMember.findFirst({
+    const memberships = await prisma.organizationMember.findMany({
       where: { userId },
-      orderBy: [{ role: "asc" }, { createdAt: "asc" }],
-      include: { organization: true }
+      include: {
+        organization: {
+          include: {
+            _count: {
+              select: {
+                members: true,
+                projects: true,
+                projectSubmissions: true
+              }
+            }
+          }
+        }
+      }
     });
+
+    const membership = sortOrganizationMemberships(memberships)[0] ?? null;
 
     return membership?.organization ?? null;
   } catch (error) {
@@ -77,7 +90,7 @@ export async function getPrimaryOrganizationForUser(userId: string) {
 
 export async function getOrganizationMembership(userId: string, organizationId?: string | null) {
   try {
-    const membership = await prisma.organizationMember.findFirst({
+    const memberships = await prisma.organizationMember.findMany({
       where: {
         userId,
         ...(organizationId ? { organizationId } : {})
@@ -98,7 +111,9 @@ export async function getOrganizationMembership(userId: string, organizationId?:
       }
     });
 
-    return membership ?? null;
+    const membership = sortOrganizationMemberships(memberships)[0] ?? null;
+
+    return membership;
   } catch (error) {
     if (isOrganizationSchemaUnavailable(error)) {
       return null;
@@ -106,6 +121,88 @@ export async function getOrganizationMembership(userId: string, organizationId?:
 
     throw error;
   }
+}
+
+export async function getOrganizationMemberships(userId: string) {
+  try {
+    const memberships = await prisma.organizationMember.findMany({
+      where: { userId },
+      include: {
+        organization: {
+          include: {
+            documents: true,
+            _count: {
+              select: {
+                members: true,
+                projects: true,
+                projectSubmissions: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    return sortOrganizationMemberships(memberships);
+  } catch (error) {
+    if (isOrganizationSchemaUnavailable(error)) {
+      return [];
+    }
+
+    throw error;
+  }
+}
+
+function sortOrganizationMemberships<
+  T extends {
+    createdAt: Date;
+    role: OrganizationMemberRole;
+    organization: {
+      status: OrganizationStatus;
+      _count?: {
+        projects?: number;
+        projectSubmissions?: number;
+      };
+    };
+  }
+>(memberships: T[]) {
+  const rolePriority: Record<OrganizationMemberRole, number> = {
+    OWNER: 0,
+    ADMIN: 1,
+    EDITOR: 2,
+    ANALYST: 3
+  };
+  const statusPriority: Record<OrganizationStatus, number> = {
+    APPROVED: 0,
+    REVIEW: 1,
+    DRAFT: 2,
+    REJECTED: 3
+  };
+
+  return [...memberships].sort((left, right) => {
+    const leftProjectWeight = (left.organization._count?.projects ?? 0) + (left.organization._count?.projectSubmissions ?? 0);
+    const rightProjectWeight = (right.organization._count?.projects ?? 0) + (right.organization._count?.projectSubmissions ?? 0);
+
+    if (leftProjectWeight !== rightProjectWeight) {
+      return rightProjectWeight - leftProjectWeight;
+    }
+
+    const leftStatus = statusPriority[left.organization.status];
+    const rightStatus = statusPriority[right.organization.status];
+
+    if (leftStatus !== rightStatus) {
+      return leftStatus - rightStatus;
+    }
+
+    const leftRole = rolePriority[left.role];
+    const rightRole = rolePriority[right.role];
+
+    if (leftRole !== rightRole) {
+      return leftRole - rightRole;
+    }
+
+    return left.createdAt.getTime() - right.createdAt.getTime();
+  });
 }
 
 export function companyHomeNextStep(status: OrganizationStatus, locale: Locale) {

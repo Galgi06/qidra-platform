@@ -18,7 +18,8 @@ export default async function CompanyProjectsPage({ searchParams }: { searchPara
   const locale = await getLocale(params);
   const isRu = locale === "ru";
   const view = Array.isArray(params?.view) ? params?.view[0] : params?.view;
-  const { membership } = await requireCompanyAccess(locale, "/company/projects");
+  const selectedOrganizationId = Array.isArray(params?.organization) ? params.organization[0] : params?.organization;
+  const { membership, memberships } = await requireCompanyAccess(locale, "/company/projects", selectedOrganizationId);
   const organizationId = membership.organizationId;
   const canManageDividends = canManageCompanyDividends(membership.role);
 
@@ -81,7 +82,12 @@ export default async function CompanyProjectsPage({ searchParams }: { searchPara
         </section>
 
         <section className="px-5 py-12 sm:px-8 lg:px-11 lg:py-16">
-          <CompanyWorkspace activePath={activeView === "submissions" ? "/company/projects?view=submissions" : "/company/projects"} locale={locale}>
+          <CompanyWorkspace
+            activePath={activeView === "submissions" ? "/company/projects?view=submissions" : "/company/projects"}
+            locale={locale}
+            memberships={memberships}
+            selectedOrganizationId={membership.organizationId}
+          >
             <div className="grid gap-6">
               {activeView === "projects" && canManageDividends ? <CompanyDividendPanel locale={locale} periods={dividendPeriods} projects={projects} /> : null}
               <div className="flex flex-wrap gap-3">
