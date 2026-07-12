@@ -327,16 +327,18 @@ export const authOptions: NextAuthOptions = {
       return true;
     },
     async jwt({ token, user }) {
-      const tokenUserId = (user?.id ?? token.id) as string | undefined;
+      let tokenUserId = (user?.id ?? token.id) as string | undefined;
+      const fallbackEmail = (typeof user?.email === "string" ? user.email : typeof token.email === "string" ? token.email : undefined)?.toLowerCase().trim();
 
       if (user) {
         token.id = user.id;
       }
 
       if (tokenUserId) {
-        const dbUser = await prisma.user.findUnique({
+        let dbUser = await prisma.user.findUnique({
           where: { id: tokenUserId },
           select: {
+            id: true,
             blockReason: true,
             blockedAt: true,
             blockedUntil: true,
@@ -344,6 +346,24 @@ export const authOptions: NextAuthOptions = {
             role: true
           }
         });
+
+        if (!dbUser && fallbackEmail) {
+          dbUser = await prisma.user.findUnique({
+            where: { email: fallbackEmail },
+            select: {
+              id: true,
+              blockReason: true,
+              blockedAt: true,
+              blockedUntil: true,
+              passwordHash: true,
+              role: true
+            }
+          });
+
+          if (dbUser) {
+            tokenUserId = dbUser.id;
+          }
+        }
 
         const currentPasswordFingerprint = passwordHashFingerprint(dbUser?.passwordHash);
         const previousPasswordFingerprint = typeof token.passwordHashFingerprint === "string" ? token.passwordHashFingerprint : null;
