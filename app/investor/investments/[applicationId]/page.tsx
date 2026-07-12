@@ -32,7 +32,12 @@ export default async function InvestorContractPage({
       project: {
         include: {
           documents: true,
-          reports: true,
+          reports: {
+            where: {
+              publishedAt: { not: null }
+            },
+            orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }]
+          },
           dividendPeriods: {
             where: {
               status: { in: [DividendPeriodStatus.APPROVED, DividendPeriodStatus.PAID] }
@@ -190,7 +195,7 @@ export default async function InvestorContractPage({
                         <DocumentItem
                           key={report.id}
                           actionLabel={isRu ? "Открыть" : "Open"}
-                          href={report.fileUrl}
+                          href={`/api/projects/${application.project.id}/reports/${report.id}`}
                           meta={report.publishedAt ? formatDate(report.publishedAt, locale) : report.period}
                           title={isRu ? report.titleRu : report.titleEn}
                         />

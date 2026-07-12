@@ -136,6 +136,68 @@ export async function readStoredFile(storagePath: string, allowedDirectory: stri
   };
 }
 
+export async function deleteStoredFile(storagePath: string, allowedDirectory: string) {
+  if (storagePath.startsWith("s3://")) {
+    const { DeleteObjectCommand } = await import("@aws-sdk/client-s3");
+    const config = readS3Config();
+    const parsed = parseS3StoragePath(storagePath);
+
+    if (parsed.bucket !== config.bucket || !isAllowedS3Key(parsed.key, allowedDirectory)) {
+      throw new Error("invalid_storage_path");
+    }
+
+    await getS3Client(config).send(
+      new DeleteObjectCommand({
+        Bucket: config.bucket,
+        Key: parsed.key
+      })
+    );
+
+    return;
+  }
+
+  if (isGcsStoragePath(storagePath)) {
+    const config = readGcsConfig();
+    const parsed = parseGcsStoragePath(storagePath);
+
+    if (parsed.bucket !== config.bucket || !isAllowedS3Key(parsed.key, allowedDirectory)) {
+      throw new Error("invalid_storage_path");
+    }
+
+    const accessToken = await getGcsAccessToken();
+    const response = await fetch(`https://storage.googleapis.com/storage/v1/b/${encodeURIComponent(parsed.bucket)}/o/${encodeURIComponent(parsed.key)}`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${accessToken}`
+      }
+    });
+
+    if (!response.ok && response.status !== 404) {
+      throw new Error(`gcs_delete_failed_${response.status}`);
+    }
+
+    return;
+  }
+
+  const uploadRoot = path.join(process.cwd(), "storage", allowedDirectory);
+  const normalizedStoragePath = storagePath.split(/[\\/]+/).join(path.sep);
+  const storagePrefix = `storage${path.sep}${allowedDirectory}${path.sep}`;
+
+  if (!normalizedStoragePath.startsWith(storagePrefix)) {
+    throw new Error("invalid_storage_path");
+  }
+
+  const relativeFilePath = normalizedStoragePath.slice(storagePrefix.length);
+  const filePath = path.resolve(uploadRoot, relativeFilePath);
+
+  if (!filePath.startsWith(`${uploadRoot}${path.sep}`)) {
+    throw new Error("invalid_storage_path");
+  }
+
+  const { rm } = await import("node:fs/promises");
+  await rm(filePath, { force: true });
+}
+
 export function fileStorageDriver() {
   const configured = (process.env.FILE_STORAGE_DRIVER || "").trim().toLowerCase();
   const driver = configured === "s3" ? "s3" : configured === "gcs" ? "gcs" : "local";

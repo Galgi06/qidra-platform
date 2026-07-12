@@ -16,6 +16,17 @@ function isRu(request: NextRequest) {
   return request.nextUrl.searchParams.get("lang") !== "en";
 }
 
+const allowedReportExtensions = new Set(["pdf", "xls", "xlsx", "csv"]);
+const allowedReportMimeTypes = new Set([
+  "application/pdf",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "text/csv",
+  "application/csv",
+  "application/octet-stream"
+]);
+const maxReportAttachmentBytes = 25 * 1024 * 1024;
+
 export async function POST(request: NextRequest) {
   const localeRu = isRu(request);
   const session = (await getServerSession(authOptions)) as SessionUser | null;
@@ -31,7 +42,38 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const parsed = dividendActionSchema.safeParse(await request.json().catch(() => null));
+  const contentType = request.headers.get("content-type") || "";
+  let parsedInput: unknown = null;
+  let attachments: File[] = [];
+
+  if (contentType.includes("multipart/form-data")) {
+    const formData = await request.formData();
+    parsedInput = Object.fromEntries(formData.entries());
+    attachments = formData
+      .getAll("attachments")
+      .filter((value): value is File => value instanceof File && value.size > 0);
+
+    const invalidAttachment = attachments.find((file) => {
+      const extension = file.name.split(".").pop()?.toLowerCase() || "";
+      return !allowedReportExtensions.has(extension) || !allowedReportMimeTypes.has(file.type || "application/octet-stream") || file.size > maxReportAttachmentBytes;
+    });
+
+    if (invalidAttachment) {
+      return NextResponse.json(
+        {
+          title: localeRu ? "Проверьте файлы" : "Check the files",
+          message: localeRu
+            ? "Для отчётности разрешены только PDF, XLS, XLSX или CSV размером до 25 МБ."
+            : "Only PDF, XLS, XLSX, or CSV files up to 25 MB are allowed for reporting."
+        },
+        { status: 400 }
+      );
+    }
+  } else {
+    parsedInput = await request.json().catch(() => null);
+  }
+
+  const parsed = dividendActionSchema.safeParse(parsedInput);
 
   if (!parsed.success) {
     return NextResponse.json(
@@ -60,6 +102,7 @@ export async function POST(request: NextRequest) {
 
   return executeDividendAction({
     actorId,
+    attachments,
     data: parsed.data,
     localeRu,
     canAccessProject: async ({ periodId, projectId }) => {

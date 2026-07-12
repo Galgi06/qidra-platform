@@ -36,3 +36,15 @@ Format for each release entry:
 ### Fixes
 - Fixed the real-estate submission flow so uploaded files are appended reliably during form submission instead of being lost in the browser state.
 - Fixed edit-mode handling of existing uploaded files by explicitly keeping or clearing current file groups per field.
+
+## [0.1.3] - 2026-07-12
+
+### Changes
+- Added company-side dividend reporting uploads for PDF, XLS, XLSX, and CSV files directly from the dividend period form.
+- Added protected project report downloads for company owners/admins, project participants, and staff with draft/publication rules.
+- Added dividend calculation guards for overlapping periods and strict quarter/year validation where the project payout frequency requires it.
+- Added operational documentation for company dividend runs and capital-days calculation.
+
+### Fixes
+- Fixed the company dividend workflow so reporting files can be attached before approval and published to participants only after approval.
+- Fixed project report links in participant contracts to avoid exposing raw storage paths.

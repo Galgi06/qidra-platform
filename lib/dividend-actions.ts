@@ -1,6 +1,8 @@
 import { DividendPaymentStatus, DividendPeriodStatus, InvestmentStatus, PaymentStatus, Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { saveProjectReportFile } from "@/lib/company-workspace";
+import { deleteStoredFile } from "@/lib/file-storage";
 import { prisma } from "@/lib/prisma";
 
 export const calculateDividendSchema = z.object({
@@ -31,11 +33,13 @@ export type CalculateDividendPayload = z.infer<typeof calculateDividendSchema>;
 
 export async function executeDividendAction({
   actorId,
+  attachments = [],
   canAccessProject,
   data,
   localeRu
 }: {
   actorId?: string;
+  attachments?: File[];
   canAccessProject: (params: { periodId?: string; projectId?: string }) => Promise<boolean>;
   data: DividendActionPayload;
   localeRu: boolean;
@@ -53,7 +57,7 @@ export async function executeDividendAction({
   if (data.action === "calculate") {
     const allowed = await canAccessProject({ projectId: data.projectId });
     if (!allowed) return accessDenied(localeRu);
-    return calculatePeriod(data, actorId, localeRu);
+    return calculatePeriod(data, actorId, localeRu, attachments);
   }
 
   const allowed = await canAccessProject({ periodId: data.periodId });
@@ -80,7 +84,7 @@ function accessDenied(localeRu: boolean) {
   );
 }
 
-async function calculatePeriod(data: CalculateDividendPayload, actorId: string | undefined, localeRu: boolean) {
+async function calculatePeriod(data: CalculateDividendPayload, actorId: string | undefined, localeRu: boolean, attachments: File[]) {
   const periodStart = parseDate(data.periodStart);
   const periodEnd = parseDate(data.periodEnd);
 
@@ -100,6 +104,18 @@ async function calculatePeriod(data: CalculateDividendPayload, actorId: string |
   const netProfitUsdt = grossRevenueUsdt.minus(directCostUsdt).minus(operatingExpenseUsdt).toDecimalPlaces(6);
   const investorSharePercent = new Prisma.Decimal(data.investorSharePercent).toDecimalPlaces(4);
   const investorPoolUsdt = netProfitUsdt.gt(0) ? netProfitUsdt.times(investorSharePercent).div(100).toDecimalPlaces(6) : new Prisma.Decimal(0);
+  const storedReports = attachments.length ? await storeProjectReports(data.projectId, data.periodLabel, attachments) : [];
+  const staleDraftReports = await prisma.projectReport.findMany({
+    where: {
+      projectId: data.projectId,
+      period: data.periodLabel,
+      publishedAt: null
+    },
+    select: {
+      fileUrl: true,
+      id: true
+    }
+  });
 
   const result = await prisma.$transaction(async (tx) => {
     const existingPeriod = await tx.projectDividendPeriod.findUnique({
@@ -113,11 +129,34 @@ async function calculatePeriod(data: CalculateDividendPayload, actorId: string |
 
     const project = await tx.project.findUnique({
       where: { id: data.projectId },
-      select: { id: true, titleRu: true, titleEn: true }
+      select: { id: true, payoutFrequency: true, titleRu: true, titleEn: true }
     });
 
     if (!project) {
       throw new DividendError("project_not_found");
+    }
+
+    if (project.payoutFrequency === "QUARTERLY" && !isQuarterPeriod(periodStart, periodEnd)) {
+      throw new DividendError("invalid_quarter_period");
+    }
+
+    if (project.payoutFrequency === "ANNUAL" && !isAnnualPeriod(periodStart, periodEnd)) {
+      throw new DividendError("invalid_annual_period");
+    }
+
+    const hasOverlap = await tx.projectDividendPeriod.findFirst({
+      where: {
+        projectId: data.projectId,
+        id: existingPeriod ? { not: existingPeriod.id } : undefined,
+        status: { not: DividendPeriodStatus.CANCELLED },
+        periodStart: { lte: periodEnd },
+        periodEnd: { gte: periodStart }
+      },
+      select: { id: true, periodLabel: true }
+    });
+
+    if (hasOverlap) {
+      throw new DividendError("overlap_period");
     }
 
     const investments = await tx.investmentApplication.findMany({
@@ -181,6 +220,27 @@ async function calculatePeriod(data: CalculateDividendPayload, actorId: string |
       }
     });
 
+    if (storedReports.length) {
+      await tx.projectReport.deleteMany({
+        where: {
+          projectId: data.projectId,
+          period: data.periodLabel,
+          publishedAt: null
+        }
+      });
+
+      await tx.projectReport.createMany({
+        data: storedReports.map((report) => ({
+          projectId: data.projectId,
+          titleRu: report.titleRu,
+          titleEn: report.titleEn,
+          period: data.periodLabel,
+          fileUrl: report.fileUrl,
+          publishedAt: null
+        }))
+      });
+    }
+
     if (investorPoolUsdt.gt(0)) {
       await tx.dividendPayment.createMany({
         data: weightedInvestments.map((investment, index) => {
@@ -227,6 +287,14 @@ async function calculatePeriod(data: CalculateDividendPayload, actorId: string |
     throw error;
   });
 
+  if (typeof result === "string" && storedReports.length) {
+    await Promise.allSettled(storedReports.map((report) => deleteStoredFile(report.fileUrl, "project-reports")));
+  }
+
+  if (typeof result !== "string" && storedReports.length && staleDraftReports.length) {
+    await Promise.allSettled(staleDraftReports.map((report) => deleteStoredFile(report.fileUrl, "project-reports")));
+  }
+
   if (result === "locked_period") {
     return NextResponse.json(
       {
@@ -257,6 +325,42 @@ async function calculatePeriod(data: CalculateDividendPayload, actorId: string |
     );
   }
 
+  if (result === "invalid_quarter_period") {
+    return NextResponse.json(
+      {
+        title: localeRu ? "Неверный квартал" : "Invalid quarter",
+        message: localeRu
+          ? "Для квартального проекта период должен совпадать с календарным кварталом."
+          : "For a quarterly project, the period must match a calendar quarter."
+      },
+      { status: 400 }
+    );
+  }
+
+  if (result === "invalid_annual_period") {
+    return NextResponse.json(
+      {
+        title: localeRu ? "Неверный годовой период" : "Invalid annual period",
+        message: localeRu
+          ? "Для годового проекта период должен совпадать с календарным годом."
+          : "For an annual project, the period must match a calendar year."
+      },
+      { status: 400 }
+    );
+  }
+
+  if (result === "overlap_period") {
+    return NextResponse.json(
+      {
+        title: localeRu ? "Период пересекается" : "Period overlaps",
+        message: localeRu
+          ? "Для проекта уже существует отчётный период с пересечением дат. Отмените или закройте конфликтующий период."
+          : "A reporting period with overlapping dates already exists for this project. Cancel or close the conflicting period first."
+      },
+      { status: 409 }
+    );
+  }
+
   return NextResponse.json({
     title: result.noDistribution ? (localeRu ? "Период сохранён" : "Period saved") : localeRu ? "Период рассчитан" : "Period calculated",
     message:
@@ -271,7 +375,10 @@ async function calculatePeriod(data: CalculateDividendPayload, actorId: string |
 }
 
 async function approvePeriod(periodId: string, adminNote: string | undefined, actorId: string | undefined, localeRu: boolean) {
-  const period = await prisma.projectDividendPeriod.findUnique({ where: { id: periodId }, include: { payments: true } });
+  const period = await prisma.projectDividendPeriod.findUnique({
+    where: { id: periodId },
+    include: { payments: true }
+  });
 
   if (!period) {
     return periodNotFound(localeRu);
@@ -297,6 +404,16 @@ async function approvePeriod(periodId: string, adminNote: string | undefined, ac
         status: DividendPeriodStatus.APPROVED,
         approvedAt: new Date(),
         adminNote: adminNote ?? period.adminNote
+      }
+    });
+    await tx.projectReport.updateMany({
+      where: {
+        projectId: period.projectId,
+        period: period.periodLabel,
+        publishedAt: null
+      },
+      data: {
+        publishedAt: new Date()
       }
     });
     await tx.dividendPayment.updateMany({
@@ -510,10 +627,47 @@ function formatUsdt(value: { toString(): string }) {
 }
 
 class DividendError extends Error {
-  code: "locked_period" | "no_investments" | "project_not_found";
+  code: "invalid_annual_period" | "invalid_quarter_period" | "locked_period" | "no_investments" | "overlap_period" | "project_not_found";
 
   constructor(code: DividendError["code"]) {
     super(code);
     this.code = code;
   }
+}
+
+function isQuarterPeriod(periodStart: Date, periodEnd: Date) {
+  return (
+    periodStart.getUTCDate() === 1 &&
+    periodStart.getUTCMonth() % 3 === 0 &&
+    periodEnd.getUTCMonth() === periodStart.getUTCMonth() + 2 &&
+    periodEnd.getUTCFullYear() === periodStart.getUTCFullYear() &&
+    periodEnd.getUTCDate() === daysInUtcMonth(periodEnd.getUTCFullYear(), periodEnd.getUTCMonth())
+  );
+}
+
+function isAnnualPeriod(periodStart: Date, periodEnd: Date) {
+  return (
+    periodStart.getUTCMonth() === 0 &&
+    periodStart.getUTCDate() === 1 &&
+    periodEnd.getUTCMonth() === 11 &&
+    periodEnd.getUTCDate() === 31 &&
+    periodEnd.getUTCFullYear() === periodStart.getUTCFullYear()
+  );
+}
+
+function daysInUtcMonth(year: number, month: number) {
+  return new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+}
+
+async function storeProjectReports(projectId: string, periodLabel: string, attachments: File[]) {
+  return Promise.all(
+    attachments.map(async (file) => {
+      const stored = await saveProjectReportFile(file, projectId);
+      return {
+        fileUrl: stored.storagePath,
+        titleEn: `Report ${periodLabel}: ${stored.name}`,
+        titleRu: `Отчёт ${periodLabel}: ${stored.name}`
+      };
+    })
+  );
 }

@@ -4,6 +4,7 @@ import { CompanyWorkspace } from "@/components/CompanyTabs";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { FeedbackForm } from "@/components/ActionFeedback";
+import { FileUpload } from "@/components/FileUpload";
 import { NotificationCard } from "@/components/NotificationCard";
 import { ButtonLink } from "@/components/ui/Button";
 import { ProjectStatusBadge } from "@/components/ui/ProjectStatusBadge";
@@ -23,7 +24,7 @@ export default async function CompanyProjectsPage({ searchParams }: { searchPara
   const organizationId = membership.organizationId;
   const canManageDividends = canManageCompanyDividends(membership.role);
 
-  const [projects, submissions, dividendPeriods] = await Promise.all([
+  const [projects, submissions, dividendPeriods, reports] = await Promise.all([
     prisma.project.findMany({
       where: { organizationId },
       include: {
@@ -46,8 +47,24 @@ export default async function CompanyProjectsPage({ searchParams }: { searchPara
       },
       orderBy: [{ periodEnd: "desc" }, { createdAt: "desc" }],
       take: 12
+    }),
+    prisma.projectReport.findMany({
+      where: {
+        project: { organizationId }
+      },
+      orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
+      take: 60
     })
   ]);
+
+  const reportsByPeriod = new Map<string, CompanyProjectReport[]>();
+
+  for (const report of reports) {
+    const key = `${report.projectId}:${report.period}`;
+    const bucket = reportsByPeriod.get(key) ?? [];
+    bucket.push(report);
+    reportsByPeriod.set(key, bucket);
+  }
 
   const activeView = view === "submissions" ? "submissions" : "projects";
 
@@ -89,7 +106,7 @@ export default async function CompanyProjectsPage({ searchParams }: { searchPara
             selectedOrganizationId={membership.organizationId}
           >
             <div className="grid gap-6">
-              {activeView === "projects" && canManageDividends ? <CompanyDividendPanel locale={locale} periods={dividendPeriods} projects={projects} /> : null}
+              {activeView === "projects" && canManageDividends ? <CompanyDividendPanel locale={locale} periods={dividendPeriods} projects={projects} reportsByPeriod={reportsByPeriod} /> : null}
               <div className="flex flex-wrap gap-3">
                 <FilterPill active={activeView === "projects"} href={withLocale("/company/projects", locale)}>
                   {isRu ? `Проекты (${projects.length})` : `Projects (${projects.length})`}
@@ -263,14 +280,27 @@ type CompanyDividendPeriod = Prisma.ProjectDividendPeriodGetPayload<{
   };
 }>;
 
+type CompanyProjectReport = Prisma.ProjectReportGetPayload<{
+  select: {
+    id: true;
+    period: true;
+    projectId: true;
+    publishedAt: true;
+    titleEn: true;
+    titleRu: true;
+  };
+}>;
+
 function CompanyDividendPanel({
   locale,
   periods,
-  projects
+  projects,
+  reportsByPeriod
 }: {
   locale: "ru" | "en";
   periods: CompanyDividendPeriod[];
   projects: CompanyProject[];
+  reportsByPeriod: Map<string, CompanyProjectReport[]>;
 }) {
   const isRu = locale === "ru";
   const defaultDates = currentQuarterDefaults();
@@ -297,6 +327,7 @@ function CompanyDividendPanel({
       <FeedbackForm
         className="grid gap-4 rounded-qidra border border-qidra-grayLight bg-qidra-grayLight p-4"
         endpoint={`/api/company/dividends?lang=${locale}`}
+        payload="form-data"
         feedback={{
           title: isRu ? "Период рассчитан" : "Period calculated",
           text: isRu ? "Начисления подготовлены. Проверьте строки и утвердите расчёт перед выплатой." : "Accruals are prepared. Review the rows and approve the calculation before payout.",
@@ -354,6 +385,15 @@ function CompanyDividendPanel({
           {isRu ? "Комментарий компании" : "Company note"}
           <textarea className="min-h-24 rounded-qidra border border-qidra-grayLight bg-white px-4 py-3 text-16 font-medium text-qidra-dark outline-none transition-colors focus:border-qidra-accent" name="adminNote" />
         </label>
+        <FileUpload
+          accept=".pdf,.xls,.xlsx,.csv"
+          hint={isRu ? "Прикрепите PDF или Excel/CSV отчётность по периоду. Файлы станут доступны участникам после утверждения периода." : "Attach PDF or Excel/CSV reporting for the period. Files become visible to participants after the period is approved."}
+          label={isRu ? "Файлы отчётности периода" : "Period reporting files"}
+          manyFilesLabel={isRu ? "файлов" : "files"}
+          name="attachments"
+          multiple
+          selectedLabel={isRu ? "Выбрано" : "Selected"}
+        />
         <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
           <label className="grid gap-2 text-14 font-medium text-qidra-dark">
             {isRu ? "Подтверждение" : "Confirmation"}
@@ -371,6 +411,7 @@ function CompanyDividendPanel({
           <div className="grid gap-3">
             {periods.map((period) => {
               const zeroDistribution = Number(period.investorPoolUsdt.toString()) <= 0;
+              const linkedReports = reportsByPeriod.get(`${period.projectId}:${period.periodLabel}`) ?? [];
 
               return (
                 <article key={period.id} className="grid gap-4 rounded-qidra border border-qidra-grayLight bg-white p-4">
@@ -407,6 +448,31 @@ function CompanyDividendPanel({
                       ) : null}
                     </div>
                   </div>
+                  {linkedReports.length ? (
+                    <div className="grid gap-2 rounded-qidra bg-qidra-grayLight p-4">
+                      <p className="text-14 font-medium text-qidra-dark">{isRu ? "Файлы отчётности" : "Reporting files"}</p>
+                      <div className="grid gap-2 md:grid-cols-2">
+                        {linkedReports.map((report) => (
+                          <Link
+                            key={report.id}
+                            className="rounded-qidra border border-qidra-grayLight bg-white px-4 py-3 text-14 font-medium text-qidra-accent transition-colors hover:border-qidra-accent hover:text-qidra-dark"
+                            href={`/api/projects/${period.projectId}/reports/${report.id}`}
+                          >
+                            {isRu ? report.titleRu : report.titleEn}
+                            <span className="mt-1 block text-12 font-normal text-qidra-grayBlue">
+                              {report.publishedAt
+                                ? isRu
+                                  ? "Опубликовано для участников"
+                                  : "Published for participants"
+                                : isRu
+                                  ? "Черновик до утверждения периода"
+                                  : "Draft until period approval"}
+                            </span>
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
                 </article>
               );
             })}
