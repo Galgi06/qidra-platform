@@ -4,8 +4,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { getAppBaseUrl, sendEmail } from "@/lib/email";
 import { createRawToken } from "@/lib/tokens";
-import { canManageCompanyTeam } from "@/lib/organizations";
 import { authOptions } from "@/lib/next-auth";
+import { canManageCompanyTeam, getOrganizationMembership } from "@/lib/organizations";
 import { prisma } from "@/lib/prisma";
 
 const createSchema = z.object({
@@ -34,10 +34,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ title: localeRu ? "Нужен вход" : "Sign in required", message: localeRu ? "Войдите в кабинет компании." : "Sign in to the company workspace." }, { status: 401 });
   }
 
-  const membership = await prisma.organizationMember.findFirst({
-    where: { userId },
-    include: { organization: true }
-  });
+  const membership = await getOrganizationMembership(userId);
 
   if (!membership || !canManageCompanyTeam(membership.role)) {
     return NextResponse.json({ title: localeRu ? "Нет доступа" : "Access denied", message: localeRu ? "Только owner или admin могут управлять командой." : "Only owner or admin can manage the team." }, { status: 403 });

@@ -2,6 +2,25 @@ import { OrganizationLeadStatus, OrganizationMemberRole, OrganizationStatus, Pri
 import { prisma } from "@/lib/prisma";
 import type { Locale } from "@/lib/i18n";
 
+const organizationMembershipInclude = {
+  organization: {
+    include: {
+      documents: true,
+      _count: {
+        select: {
+          members: true,
+          projects: true,
+          projectSubmissions: true
+        }
+      }
+    }
+  }
+} satisfies Prisma.OrganizationMemberInclude;
+
+type OrganizationMembershipRecord = Prisma.OrganizationMemberGetPayload<{
+  include: typeof organizationMembershipInclude;
+}>;
+
 export function companyStatusLabel(status: OrganizationStatus, locale: Locale) {
   const labels: Record<OrganizationStatus, Record<Locale, string>> = {
     DRAFT: { ru: "Черновик", en: "Draft" },
@@ -59,24 +78,7 @@ export function isOrganizationSchemaUnavailable(error: unknown) {
 
 export async function getPrimaryOrganizationForUser(userId: string) {
   try {
-    const memberships = await prisma.organizationMember.findMany({
-      where: { userId },
-      include: {
-        organization: {
-          include: {
-            _count: {
-              select: {
-                members: true,
-                projects: true,
-                projectSubmissions: true
-              }
-            }
-          }
-        }
-      }
-    });
-
-    const membership = sortOrganizationMemberships(memberships)[0] ?? null;
+    const membership = (await getOrganizationMemberships(userId))[0] ?? null;
 
     return membership?.organization ?? null;
   } catch (error) {
@@ -90,28 +92,7 @@ export async function getPrimaryOrganizationForUser(userId: string) {
 
 export async function getOrganizationMembership(userId: string, organizationId?: string | null) {
   try {
-    const memberships = await prisma.organizationMember.findMany({
-      where: {
-        userId,
-        ...(organizationId ? { organizationId } : {})
-      },
-      include: {
-        organization: {
-          include: {
-            documents: true,
-            _count: {
-              select: {
-                members: true,
-                projects: true,
-                projectSubmissions: true
-              }
-            }
-          }
-        }
-      }
-    });
-
-    const membership = sortOrganizationMemberships(memberships)[0] ?? null;
+    const membership = (await getOrganizationMemberships(userId, organizationId))[0] ?? null;
 
     return membership;
   } catch (error) {
@@ -123,12 +104,40 @@ export async function getOrganizationMembership(userId: string, organizationId?:
   }
 }
 
-export async function getOrganizationMemberships(userId: string) {
+export async function getOrganizationMemberships(userId: string, organizationId?: string | null) {
   try {
-    const memberships = await prisma.organizationMember.findMany({
-      where: { userId },
-      include: {
-        organization: {
+    return await getAccessibleOrganizationMemberships(userId, organizationId);
+  } catch (error) {
+    if (isOrganizationSchemaUnavailable(error)) {
+      return [];
+    }
+
+    throw error;
+  }
+}
+
+async function getAccessibleOrganizationMemberships(userId: string, organizationId?: string | null) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { email: true }
+  });
+
+  const normalizedEmail = user?.email?.trim().toLowerCase() || null;
+
+  const [memberships, fallbackOrganizations] = await Promise.all([
+    prisma.organizationMember.findMany({
+      where: {
+        userId,
+        ...(organizationId ? { organizationId } : {})
+      },
+      include: organizationMembershipInclude
+    }),
+    normalizedEmail
+      ? prisma.organization.findMany({
+          where: {
+            contactEmail: normalizedEmail,
+            ...(organizationId ? { id: organizationId } : {})
+          },
           include: {
             documents: true,
             _count: {
@@ -139,18 +148,24 @@ export async function getOrganizationMemberships(userId: string) {
               }
             }
           }
-        }
-      }
-    });
+        })
+      : Promise.resolve([])
+  ]);
 
-    return sortOrganizationMemberships(memberships);
-  } catch (error) {
-    if (isOrganizationSchemaUnavailable(error)) {
-      return [];
-    }
+  const knownOrganizationIds = new Set(memberships.map((membership) => membership.organizationId));
+  const recoveredMemberships: OrganizationMembershipRecord[] = fallbackOrganizations
+    .filter((organization) => !knownOrganizationIds.has(organization.id))
+    .map((organization) => ({
+      id: `recovered:${userId}:${organization.id}`,
+      userId,
+      organizationId: organization.id,
+      role: OrganizationMemberRole.OWNER,
+      createdAt: organization.createdAt,
+      updatedAt: organization.updatedAt,
+      organization
+    }));
 
-    throw error;
-  }
+  return sortOrganizationMemberships([...memberships, ...recoveredMemberships]);
 }
 
 function sortOrganizationMemberships<

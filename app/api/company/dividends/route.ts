@@ -4,7 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { authOptions } from "@/lib/next-auth";
 import { prisma } from "@/lib/prisma";
 import { dividendActionSchema, executeDividendAction } from "@/lib/dividend-actions";
-import { canManageCompanyDividends } from "@/lib/organizations";
+import { canManageCompanyDividends, getOrganizationMembership } from "@/lib/organizations";
 
 type SessionUser = {
   user?: {
@@ -85,10 +85,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const membership = await prisma.organizationMember.findFirst({
-    where: { userId: actorId },
-    select: { organizationId: true, role: true }
-  });
+  const membership = await getOrganizationMembership(actorId);
 
   if (!membership || !canManageCompanyDividends(membership.role as OrganizationMemberRole)) {
     return NextResponse.json(

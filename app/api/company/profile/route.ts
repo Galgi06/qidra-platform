@@ -4,6 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { authOptions } from "@/lib/next-auth";
 import { prisma } from "@/lib/prisma";
+import { getOrganizationMembership } from "@/lib/organizations";
 import { isValidNormalizedPublicSlug, normalizePublicSlug } from "@/lib/public-slug";
 
 const schema = z.object({
@@ -67,10 +68,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const membership = await prisma.organizationMember.findFirst({
-    where: { userId },
-    include: { organization: true }
-  });
+  const membership = await getOrganizationMembership(userId);
 
   if (!membership) {
     return NextResponse.json(
