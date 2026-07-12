@@ -4,7 +4,6 @@ import { CompanyWorkspace } from "@/components/CompanyTabs";
 import { NotificationCard } from "@/components/NotificationCard";
 import { ButtonLink } from "@/components/ui/Button";
 import { requireCompanyAccess } from "@/lib/access";
-import { companyWorkspaceProjectWhere } from "@/lib/company-workspace";
 import { getLocale, type SearchParams, withLocale } from "@/lib/i18n";
 import { companyHomeNextStep, companyLeadStatusLabel, companyMemberRoleLabel, companyStatusLabel } from "@/lib/organizations";
 import { prisma } from "@/lib/prisma";
@@ -19,7 +18,7 @@ export default async function CompanyPage({ searchParams }: { searchParams?: Pro
   const userId = session.user?.id ?? "";
   const [submissionCount, activeProjects, memberCount, leadCount, newLeadCount, documentCount] = await Promise.all([
     prisma.projectSubmission.count({ where: { organizationId: organization.id } }),
-    prisma.project.count({ where: companyWorkspaceProjectWhere(organization.id, userId) }),
+    prisma.project.count({ where: { organizationId: organization.id } }),
     prisma.organizationMember.count({ where: { organizationId: organization.id } }),
     prisma.organizationLead.count({ where: { organizationId: organization.id } }),
     prisma.organizationLead.count({ where: { organizationId: organization.id, status: "NEW" } }),
@@ -58,7 +57,7 @@ export default async function CompanyPage({ searchParams }: { searchParams?: Pro
                 <ButtonLink href={withLocale(nextStep.href, locale)} className="h-12 min-w-44">
                   {nextStep.buttonLabel}
                 </ButtonLink>
-                <ButtonLink href={withLocale("/company/projects", locale)} variant="outline" className="h-12 min-w-44">
+                <ButtonLink href={withOrganizationParam("/company/projects", locale, membership.organizationId)} variant="outline" className="h-12 min-w-44">
                   {isRu ? "Проекты компании" : "Company projects"}
                 </ButtonLink>
                 <ButtonLink href={withLocale("/investor", locale)} variant="outline" className="h-12 min-w-44">
@@ -73,7 +72,7 @@ export default async function CompanyPage({ searchParams }: { searchParams?: Pro
         </section>
 
         <section className="px-5 py-12 sm:px-8 lg:px-11 lg:py-16">
-          <CompanyWorkspace activePath="/company" locale={locale} memberships={memberships} selectedOrganizationId={membership.organizationId}>
+          <CompanyWorkspace activePath={`/company?organization=${membership.organizationId}`} locale={locale} memberships={memberships} selectedOrganizationId={membership.organizationId}>
             <div className="grid gap-8">
               <div className="grid gap-5 md:grid-cols-4">
                 <MetricCard label={isRu ? "Статус компании" : "Company status"} value={companyStatusLabel(organization.status, locale)} />
@@ -202,4 +201,11 @@ function InfoRow({ label, value }: { label: string; value: string }) {
       <p className="mt-1 font-medium text-qidra-dark">{value}</p>
     </div>
   );
+}
+
+function withOrganizationParam(href: string, locale: "ru" | "en", organizationId: string) {
+  const localized = withLocale(href, locale);
+  const url = new URL(localized, "https://qidra.io");
+  url.searchParams.set("organization", organizationId);
+  return `${url.pathname}${url.search}`;
 }

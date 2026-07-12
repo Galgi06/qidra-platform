@@ -78,7 +78,8 @@ export function isOrganizationSchemaUnavailable(error: unknown) {
 
 export async function getPrimaryOrganizationForUser(userId: string) {
   try {
-    const membership = (await getOrganizationMemberships(userId))[0] ?? null;
+    const memberships = await getAccessibleOrganizationMemberships(userId);
+    const membership = memberships[0] ?? null;
 
     return membership?.organization ?? null;
   } catch (error) {
@@ -92,9 +93,8 @@ export async function getPrimaryOrganizationForUser(userId: string) {
 
 export async function getOrganizationMembership(userId: string, organizationId?: string | null) {
   try {
-    const membership = (await getOrganizationMemberships(userId, organizationId))[0] ?? null;
-
-    return membership;
+    const memberships = await getAccessibleOrganizationMemberships(userId, organizationId);
+    return memberships[0] ?? null;
   } catch (error) {
     if (isOrganizationSchemaUnavailable(error)) {
       return null;
@@ -104,9 +104,9 @@ export async function getOrganizationMembership(userId: string, organizationId?:
   }
 }
 
-export async function getOrganizationMemberships(userId: string, organizationId?: string | null) {
+export async function getOrganizationMemberships(userId: string) {
   try {
-    return await getAccessibleOrganizationMemberships(userId, organizationId);
+    return getAccessibleOrganizationMemberships(userId);
   } catch (error) {
     if (isOrganizationSchemaUnavailable(error)) {
       return [];
@@ -116,56 +116,52 @@ export async function getOrganizationMemberships(userId: string, organizationId?
   }
 }
 
-async function getAccessibleOrganizationMemberships(userId: string, organizationId?: string | null) {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { email: true }
-  });
-
-  const normalizedEmail = user?.email?.trim().toLowerCase() || null;
-
-  const [memberships, fallbackOrganizations] = await Promise.all([
+export async function getAccessibleOrganizationMemberships(userId: string, organizationId?: string | null) {
+  const [user, directMemberships] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true }
+    }),
     prisma.organizationMember.findMany({
       where: {
         userId,
         ...(organizationId ? { organizationId } : {})
       },
       include: organizationMembershipInclude
-    }),
-    normalizedEmail
-      ? prisma.organization.findMany({
-          where: {
-            contactEmail: normalizedEmail,
-            ...(organizationId ? { id: organizationId } : {})
-          },
-          include: {
-            documents: true,
-            _count: {
-              select: {
-                members: true,
-                projects: true,
-                projectSubmissions: true
-              }
-            }
-          }
-        })
-      : Promise.resolve([])
+    })
   ]);
 
-  const knownOrganizationIds = new Set(memberships.map((membership) => membership.organizationId));
-  const recoveredMemberships: OrganizationMembershipRecord[] = fallbackOrganizations
-    .filter((organization) => !knownOrganizationIds.has(organization.id))
-    .map((organization) => ({
-      id: `recovered:${userId}:${organization.id}`,
-      userId,
-      organizationId: organization.id,
-      role: OrganizationMemberRole.OWNER,
-      createdAt: organization.createdAt,
-      updatedAt: organization.updatedAt,
-      organization
-    }));
+  const normalizedEmail = user?.email?.trim().toLowerCase();
+  const directIds = new Set(directMemberships.map((membership) => membership.organizationId));
 
-  return sortOrganizationMemberships([...memberships, ...recoveredMemberships]);
+  let recoveredMemberships: OrganizationMembershipRecord[] = [];
+
+  if (normalizedEmail) {
+    const fallbackOrganizations = await prisma.organization.findMany({
+      where: {
+        contactEmail: {
+          equals: normalizedEmail,
+          mode: "insensitive"
+        },
+        ...(organizationId ? { id: organizationId } : {})
+      },
+      include: organizationMembershipInclude.organization.include
+    });
+
+    recoveredMemberships = fallbackOrganizations
+      .filter((organization) => !directIds.has(organization.id))
+      .map((organization) => ({
+        id: `recovered:${organization.id}:${userId}`,
+        organizationId: organization.id,
+        userId,
+        role: OrganizationMemberRole.OWNER,
+        createdAt: organization.createdAt,
+        updatedAt: organization.updatedAt,
+        organization
+      }));
+  }
+
+  return sortOrganizationMemberships([...directMemberships, ...recoveredMemberships]);
 }
 
 function sortOrganizationMemberships<

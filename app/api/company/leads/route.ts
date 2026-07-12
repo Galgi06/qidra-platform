@@ -2,8 +2,9 @@ import { OrganizationLeadStatus } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
+import { canManageCompanyLeads } from "@/lib/organizations";
 import { authOptions } from "@/lib/next-auth";
-import { canManageCompanyLeads, getOrganizationMembership } from "@/lib/organizations";
+import { getOrganizationMembership } from "@/lib/organizations";
 import { prisma } from "@/lib/prisma";
 
 const schema = z.object({

@@ -3,8 +3,8 @@ import { getServerSession } from "next-auth";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { authOptions } from "@/lib/next-auth";
-import { prisma } from "@/lib/prisma";
 import { getOrganizationMembership } from "@/lib/organizations";
+import { prisma } from "@/lib/prisma";
 import { isValidNormalizedPublicSlug, normalizePublicSlug } from "@/lib/public-slug";
 
 const schema = z.object({

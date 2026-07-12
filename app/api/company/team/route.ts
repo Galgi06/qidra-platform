@@ -4,8 +4,9 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { getAppBaseUrl, sendEmail } from "@/lib/email";
 import { createRawToken } from "@/lib/tokens";
+import { canManageCompanyTeam } from "@/lib/organizations";
 import { authOptions } from "@/lib/next-auth";
-import { canManageCompanyTeam, getOrganizationMembership } from "@/lib/organizations";
+import { getOrganizationMembership } from "@/lib/organizations";
 import { prisma } from "@/lib/prisma";
 
 const createSchema = z.object({

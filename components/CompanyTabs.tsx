@@ -235,6 +235,10 @@ function companyWorkspaceStatus(status: OrganizationStatus, locale: Locale) {
 }
 
 function CompanyNavigationContent({ activePath, compact = false, locale }: { activePath: string; compact?: boolean; locale: Locale }) {
+  const [basePath, query = ""] = activePath.split("?");
+  const activeParams = new URLSearchParams(query);
+  const selectedOrganizationId = activeParams.get("organization");
+
   return (
     <div className={`grid gap-5 ${compact ? "md:grid-cols-2 xl:grid-cols-4" : ""}`}>
       {companyGroups.map((group) => {
@@ -253,7 +257,7 @@ function CompanyNavigationContent({ activePath, compact = false, locale }: { act
                     className={`grid gap-1 rounded-qidra px-4 py-3 transition-[background-color,color,box-shadow] ${
                       active ? "bg-qidra-dark text-white shadow-[0_12px_28px_rgba(18,20,23,0.18)]" : "text-qidra-dark hover:bg-qidra-grayLight hover:shadow-[inset_3px_0_0_var(--qidra-accent)]"
                     }`}
-                    href={withLocale(section.path, locale)}
+                    href={selectedOrganizationId ? withOrganization(section.path, locale, selectedOrganizationId) : withLocale(section.path, locale)}
                   >
                     <span className="text-15 font-medium">{section.label[locale]}</span>
                     <span className={`text-12 ${active ? "text-white/70" : "text-qidra-grayBlue"}`}>{section.description[locale]}</span>

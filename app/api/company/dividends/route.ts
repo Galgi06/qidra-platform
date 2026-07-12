@@ -2,9 +2,10 @@ import { OrganizationMemberRole } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { NextResponse, type NextRequest } from "next/server";
 import { authOptions } from "@/lib/next-auth";
+import { getOrganizationMembership } from "@/lib/organizations";
 import { prisma } from "@/lib/prisma";
 import { dividendActionSchema, executeDividendAction } from "@/lib/dividend-actions";
-import { canManageCompanyDividends, getOrganizationMembership } from "@/lib/organizations";
+import { canManageCompanyDividends } from "@/lib/organizations";
 
 type SessionUser = {
   user?: {
@@ -17,14 +18,6 @@ function isRu(request: NextRequest) {
 }
 
 const allowedReportExtensions = new Set(["pdf", "xls", "xlsx", "csv"]);
-const allowedReportMimeTypes = new Set([
-  "application/pdf",
-  "application/vnd.ms-excel",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  "text/csv",
-  "application/csv",
-  "application/octet-stream"
-]);
 const maxReportAttachmentBytes = 25 * 1024 * 1024;
 
 export async function POST(request: NextRequest) {
@@ -55,7 +48,7 @@ export async function POST(request: NextRequest) {
 
     const invalidAttachment = attachments.find((file) => {
       const extension = file.name.split(".").pop()?.toLowerCase() || "";
-      return !allowedReportExtensions.has(extension) || !allowedReportMimeTypes.has(file.type || "application/octet-stream") || file.size > maxReportAttachmentBytes;
+      return !allowedReportExtensions.has(extension) || file.size > maxReportAttachmentBytes;
     });
 
     if (invalidAttachment) {

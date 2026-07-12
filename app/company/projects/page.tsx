@@ -9,7 +9,6 @@ import { NotificationCard } from "@/components/NotificationCard";
 import { ButtonLink } from "@/components/ui/Button";
 import { ProjectStatusBadge } from "@/components/ui/ProjectStatusBadge";
 import { requireCompanyAccess } from "@/lib/access";
-import { companyWorkspaceProjectWhere } from "@/lib/company-workspace";
 import { getLocale, type SearchParams, withLocale } from "@/lib/i18n";
 import { canManageCompanyDividends } from "@/lib/organizations";
 import { payoutFrequencyLabel } from "@/lib/project-catalog";
@@ -21,15 +20,13 @@ export default async function CompanyProjectsPage({ searchParams }: { searchPara
   const isRu = locale === "ru";
   const view = Array.isArray(params?.view) ? params?.view[0] : params?.view;
   const selectedOrganizationId = Array.isArray(params?.organization) ? params.organization[0] : params?.organization;
-  const { membership, memberships, session } = await requireCompanyAccess(locale, "/company/projects", selectedOrganizationId);
+  const { membership, memberships } = await requireCompanyAccess(locale, "/company/projects", selectedOrganizationId);
   const organizationId = membership.organizationId;
-  const userId = session.user?.id ?? "";
   const canManageDividends = canManageCompanyDividends(membership.role);
-  const projectWhere = companyWorkspaceProjectWhere(organizationId, userId);
 
-  const [projects, submissions] = await Promise.all([
+  const [projects, submissions, dividendPeriods, reports] = await Promise.all([
     prisma.project.findMany({
-      where: projectWhere,
+      where: { organizationId },
       include: {
         dividendPeriods: {
           orderBy: [{ periodEnd: "desc" }, { createdAt: "desc" }],
@@ -41,14 +38,9 @@ export default async function CompanyProjectsPage({ searchParams }: { searchPara
     prisma.projectSubmission.findMany({
       where: { organizationId },
       orderBy: { createdAt: "desc" }
-    })
-  ]);
-
-  const projectIds = projects.map((project) => project.id);
-
-  const [dividendPeriods, reports] = await Promise.all([
+    }),
     prisma.projectDividendPeriod.findMany({
-      where: projectIds.length ? { projectId: { in: projectIds } } : { projectId: "__missing__" },
+      where: { project: { organizationId } },
       include: {
         project: { select: { titleRu: true, titleEn: true } },
         _count: { select: { payments: true } }
@@ -57,7 +49,9 @@ export default async function CompanyProjectsPage({ searchParams }: { searchPara
       take: 12
     }),
     prisma.projectReport.findMany({
-      where: projectIds.length ? { projectId: { in: projectIds } } : { projectId: "__missing__" },
+      where: {
+        project: { organizationId }
+      },
       orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
       take: 60
     })
@@ -96,7 +90,7 @@ export default async function CompanyProjectsPage({ searchParams }: { searchPara
                 <ButtonLink href={withLocale("/investor/projects/new", locale)} className="h-12 min-w-44">
                   {isRu ? "Новый листинг" : "New listing"}
                 </ButtonLink>
-                <ButtonLink href={withLocale("/company", locale)} variant="outline" className="h-12 min-w-44">
+                <ButtonLink href={withOrganizationParam("/company", locale, membership.organizationId)} variant="outline" className="h-12 min-w-44">
                   {isRu ? "Вернуться в кабинет" : "Back to workspace"}
                 </ButtonLink>
               </div>
@@ -106,7 +100,7 @@ export default async function CompanyProjectsPage({ searchParams }: { searchPara
 
         <section className="px-5 py-12 sm:px-8 lg:px-11 lg:py-16">
           <CompanyWorkspace
-            activePath={activeView === "submissions" ? "/company/projects?view=submissions" : "/company/projects"}
+            activePath={activeView === "submissions" ? `/company/projects?view=submissions&organization=${membership.organizationId}` : `/company/projects?organization=${membership.organizationId}`}
             locale={locale}
             memberships={memberships}
             selectedOrganizationId={membership.organizationId}
@@ -114,10 +108,10 @@ export default async function CompanyProjectsPage({ searchParams }: { searchPara
             <div className="grid gap-6">
               {activeView === "projects" && canManageDividends ? <CompanyDividendPanel locale={locale} periods={dividendPeriods} projects={projects} reportsByPeriod={reportsByPeriod} /> : null}
               <div className="flex flex-wrap gap-3">
-                <FilterPill active={activeView === "projects"} href={withLocale("/company/projects", locale)}>
+                <FilterPill active={activeView === "projects"} href={withOrganizationParam("/company/projects", locale, membership.organizationId)}>
                   {isRu ? `Проекты (${projects.length})` : `Projects (${projects.length})`}
                 </FilterPill>
-                <FilterPill active={activeView === "submissions"} href={withLocale("/company/projects?view=submissions", locale)}>
+                <FilterPill active={activeView === "submissions"} href={withOrganizationParam("/company/projects?view=submissions", locale, membership.organizationId)}>
                   {isRu ? `Листинги (${submissions.length})` : `Listings (${submissions.length})`}
                 </FilterPill>
               </div>
@@ -225,6 +219,13 @@ function FilterPill({ active, children, href }: { active: boolean; children: Rea
       {children}
     </Link>
   );
+}
+
+function withOrganizationParam(href: string, locale: "ru" | "en", organizationId: string) {
+  const localized = withLocale(href, locale);
+  const url = new URL(localized, "https://qidra.io");
+  url.searchParams.set("organization", organizationId);
+  return `${url.pathname}${url.search}`;
 }
 
 function Fact({ label, value }: { label: string; value: string }) {
