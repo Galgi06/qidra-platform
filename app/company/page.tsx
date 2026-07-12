@@ -4,6 +4,7 @@ import { CompanyWorkspace } from "@/components/CompanyTabs";
 import { NotificationCard } from "@/components/NotificationCard";
 import { ButtonLink } from "@/components/ui/Button";
 import { requireCompanyAccess } from "@/lib/access";
+import { companyWorkspaceProjectWhere } from "@/lib/company-workspace";
 import { getLocale, type SearchParams, withLocale } from "@/lib/i18n";
 import { companyHomeNextStep, companyLeadStatusLabel, companyMemberRoleLabel, companyStatusLabel } from "@/lib/organizations";
 import { prisma } from "@/lib/prisma";
@@ -18,7 +19,7 @@ export default async function CompanyPage({ searchParams }: { searchParams?: Pro
   const userId = session.user?.id ?? "";
   const [submissionCount, activeProjects, memberCount, leadCount, newLeadCount, documentCount] = await Promise.all([
     prisma.projectSubmission.count({ where: { organizationId: organization.id } }),
-    prisma.project.count({ where: { organizationId: organization.id } }),
+    prisma.project.count({ where: companyWorkspaceProjectWhere(organization.id, userId) }),
     prisma.organizationMember.count({ where: { organizationId: organization.id } }),
     prisma.organizationLead.count({ where: { organizationId: organization.id } }),
     prisma.organizationLead.count({ where: { organizationId: organization.id, status: "NEW" } }),

@@ -1,4 +1,4 @@
-import { OrganizationAnalyticsEventType, OrganizationLeadStatus, OrganizationMemberRole, Prisma } from "@prisma/client";
+import { OrganizationAnalyticsEventType, OrganizationLeadStatus, OrganizationMemberRole, Prisma, ProjectSubmissionStatus } from "@prisma/client";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { isOrganizationSchemaUnavailable } from "@/lib/organizations";
@@ -50,6 +50,29 @@ export async function saveProjectReportFile(file: File, projectId: string) {
     size: file.size,
     storagePath,
     type
+  };
+}
+
+export function companyWorkspaceProjectWhere(organizationId: string, userId: string): Prisma.ProjectWhereInput {
+  return {
+    OR: [
+      { organizationId },
+      {
+        projectSubmissions: {
+          some: {
+            organizationId
+          }
+        }
+      },
+      {
+        projectSubmissions: {
+          some: {
+            userId,
+            status: ProjectSubmissionStatus.APPROVED
+          }
+        }
+      }
+    ]
   };
 }
 
