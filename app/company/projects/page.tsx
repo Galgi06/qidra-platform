@@ -9,6 +9,7 @@ import { NotificationCard } from "@/components/NotificationCard";
 import { ButtonLink } from "@/components/ui/Button";
 import { ProjectStatusBadge } from "@/components/ui/ProjectStatusBadge";
 import { requireCompanyAccess } from "@/lib/access";
+import { companyWorkspaceProjectWhere } from "@/lib/company-workspace";
 import { getLocale, type SearchParams, withLocale } from "@/lib/i18n";
 import { canManageCompanyDividends } from "@/lib/organizations";
 import { payoutFrequencyLabel } from "@/lib/project-catalog";
@@ -20,13 +21,14 @@ export default async function CompanyProjectsPage({ searchParams }: { searchPara
   const isRu = locale === "ru";
   const view = Array.isArray(params?.view) ? params?.view[0] : params?.view;
   const selectedOrganizationId = Array.isArray(params?.organization) ? params.organization[0] : params?.organization;
-  const { membership, memberships } = await requireCompanyAccess(locale, "/company/projects", selectedOrganizationId);
+  const { membership, memberships, session } = await requireCompanyAccess(locale, "/company/projects", selectedOrganizationId);
   const organizationId = membership.organizationId;
   const canManageDividends = canManageCompanyDividends(membership.role);
+  const userId = session.user?.id ?? "";
 
-  const [projects, submissions, dividendPeriods, reports] = await Promise.all([
+  const [projects, submissions] = await Promise.all([
     prisma.project.findMany({
-      where: { organizationId },
+      where: companyWorkspaceProjectWhere(organizationId, userId),
       include: {
         dividendPeriods: {
           orderBy: [{ periodEnd: "desc" }, { createdAt: "desc" }],
@@ -38,9 +40,16 @@ export default async function CompanyProjectsPage({ searchParams }: { searchPara
     prisma.projectSubmission.findMany({
       where: { organizationId },
       orderBy: { createdAt: "desc" }
-    }),
+    })
+  ]);
+
+  const projectIds = projects.map((project) => project.id);
+
+  const [dividendPeriods, reports] = await Promise.all([
     prisma.projectDividendPeriod.findMany({
-      where: { project: { organizationId } },
+      where: {
+        ...(projectIds.length ? { projectId: { in: projectIds } } : { projectId: "__none__" })
+      },
       include: {
         project: { select: { titleRu: true, titleEn: true } },
         _count: { select: { payments: true } }
@@ -50,7 +59,7 @@ export default async function CompanyProjectsPage({ searchParams }: { searchPara
     }),
     prisma.projectReport.findMany({
       where: {
-        project: { organizationId }
+        ...(projectIds.length ? { projectId: { in: projectIds } } : { projectId: "__none__" })
       },
       orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
       take: 60
