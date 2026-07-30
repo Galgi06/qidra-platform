@@ -406,7 +406,7 @@ export async function POST(request: NextRequest) {
         }
       })
     : null;
-  const submittedSector = readText(formData, "sectorCurrent") || readText(formData, "sector");
+  const submittedSector = readText(formData, "sector") || readText(formData, "sectorCurrent");
 
   const parsed = projectSubmissionSchema.safeParse({
     title: readText(formData, "title"),

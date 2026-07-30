@@ -14,6 +14,12 @@ const amountSchema = z
   .refine((value) => new Prisma.Decimal(value).gt(0), "positive");
 
 const noteSchema = z.string().trim().min(12).max(800);
+const optionalPreparedText = (max: number) =>
+  z.preprocess((value) => {
+    if (typeof value !== "string") return undefined;
+    const trimmed = value.trim();
+    return trimmed ? trimmed : undefined;
+  }, z.string().max(max).optional());
 
 const optionalText = z.preprocess((value) => {
   if (typeof value !== "string") return undefined;
@@ -39,12 +45,12 @@ const submissionActionSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("prepare"),
     confirmation: z.string().trim(),
-    descriptionEn: z.string().trim().min(20).max(5000),
-    descriptionRu: z.string().trim().min(20).max(5000),
-    expectedReturnEn: z.string().trim().min(5).max(180),
-    expectedReturnRu: z.string().trim().min(5).max(180),
-    expectedYieldEn: z.string().trim().min(2).max(180),
-    expectedYieldRu: z.string().trim().min(2).max(180),
+    descriptionEn: optionalPreparedText(5000),
+    descriptionRu: optionalPreparedText(5000),
+    expectedReturnEn: optionalPreparedText(180),
+    expectedReturnRu: optionalPreparedText(180),
+    expectedYieldEn: optionalPreparedText(180),
+    expectedYieldRu: optionalPreparedText(180),
     stageRu: optionalText,
     stageEn: optionalText,
     currentProgressRu: optionalText,
@@ -53,14 +59,18 @@ const submissionActionSchema = z.discriminatedUnion("action", [
     fundraisingEndAt: optionalDate,
     plannedLaunchAt: optionalDate,
     plannedDividendAt: optionalDate,
-    payoutFrequency: z.nativeEnum(PayoutFrequency).default(PayoutFrequency.CUSTOM),
+    payoutFrequency: z.preprocess((value) => {
+      if (typeof value !== "string") return undefined;
+      const trimmed = value.trim();
+      return trimmed ? trimmed : undefined;
+    }, z.nativeEnum(PayoutFrequency).optional()),
     participationTermRu: optionalText,
     participationTermEn: optionalText,
     raisePlanRu: optionalText,
     raisePlanEn: optionalText,
-    location: z.string().trim().min(2).max(120),
+    location: optionalPreparedText(120),
     note: noteSchema,
-    riskLevel: z.string().trim().min(2).max(80),
+    riskLevel: optionalPreparedText(80),
     slug: z
       .string()
       .trim()
@@ -68,13 +78,21 @@ const submissionActionSchema = z.discriminatedUnion("action", [
       .min(3)
       .max(120)
       .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
-    status: z.enum(["DRAFT", "REVIEW", "ACTIVE", "PAUSED"]).default("ACTIVE"),
-    structure: z.enum(["Mudaraba", "Musharaka"]).default("Mudaraba"),
-    summaryEn: z.string().trim().min(5).max(260),
-    summaryRu: z.string().trim().min(5).max(260),
+    status: z.preprocess((value) => {
+      if (typeof value !== "string") return undefined;
+      const trimmed = value.trim();
+      return trimmed ? trimmed : undefined;
+    }, z.enum(["DRAFT", "REVIEW", "ACTIVE", "PAUSED"]).optional()),
+    structure: z.preprocess((value) => {
+      if (typeof value !== "string") return undefined;
+      const trimmed = value.trim();
+      return trimmed ? trimmed : undefined;
+    }, z.enum(["Mudaraba", "Musharaka"]).optional()),
+    summaryEn: optionalPreparedText(260),
+    summaryRu: optionalPreparedText(260),
     targetUsdt: amountSchema,
-    titleEn: z.string().trim().min(2).max(160),
-    titleRu: z.string().trim().min(2).max(160)
+    titleEn: optionalPreparedText(160),
+    titleRu: optionalPreparedText(160)
   })
 ]);
 
@@ -94,6 +112,11 @@ type SessionUser = {
 
 function isRu(request: NextRequest) {
   return request.nextUrl.searchParams.get("lang") !== "en";
+}
+
+function normalizePreparedText(value: string | undefined, fallback: string, minLength: number) {
+  const candidate = value?.trim() || fallback.trim();
+  return candidate.length >= minLength ? candidate : fallback.trim();
 }
 
 function readSubmissionDocuments(value: unknown): SubmissionDocument[] {
@@ -298,7 +321,21 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
 
   const data = parsed.data;
-  const projectStatus = data.status as ProjectStatus;
+  const summaryRu = normalizePreparedText(data.summaryRu, submission.summary || submission.title || "Описание проекта уточняется.", 5);
+  const summaryEn = normalizePreparedText(data.summaryEn, "Project details are being clarified.", 5);
+  const descriptionRu = normalizePreparedText(data.descriptionRu, submission.summary || submission.currentProgress || "Подробное описание проекта уточняется после проверки документов.", 20);
+  const descriptionEn = normalizePreparedText(data.descriptionEn, "Detailed project description will be уточнена after document review.", 20);
+  const expectedReturnRu = normalizePreparedText(data.expectedReturnRu, submission.expectedReturn || "Результат проекта зависит от фактических итогов реализации.", 5);
+  const expectedReturnEn = normalizePreparedText(data.expectedReturnEn, "Project outcome depends on actual implementation results.", 5);
+  const expectedYieldRu = normalizePreparedText(data.expectedYieldRu, submission.expectedYield || "Ориентир доходности уточняется, это не гарантия.", 2);
+  const expectedYieldEn = normalizePreparedText(data.expectedYieldEn, "Return guidance is indicative and not guaranteed.", 2);
+  const titleRu = normalizePreparedText(data.titleRu, submission.title || "Проект", 2);
+  const titleEn = normalizePreparedText(data.titleEn, submission.title || "Project", 2);
+  const location = normalizePreparedText(data.location, submission.location || "UAE", 2);
+  const riskLevel = normalizePreparedText(data.riskLevel, "Moderate", 2);
+  const projectStatus = (data.status ?? "ACTIVE") as ProjectStatus;
+  const payoutFrequency = data.payoutFrequency ?? PayoutFrequency.CUSTOM;
+  const structure = data.structure ?? "Mudaraba";
   const submissionDocuments = readSubmissionDocuments(submission.documents);
 
   if (!submissionDocuments.length) {
@@ -320,12 +357,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         submission.propertyData && typeof submission.propertyData === "object" && "coverImage" in submission.propertyData
           ? ((submission.propertyData as { coverImage?: unknown }).coverImage as string | undefined)
           : undefined,
-      descriptionEn: data.descriptionEn,
-      descriptionRu: data.descriptionRu,
-      expectedReturnEn: data.expectedReturnEn,
-      expectedReturnRu: data.expectedReturnRu,
-      expectedYieldEn: data.expectedYieldEn,
-      expectedYieldRu: data.expectedYieldRu,
+      descriptionEn,
+      descriptionRu,
+      expectedReturnEn,
+      expectedReturnRu,
+      expectedYieldEn,
+      expectedYieldRu,
       stageRu: data.stageRu,
       stageEn: data.stageEn,
       currentProgressRu: data.currentProgressRu,
@@ -335,22 +372,22 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       organizationId: submission.organizationId,
       plannedLaunchAt: data.plannedLaunchAt,
       plannedDividendAt: data.plannedDividendAt,
-      payoutFrequency: data.payoutFrequency,
+      payoutFrequency,
       participationTermRu: data.participationTermRu,
       participationTermEn: data.participationTermEn,
       raisePlanRu: data.raisePlanRu,
       raisePlanEn: data.raisePlanEn,
-      location: data.location,
+      location,
       propertyData: submission.propertyData ?? undefined,
-      riskLevel: data.riskLevel,
+      riskLevel,
       slug: data.slug,
       status: projectStatus,
-      structure: data.structure,
-      summaryEn: data.summaryEn,
-      summaryRu: data.summaryRu,
+      structure,
+      summaryEn,
+      summaryRu,
       targetUsdt: data.targetUsdt,
-      titleEn: data.titleEn,
-      titleRu: data.titleRu
+      titleEn,
+      titleRu
     } satisfies Prisma.ProjectUncheckedCreateInput;
 
     const createdOrUpdated = linkedProject
