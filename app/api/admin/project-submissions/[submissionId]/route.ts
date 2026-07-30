@@ -12,6 +12,11 @@ const amountSchema = z
   .transform((value) => value.replace(",", ".").replace(/\s/g, ""))
   .refine((value) => /^\d+(\.\d{1,6})?$/.test(value), "invalid")
   .refine((value) => new Prisma.Decimal(value).gt(0), "positive");
+const optionalAmountSchema = z.preprocess((value) => {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : undefined;
+}, amountSchema.optional());
 
 const noteSchema = z.string().trim().min(12).max(800);
 const optionalPreparedText = (max: number) =>
@@ -71,13 +76,7 @@ const submissionActionSchema = z.discriminatedUnion("action", [
     location: optionalPreparedText(120),
     note: noteSchema,
     riskLevel: optionalPreparedText(80),
-    slug: z
-      .string()
-      .trim()
-      .toLowerCase()
-      .min(3)
-      .max(120)
-      .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+    slug: optionalPreparedText(120),
     status: z.preprocess((value) => {
       if (typeof value !== "string") return undefined;
       const trimmed = value.trim();
@@ -90,7 +89,7 @@ const submissionActionSchema = z.discriminatedUnion("action", [
     }, z.enum(["Mudaraba", "Musharaka"]).optional()),
     summaryEn: optionalPreparedText(260),
     summaryRu: optionalPreparedText(260),
-    targetUsdt: amountSchema,
+    targetUsdt: optionalAmountSchema,
     titleEn: optionalPreparedText(160),
     titleRu: optionalPreparedText(160)
   })
@@ -117,6 +116,17 @@ function isRu(request: NextRequest) {
 function normalizePreparedText(value: string | undefined, fallback: string, minLength: number) {
   const candidate = value?.trim() || fallback.trim();
   return candidate.length >= minLength ? candidate : fallback.trim();
+}
+
+function normalizeSlug(value: string | undefined, fallback: string) {
+  const candidate = (value?.trim() || fallback.trim())
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+  return candidate || `project-${Date.now()}`;
 }
 
 function readSubmissionDocuments(value: unknown): SubmissionDocument[] {
@@ -295,17 +305,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
 
   const linkedProject = submission.projectId ? await prisma.project.findUnique({ where: { id: submission.projectId } }) : null;
-  const existingProject = await prisma.project.findUnique({ where: { slug: parsed.data.slug } });
-
-  if (existingProject && existingProject.id !== submission.projectId) {
-    return NextResponse.json(
-      {
-        title: localeRu ? "Адрес проекта уже занят" : "Project address already exists",
-        message: localeRu ? "Выберите другой адрес проекта латиницей." : "Choose another latin project address."
-      },
-      { status: 409 }
-    );
-  }
 
   if (submission.projectId && !linkedProject) {
     return NextResponse.json(
@@ -333,10 +332,23 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const titleEn = normalizePreparedText(data.titleEn, submission.title || "Project", 2);
   const location = normalizePreparedText(data.location, submission.location || "UAE", 2);
   const riskLevel = normalizePreparedText(data.riskLevel, "Moderate", 2);
+  const slug = normalizeSlug(data.slug, linkedProject?.slug || titleEn || titleRu || submission.title || "project");
+  const targetUsdt = data.targetUsdt ?? submission.targetUsdt?.toString() ?? linkedProject?.targetUsdt?.toString() ?? "1";
   const projectStatus = (data.status ?? "ACTIVE") as ProjectStatus;
   const payoutFrequency = data.payoutFrequency ?? PayoutFrequency.CUSTOM;
   const structure = data.structure ?? "Mudaraba";
   const submissionDocuments = readSubmissionDocuments(submission.documents);
+  const existingProject = await prisma.project.findUnique({ where: { slug } });
+
+  if (existingProject && existingProject.id !== submission.projectId) {
+    return NextResponse.json(
+      {
+        title: localeRu ? "Адрес проекта уже занят" : "Project address already exists",
+        message: localeRu ? "Выберите другой адрес проекта латиницей." : "Choose another latin project address."
+      },
+      { status: 409 }
+    );
+  }
 
   if (!submissionDocuments.length) {
     return NextResponse.json(
@@ -380,12 +392,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       location,
       propertyData: submission.propertyData ?? undefined,
       riskLevel,
-      slug: data.slug,
+      slug,
       status: projectStatus,
       structure,
       summaryEn,
       summaryRu,
-      targetUsdt: data.targetUsdt,
+      targetUsdt,
       titleEn,
       titleRu
     } satisfies Prisma.ProjectUncheckedCreateInput;
