@@ -9,7 +9,6 @@ import { saveUploadedFile } from "@/lib/file-storage";
 import { isDetailedText, isMeaningfulText, zodFieldErrors } from "@/lib/form-validation";
 import { getPrimaryOrganizationForUser } from "@/lib/organizations";
 import { prisma } from "@/lib/prisma";
-import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { incomeSourceOptions, parseRealEstateData, propertyStatusOptions, propertyTypeOptions, type RealEstateDocumentAsset } from "@/lib/real-estate";
 
 export const runtime = "nodejs";
@@ -52,7 +51,7 @@ const projectSubmissionSchema = z.object({
   payoutFrequency: z.nativeEnum(PayoutFrequency).default(PayoutFrequency.CUSTOM),
   participationTerm: plainText(3, 180),
   raisePlan: z.string().trim().max(2500).optional(),
-  summary: detailedText(120, 100000, 70, 25),
+  summary: plainText(2, 100000),
   propertyObjectName: optionalText,
   propertyComplexName: optionalText,
   propertyDeveloper: optionalText,
@@ -210,7 +209,7 @@ function projectFieldLabels(localeRu: boolean) {
     sector: localeRu ? "Выберите отрасль проекта." : "Select project sector.",
     sectorOther: localeRu ? "Укажите отрасль словами." : "Enter the sector in words.",
     stage: localeRu ? "Укажите реальную стадию проекта словами." : "Enter the real project stage in words.",
-    summary: localeRu ? "Добавьте подробное описание: бизнес-модель, активы, участники, сроки, риски и документы." : "Add a detailed description: business model, assets, parties, timeline, risks and documents.",
+    summary: localeRu ? "Добавьте описание проекта." : "Add a project description.",
     targetUsdt: localeRu ? "Укажите корректную сумму цели в USDT." : "Enter a valid target amount in USDT.",
     title: localeRu ? "Укажите нормальное название проекта, не набор букв или цифр." : "Enter a real project title, not random letters or numbers."
   };
@@ -364,17 +363,6 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const rateLimit = checkRateLimit({
-    key: `project-submission:create:${userId}`,
-    limit: 6,
-    request,
-    windowMs: 60 * 60 * 1000
-  });
-
-  if (!rateLimit.allowed) {
-    return rateLimitResponse(localeRu, rateLimit.retryAfterSeconds);
-  }
-
   const latestKyc = await prisma.kycApplication.findFirst({
     where: { userId },
     orderBy: { createdAt: "desc" },
@@ -493,8 +481,8 @@ export async function POST(request: NextRequest) {
         title: localeRu ? "Проверьте заявку" : "Check application",
         message:
           localeRu
-            ? "Исправьте поля, выделенные красным. Описание должно быть осмысленным и достаточно подробным."
-            : "Fix the fields highlighted in red. The description must be meaningful and detailed enough.",
+            ? "Исправьте поля, выделенные красным."
+            : "Fix the fields highlighted in red.",
         fieldErrors
       },
       { status: 400 }
