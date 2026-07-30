@@ -4,6 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { saveOrganizationFile } from "@/lib/company-workspace";
 import { authOptions } from "@/lib/next-auth";
+import { getOrganizationMembership } from "@/lib/organizations";
 import { prisma } from "@/lib/prisma";
 
 const schema = z.object({
@@ -31,10 +32,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ title: localeRu ? "Нужен вход" : "Sign in required", message: localeRu ? "Войдите в кабинет компании." : "Sign in to the company workspace." }, { status: 401 });
   }
 
-  const membership = await prisma.organizationMember.findFirst({
-    where: { userId },
-    include: { organization: true }
-  });
+  const membership = await getOrganizationMembership(userId);
 
   if (!membership || !canUpload(membership.role)) {
     return NextResponse.json({ title: localeRu ? "Нет доступа" : "Access denied", message: localeRu ? "Недостаточно прав для загрузки документов компании." : "You do not have permission to upload company documents." }, { status: 403 });

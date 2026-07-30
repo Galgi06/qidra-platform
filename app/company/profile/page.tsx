@@ -9,9 +9,11 @@ import { requireCompanyAccess } from "@/lib/access";
 import { getLocale, type SearchParams, withLocale } from "@/lib/i18n";
 
 export default async function CompanyProfilePage({ searchParams }: { searchParams?: Promise<SearchParams> }) {
+  const params = await searchParams;
   const locale = await getLocale(searchParams);
   const isRu = locale === "ru";
-  const { membership } = await requireCompanyAccess(locale, "/company/profile");
+  const selectedOrganizationId = Array.isArray(params?.organization) ? params.organization[0] : params?.organization;
+  const { membership, memberships } = await requireCompanyAccess(locale, "/company/profile", selectedOrganizationId);
   const organization = membership.organization;
 
   return (
@@ -35,7 +37,7 @@ export default async function CompanyProfilePage({ searchParams }: { searchParam
         </section>
 
         <section className="px-5 py-12 sm:px-8 lg:px-11 lg:py-16">
-          <CompanyWorkspace activePath="/company/profile" locale={locale}>
+          <CompanyWorkspace activePath="/company/profile" locale={locale} memberships={memberships} selectedOrganizationId={membership.organizationId}>
             <div className="grid gap-8 xl:grid-cols-[1fr_0.44fr]">
               <FeedbackForm
                 className="premium-card grid gap-6 p-6 sm:p-8"
@@ -52,9 +54,28 @@ export default async function CompanyProfilePage({ searchParams }: { searchParam
                 }}
               >
                 <div className="grid gap-4 md:grid-cols-2">
-                  <Input label={isRu ? "Публичное название" : "Public display name"} name="displayName" defaultValue={organization.displayName} required />
-                  <Input label={isRu ? "Юридическое название" : "Legal name"} name="legalName" defaultValue={organization.legalName} required />
-                  <Input label={isRu ? "Публичный адрес" : "Public slug"} name="publicSlug" defaultValue={organization.publicSlug} required />
+                  <Input
+                    hint={isRu ? "Короткое понятное название, которое увидят на платформе." : "A short clear name shown on the platform."}
+                    label={isRu ? "Публичное название" : "Public display name"}
+                    name="displayName"
+                    defaultValue={organization.displayName}
+                    required
+                  />
+                  <Input
+                    hint={isRu ? "Юридическое название компании или фонда. Не указывайте здесь адрес." : "The legal name of the company or fund. Do not put an address here."}
+                    label={isRu ? "Юридическое название" : "Legal name"}
+                    name="legalName"
+                    defaultValue={organization.legalName}
+                    required
+                  />
+                  <Input
+                    hint={isRu ? "Публичный адрес можно вводить свободно. Система сама нормализует ссылку." : "The public address can be entered freely. The system normalizes the link automatically."}
+                    label={isRu ? "Публичный адрес" : "Public address"}
+                    name="publicSlug"
+                    defaultValue={organization.publicSlug}
+                    placeholder={isRu ? "Например: Dubai, Business Bay, Downtown" : "Example: Dubai, Business Bay, Downtown"}
+                    required
+                  />
                   <Input label={isRu ? "Тип компании" : "Company type"} name="typeLabel" defaultValue={organization.typeLabel || ""} placeholder={isRu ? "Фонд, девелопер, торговая компания..." : "Fund, developer, trading company..."} />
                   <Input label={isRu ? "Страна" : "Country"} name="country" defaultValue={organization.country || ""} />
                   <Input label={isRu ? "Город" : "City"} name="city" defaultValue={organization.city || ""} />

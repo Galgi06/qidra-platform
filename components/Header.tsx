@@ -30,6 +30,7 @@ export async function Header({ locale, path = "/" }: { locale: Locale; path?: st
   const links = [
     ...(supportDeskSession ? [{ href: operationsHref, label: locale === "ru" ? "Операционный центр" : "Operations center" }] : []),
     ...(organization ? [{ href: "/company", label: locale === "ru" ? "Кабинет компании" : "Company workspace" }] : []),
+    ...(signedIn ? [{ href: "/investor", label: locale === "ru" ? "Профиль участника" : "Participant profile" }] : []),
     { href: "/projects", label: t.projects },
     { href: "/faq", label: t.faq },
     { href: "/legal/terms", label: t.legal }

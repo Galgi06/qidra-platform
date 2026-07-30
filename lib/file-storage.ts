@@ -1,4 +1,5 @@
 import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { createSign } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { Readable } from "node:stream";
@@ -12,7 +13,7 @@ type SaveUploadedFileOptions = {
 
 type ReadStoredFileResult = {
   body: Buffer;
-  storage: "local" | "s3";
+  storage: "gcs" | "local" | "s3";
 };
 
 type S3Config = {
@@ -24,7 +25,18 @@ type S3Config = {
   secretAccessKey: string;
 };
 
+type GcsConfig = {
+  bucket: string;
+};
+
+type GcpServiceAccount = {
+  client_email: string;
+  private_key: string;
+  token_uri?: string;
+};
+
 let s3Client: S3Client | null = null;
+let gcsTokenCache: { accessToken: string; expiresAt: number } | null = null;
 
 export async function saveUploadedFile({ contentType, directory, file, storedName }: SaveUploadedFileOptions) {
   const body = Buffer.from(await file.arrayBuffer());
@@ -45,6 +57,13 @@ export async function saveUploadedFile({ contentType, directory, file, storedNam
     );
 
     return `s3://${config.bucket}/${key}`;
+  }
+
+  if (fileStorageDriver() === "gcs") {
+    const config = readGcsConfig();
+    const key = storageKey(directory, storedName);
+    await uploadToGcs({ body, bucket: config.bucket, contentType, key });
+    return `gcs://${config.bucket}/${key}`;
   }
 
   const uploadDir = path.join(process.cwd(), "storage", directory);
@@ -82,6 +101,20 @@ export async function readStoredFile(storagePath: string, allowedDirectory: stri
     };
   }
 
+  if (isGcsStoragePath(storagePath)) {
+    const config = readGcsConfig();
+    const parsed = parseGcsStoragePath(storagePath);
+
+    if (parsed.bucket !== config.bucket || !isAllowedS3Key(parsed.key, allowedDirectory)) {
+      throw new Error("invalid_storage_path");
+    }
+
+    return {
+      body: await downloadFromGcs(parsed.bucket, parsed.key),
+      storage: "gcs"
+    };
+  }
+
   const uploadRoot = path.join(process.cwd(), "storage", allowedDirectory);
   const normalizedStoragePath = storagePath.split(/[\\/]+/).join(path.sep);
   const storagePrefix = `storage${path.sep}${allowedDirectory}${path.sep}`;
@@ -103,11 +136,74 @@ export async function readStoredFile(storagePath: string, allowedDirectory: stri
   };
 }
 
-export function fileStorageDriver() {
-  const driver = process.env.FILE_STORAGE_DRIVER === "s3" ? "s3" : "local";
+export async function deleteStoredFile(storagePath: string, allowedDirectory: string) {
+  if (storagePath.startsWith("s3://")) {
+    const { DeleteObjectCommand } = await import("@aws-sdk/client-s3");
+    const config = readS3Config();
+    const parsed = parseS3StoragePath(storagePath);
 
-  if (process.env.NODE_ENV === "production" && driver !== "s3") {
-    throw new Error("production_file_storage_must_use_s3");
+    if (parsed.bucket !== config.bucket || !isAllowedS3Key(parsed.key, allowedDirectory)) {
+      throw new Error("invalid_storage_path");
+    }
+
+    await getS3Client(config).send(
+      new DeleteObjectCommand({
+        Bucket: config.bucket,
+        Key: parsed.key
+      })
+    );
+
+    return;
+  }
+
+  if (isGcsStoragePath(storagePath)) {
+    const config = readGcsConfig();
+    const parsed = parseGcsStoragePath(storagePath);
+
+    if (parsed.bucket !== config.bucket || !isAllowedS3Key(parsed.key, allowedDirectory)) {
+      throw new Error("invalid_storage_path");
+    }
+
+    const accessToken = await getGcsAccessToken();
+    const response = await fetch(`https://storage.googleapis.com/storage/v1/b/${encodeURIComponent(parsed.bucket)}/o/${encodeURIComponent(parsed.key)}`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${accessToken}`
+      }
+    });
+
+    if (!response.ok && response.status !== 404) {
+      throw new Error(`gcs_delete_failed_${response.status}`);
+    }
+
+    return;
+  }
+
+  const uploadRoot = path.join(process.cwd(), "storage", allowedDirectory);
+  const normalizedStoragePath = storagePath.split(/[\\/]+/).join(path.sep);
+  const storagePrefix = `storage${path.sep}${allowedDirectory}${path.sep}`;
+
+  if (!normalizedStoragePath.startsWith(storagePrefix)) {
+    throw new Error("invalid_storage_path");
+  }
+
+  const relativeFilePath = normalizedStoragePath.slice(storagePrefix.length);
+  const filePath = path.resolve(uploadRoot, relativeFilePath);
+
+  if (!filePath.startsWith(`${uploadRoot}${path.sep}`)) {
+    throw new Error("invalid_storage_path");
+  }
+
+  const { rm } = await import("node:fs/promises");
+  await rm(filePath, { force: true });
+}
+
+export function fileStorageDriver() {
+  const configured = (process.env.FILE_STORAGE_DRIVER || "").trim().toLowerCase();
+  const driver = configured === "s3" ? "s3" : configured === "gcs" ? "gcs" : "local";
+
+  if (process.env.NODE_ENV === "production" && !["s3", "gcs"].includes(driver)) {
+    throw new Error("production_file_storage_must_use_remote_storage");
   }
 
   return driver;
@@ -157,6 +253,16 @@ function readS3Config(): S3Config {
   };
 }
 
+function readGcsConfig(): GcsConfig {
+  const bucket = process.env.GCS_BUCKET_NAME?.trim();
+
+  if (!bucket) {
+    throw new Error("gcs_storage_not_configured");
+  }
+
+  return { bucket };
+}
+
 function getS3Client(config: S3Config) {
   if (!s3Client) {
     s3Client = new S3Client({
@@ -183,6 +289,180 @@ function parseS3StoragePath(storagePath: string) {
   }
 
   return { bucket, key };
+}
+
+function isGcsStoragePath(storagePath: string) {
+  return storagePath.startsWith("gcs://") || storagePath.startsWith("gs://") || storagePath.startsWith("https://storage.googleapis.com/") || storagePath.startsWith("https://storage.cloud.google.com/");
+}
+
+function parseGcsStoragePath(storagePath: string) {
+  if (storagePath.startsWith("gcs://") || storagePath.startsWith("gs://")) {
+    const url = new URL(storagePath.replace(/^gs:\/\//, "gcs://"));
+    const bucket = url.hostname;
+    const key = url.pathname.replace(/^\/+/, "");
+
+    if (!bucket || !key) {
+      throw new Error("invalid_storage_path");
+    }
+
+    return { bucket, key };
+  }
+
+  const url = new URL(storagePath);
+  const pathname = url.pathname.replace(/^\/+/, "");
+  const parts = pathname.split("/");
+  const bucket = parts.shift() || "";
+  const key = parts.join("/");
+
+  if (!bucket || !key) {
+    throw new Error("invalid_storage_path");
+  }
+
+  return { bucket, key };
+}
+
+async function uploadToGcs({ body, bucket, contentType, key }: { body: Buffer; bucket: string; contentType: string; key: string }) {
+  const accessToken = await getGcsAccessToken();
+  const response = await fetch(`https://storage.googleapis.com/upload/storage/v1/b/${encodeURIComponent(bucket)}/o?uploadType=media&name=${encodeURIComponent(key)}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": contentType
+    },
+    body: new Uint8Array(body)
+  });
+
+  if (!response.ok) {
+    throw new Error(`gcs_upload_failed_${response.status}`);
+  }
+}
+
+async function downloadFromGcs(bucket: string, key: string) {
+  const accessToken = await getGcsAccessToken();
+  const response = await fetch(`https://storage.googleapis.com/storage/v1/b/${encodeURIComponent(bucket)}/o/${encodeURIComponent(key)}?alt=media`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`gcs_download_failed_${response.status}`);
+  }
+
+  return Buffer.from(await response.arrayBuffer());
+}
+
+async function getGcsAccessToken() {
+  if (gcsTokenCache && gcsTokenCache.expiresAt > Date.now() + 60_000) {
+    return gcsTokenCache.accessToken;
+  }
+
+  const serviceAccount = parseServiceAccountFromEnv();
+  const token = serviceAccount ? await fetchServiceAccountToken(serviceAccount) : await fetchMetadataServerToken();
+
+  gcsTokenCache = token;
+  return token.accessToken;
+}
+
+function parseServiceAccountFromEnv() {
+  const rawValue = process.env.GCP_SERVICE_ACCOUNT_KEY?.trim();
+
+  if (!rawValue) {
+    return null;
+  }
+
+  const candidates = [rawValue];
+
+  try {
+    candidates.push(Buffer.from(rawValue, "base64").toString("utf8"));
+  } catch {}
+
+  for (const candidate of candidates) {
+    try {
+      const parsed = JSON.parse(candidate) as Partial<GcpServiceAccount>;
+
+      if (parsed.client_email && parsed.private_key) {
+        return {
+          client_email: parsed.client_email,
+          private_key: parsed.private_key,
+          token_uri: parsed.token_uri || "https://oauth2.googleapis.com/token"
+        } satisfies GcpServiceAccount;
+      }
+    } catch {}
+  }
+
+  throw new Error("invalid_gcp_service_account_key");
+}
+
+async function fetchServiceAccountToken(serviceAccount: GcpServiceAccount) {
+  const now = Math.floor(Date.now() / 1000);
+  const header = encodeJwtSegment({ alg: "RS256", typ: "JWT" });
+  const claim = encodeJwtSegment({
+    iss: serviceAccount.client_email,
+    scope: "https://www.googleapis.com/auth/devstorage.read_write",
+    aud: serviceAccount.token_uri || "https://oauth2.googleapis.com/token",
+    exp: now + 3600,
+    iat: now
+  });
+  const unsigned = `${header}.${claim}`;
+  const signer = createSign("RSA-SHA256");
+  signer.update(unsigned);
+  signer.end();
+  const signature = signer.sign(serviceAccount.private_key, "base64url");
+  const assertion = `${unsigned}.${signature}`;
+
+  const response = await fetch(serviceAccount.token_uri || "https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded"
+    },
+    body: new URLSearchParams({
+      assertion,
+      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer"
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error(`gcs_oauth_failed_${response.status}`);
+  }
+
+  const payload = (await response.json()) as { access_token?: string; expires_in?: number };
+
+  if (!payload.access_token) {
+    throw new Error("gcs_oauth_missing_access_token");
+  }
+
+  return {
+    accessToken: payload.access_token,
+    expiresAt: Date.now() + (payload.expires_in || 3600) * 1000
+  };
+}
+
+async function fetchMetadataServerToken() {
+  const response = await fetch("http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token", {
+    headers: {
+      "Metadata-Flavor": "Google"
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`gcs_metadata_token_failed_${response.status}`);
+  }
+
+  const payload = (await response.json()) as { access_token?: string; expires_in?: number };
+
+  if (!payload.access_token) {
+    throw new Error("gcs_metadata_missing_access_token");
+  }
+
+  return {
+    accessToken: payload.access_token,
+    expiresAt: Date.now() + (payload.expires_in || 3600) * 1000
+  };
+}
+
+function encodeJwtSegment(payload: Record<string, unknown>) {
+  return Buffer.from(JSON.stringify(payload)).toString("base64url");
 }
 
 async function streamToBuffer(body: unknown) {

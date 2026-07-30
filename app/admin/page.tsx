@@ -32,6 +32,11 @@ const sections = [
     text: { ru: "Создание, публикация и архив проектов.", en: "Create, edit, publish and archive projects." }
   },
   {
+    href: "/admin/organizations",
+    label: { ru: "Компании", en: "Companies" },
+    text: { ru: "Профили компаний, статусы модерации и ownership.", en: "Company profiles, moderation statuses and ownership." }
+  },
+  {
     href: "/admin/project-submissions",
     label: { ru: "Размещение проектов", en: "Project listings" },
     text: { ru: "Входящие проекты участников перед первичной проверкой.", en: "Incoming participant projects before initial review." }
@@ -82,6 +87,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     activeProjectCount,
     draftProjectCount,
     reviewProjectCount,
+    reviewOrganizationCount,
     pendingProjectSubmissionCount,
     pendingDepositCount,
     pendingWithdrawalCount,
@@ -94,6 +100,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     prisma.project.count({ where: { status: { in: [ProjectStatus.ACTIVE, ProjectStatus.FUNDED] } } }),
     prisma.project.count({ where: { status: ProjectStatus.DRAFT } }),
     prisma.project.count({ where: { status: ProjectStatus.REVIEW } }),
+    prisma.organization.count({ where: { status: "REVIEW" } }),
     prisma.projectSubmission.count({ where: { status: { in: ["SUBMITTED", "REVIEW"] } } }),
     prisma.walletTransaction.count({ where: { status: PaymentStatus.PENDING, type: TransactionType.DEPOSIT } }),
     prisma.walletTransaction.count({ where: { status: PaymentStatus.PENDING, type: TransactionType.WITHDRAWAL } }),
@@ -124,6 +131,11 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       label: { ru: "Проекты", en: "Projects" },
       value: formatNumber(activeProjectCount),
       note: { ru: `${formatNumber(pendingProjectSubmissionCount)} входящих`, en: `${formatNumber(pendingProjectSubmissionCount)} incoming` }
+    },
+    {
+      label: { ru: "Компании", en: "Companies" },
+      value: formatNumber(reviewOrganizationCount),
+      note: { ru: "На проверке профиля", en: "Profiles in review" }
     }
   ];
   const queueItems = [
@@ -150,6 +162,12 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       label: { ru: "Проекты на проверке", en: "Projects in review" },
       value: reviewProjectCount,
       text: { ru: "Подготовить публикацию после юридической проверки.", en: "Prepare publishing after legal review." }
+    },
+    {
+      href: withLocale("/admin/organizations?status=review", locale),
+      label: { ru: "Профили компаний", en: "Company profiles" },
+      value: reviewOrganizationCount,
+      text: { ru: "Проверить данные компании, представителя и публичный профиль.", en: "Review company data, representative and public profile." }
     },
     {
       href: withLocale("/admin/project-submissions", locale),

@@ -8,12 +8,43 @@ import { hashToken } from "@/lib/tokens";
 
 const resetPasswordSchema = z.object({
   email: z.string().trim().email().max(255),
-  token: z.string().min(20),
-  password: z.string().max(128).refine(isStrongPassword)
+  token: z.string().trim().min(20),
+  password: z.string().max(128).refine(isStrongPassword),
+  passwordConfirm: z.string().max(128)
+}).superRefine((data, context) => {
+  if (data.password !== data.passwordConfirm) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "password_mismatch",
+      path: ["passwordConfirm"]
+    });
+  }
 });
 
 function isRu(request: NextRequest) {
   return request.nextUrl.searchParams.get("lang") !== "en";
+}
+
+function resetPasswordFieldErrors(localeRu: boolean, error: z.ZodError) {
+  const fieldErrors = error.flatten().fieldErrors as Record<string, string[] | undefined>;
+  const nextFieldErrors: Record<string, string> = {};
+
+  if (fieldErrors.password?.length) {
+    nextFieldErrors.password = localeRu ? passwordPolicyDescription.ru : passwordPolicyDescription.en;
+  }
+
+  if (fieldErrors.passwordConfirm?.length) {
+    nextFieldErrors.passwordConfirm =
+      fieldErrors.passwordConfirm.some((message) => message === "password_mismatch")
+        ? localeRu
+          ? "Пароли должны совпадать."
+          : "Passwords must match."
+        : localeRu
+          ? "Повторите пароль."
+          : "Confirm the password.";
+  }
+
+  return Object.keys(nextFieldErrors).length ? nextFieldErrors : undefined;
 }
 
 export async function POST(request: NextRequest) {
@@ -23,6 +54,7 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json(
       {
+        fieldErrors: resetPasswordFieldErrors(localeRu, parsed.error),
         title: localeRu ? "Проверьте данные" : "Check the details",
         message: localeRu ? passwordPolicyDescription.ru : passwordPolicyDescription.en
       },
@@ -45,14 +77,39 @@ export async function POST(request: NextRequest) {
   const tokenHash = hashToken(parsed.data.token);
   const identifier = `password-reset:${email}`;
   const verificationToken = await prisma.verificationToken.findUnique({
-    where: { token: tokenHash }
+    where: {
+      identifier_token: {
+        identifier,
+        token: tokenHash
+      }
+    }
   });
 
-  if (!verificationToken || verificationToken.identifier !== identifier || verificationToken.expires < new Date()) {
+  if (!verificationToken || verificationToken.expires < new Date()) {
     return NextResponse.json(
       {
         title: localeRu ? "Ссылка недействительна" : "Invalid link",
-        message: localeRu ? "Запросите новую ссылку восстановления пароля." : "Request a new password reset link."
+        message: localeRu
+          ? "Ссылка восстановления недействительна или уже была использована. Запросите новую ссылку и откройте только последнее письмо."
+          : "The reset link is invalid or has already been used. Request a new link and open only the latest email."
+      },
+      { status: 400 }
+    );
+  }
+
+  const existingUser = await prisma.user.findUnique({
+    where: { email },
+    select: {
+      emailVerified: true,
+      id: true
+    }
+  });
+
+  if (!existingUser) {
+    return NextResponse.json(
+      {
+        title: localeRu ? "Аккаунт не найден" : "Account not found",
+        message: localeRu ? "Запросите новую ссылку восстановления для существующего аккаунта." : "Request a new reset link for an existing account."
       },
       { status: 400 }
     );
@@ -63,7 +120,10 @@ export async function POST(request: NextRequest) {
   await prisma.$transaction([
     prisma.user.update({
       where: { email },
-      data: { passwordHash }
+      data: {
+        passwordHash,
+        emailVerified: existingUser.emailVerified ?? new Date()
+      }
     }),
     prisma.verificationToken.delete({
       where: { token: tokenHash }

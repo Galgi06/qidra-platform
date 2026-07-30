@@ -501,16 +501,25 @@ model ProjectDividendPeriod {
   periodLabel         String
   periodStart         DateTime
   periodEnd           DateTime
+  calculationMode     String               @default("PROJECT_PROFIT")
   grossRevenueUsdt    Decimal              @default(0) @db.Decimal(18, 6)
   directCostUsdt      Decimal              @default(0) @db.Decimal(18, 6)
   operatingExpenseUsdt Decimal             @default(0) @db.Decimal(18, 6)
   netProfitUsdt       Decimal              @default(0) @db.Decimal(18, 6)
   investorPoolUsdt    Decimal              @default(0) @db.Decimal(18, 6)
+  companyProfitUsdt   Decimal              @default(0) @db.Decimal(18, 6)
+  roundingDifferenceUsdt Decimal           @default(0) @db.Decimal(18, 6)
   investorSharePercent Decimal             @default(0) @db.Decimal(9, 4)
+  profitAccrualStartAt DateTime?
   status              DividendPeriodStatus @default(DRAFT)
   adminNote           String?              @db.Text
+  draftVersion        Int                  @default(1)
+  algorithmVersion    String?
+  calculationSnapshot Json?
+  calculatedAt        DateTime?
   approvedAt          DateTime?
   paidAt              DateTime?
+  cancelledAt         DateTime?
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
   project             Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -528,9 +537,12 @@ model DividendPayment {
   userId              String
   walletTransactionId String?               @unique
   amountUsdt          Decimal               @db.Decimal(18, 6)
+  rawAmountUsdt       Decimal               @default(0) @db.Decimal(18, 6)
   investmentAmountUsdt Decimal              @db.Decimal(18, 6)
   weight              Decimal               @default(0) @db.Decimal(18, 6)
+  sharePercent        Decimal               @default(0) @db.Decimal(18, 6)
   eligibleDays        Int                   @default(0)
+  eligibleStartAt     DateTime?
   status              DividendPaymentStatus @default(CALCULATED)
   paidAt              DateTime?
   createdAt           DateTime              @default(now())
@@ -587,6 +599,7 @@ model SupportMessage {
   threadId  String
   senderId  String?
   body      String        @db.Text
+  attachments Json?
   internal  Boolean       @default(false)
   createdAt DateTime      @default(now())
   thread    SupportThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
@@ -626,6 +639,7 @@ model GuestSupportMessage {
   senderKind  String
   senderName  String?
   body        String             @db.Text
+  attachments Json?
   createdAt   DateTime           @default(now())
   thread      GuestSupportThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
 

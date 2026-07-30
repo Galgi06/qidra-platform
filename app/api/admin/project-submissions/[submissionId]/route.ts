@@ -271,28 +271,29 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     );
   }
 
-  if (submission.projectId) {
-    return NextResponse.json(
-      {
-        title: localeRu ? "Проект уже создан" : "Project already created",
-        message:
-          localeRu
-            ? "Эта заявка уже связана с черновиком проекта. Откройте связанный проект в админке."
-            : "This submission is already linked to a project draft. Open the linked project in admin."
-      },
-      { status: 409 }
-    );
-  }
-
+  const linkedProject = submission.projectId ? await prisma.project.findUnique({ where: { id: submission.projectId } }) : null;
   const existingProject = await prisma.project.findUnique({ where: { slug: parsed.data.slug } });
 
-  if (existingProject) {
+  if (existingProject && existingProject.id !== submission.projectId) {
     return NextResponse.json(
       {
         title: localeRu ? "Адрес проекта уже занят" : "Project address already exists",
         message: localeRu ? "Выберите другой адрес проекта латиницей." : "Choose another latin project address."
       },
       { status: 409 }
+    );
+  }
+
+  if (submission.projectId && !linkedProject) {
+    return NextResponse.json(
+      {
+        title: localeRu ? "Связанный проект не найден" : "Linked project not found",
+        message:
+          localeRu
+            ? "У заявки указан проект, но он недоступен. Проверьте связанный листинг в админке."
+            : "The submission references a project, but it is no longer available. Check the linked listing in admin."
+      },
+      { status: 404 }
     );
   }
 
@@ -314,46 +315,65 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
 
   const project = await prisma.$transaction(async (tx) => {
-    const created = await tx.project.create({
-      data: {
-        coverImage:
-          submission.propertyData && typeof submission.propertyData === "object" && "coverImage" in submission.propertyData
-            ? ((submission.propertyData as { coverImage?: unknown }).coverImage as string | undefined)
-            : undefined,
-        descriptionEn: data.descriptionEn,
-        descriptionRu: data.descriptionRu,
-        expectedReturnEn: data.expectedReturnEn,
-        expectedReturnRu: data.expectedReturnRu,
-        expectedYieldEn: data.expectedYieldEn,
-        expectedYieldRu: data.expectedYieldRu,
-        stageRu: data.stageRu,
-        stageEn: data.stageEn,
-        currentProgressRu: data.currentProgressRu,
-        currentProgressEn: data.currentProgressEn,
-        fundraisingStartAt: data.fundraisingStartAt,
-        fundraisingEndAt: data.fundraisingEndAt,
-        organizationId: submission.organizationId,
-        plannedLaunchAt: data.plannedLaunchAt,
-        plannedDividendAt: data.plannedDividendAt,
-        payoutFrequency: data.payoutFrequency,
-        participationTermRu: data.participationTermRu,
-        participationTermEn: data.participationTermEn,
-        raisePlanRu: data.raisePlanRu,
-        raisePlanEn: data.raisePlanEn,
-        fundedUsdt: 0,
-        location: data.location,
-        propertyData: submission.propertyData ?? undefined,
-        riskLevel: data.riskLevel,
-        slug: data.slug,
-        status: projectStatus,
-        structure: data.structure,
-        summaryEn: data.summaryEn,
-        summaryRu: data.summaryRu,
-        targetUsdt: data.targetUsdt,
-        titleEn: data.titleEn,
-        titleRu: data.titleRu
-      }
-    });
+    const baseProjectPayload = {
+      coverImage:
+        submission.propertyData && typeof submission.propertyData === "object" && "coverImage" in submission.propertyData
+          ? ((submission.propertyData as { coverImage?: unknown }).coverImage as string | undefined)
+          : undefined,
+      descriptionEn: data.descriptionEn,
+      descriptionRu: data.descriptionRu,
+      expectedReturnEn: data.expectedReturnEn,
+      expectedReturnRu: data.expectedReturnRu,
+      expectedYieldEn: data.expectedYieldEn,
+      expectedYieldRu: data.expectedYieldRu,
+      stageRu: data.stageRu,
+      stageEn: data.stageEn,
+      currentProgressRu: data.currentProgressRu,
+      currentProgressEn: data.currentProgressEn,
+      fundraisingStartAt: data.fundraisingStartAt,
+      fundraisingEndAt: data.fundraisingEndAt,
+      organizationId: submission.organizationId,
+      plannedLaunchAt: data.plannedLaunchAt,
+      plannedDividendAt: data.plannedDividendAt,
+      payoutFrequency: data.payoutFrequency,
+      participationTermRu: data.participationTermRu,
+      participationTermEn: data.participationTermEn,
+      raisePlanRu: data.raisePlanRu,
+      raisePlanEn: data.raisePlanEn,
+      location: data.location,
+      propertyData: submission.propertyData ?? undefined,
+      riskLevel: data.riskLevel,
+      slug: data.slug,
+      status: projectStatus,
+      structure: data.structure,
+      summaryEn: data.summaryEn,
+      summaryRu: data.summaryRu,
+      targetUsdt: data.targetUsdt,
+      titleEn: data.titleEn,
+      titleRu: data.titleRu
+    } satisfies Prisma.ProjectUncheckedCreateInput;
+
+    const createdOrUpdated = linkedProject
+      ? await tx.project.update({
+          where: { id: linkedProject.id },
+          data: baseProjectPayload
+        })
+      : await tx.project.create({
+          data: {
+            ...baseProjectPayload,
+            fundedUsdt: 0
+          }
+        });
+
+    if (linkedProject) {
+      await tx.projectDocument.deleteMany({
+        where: {
+          kind: DocumentKind.PROJECT,
+          projectId: linkedProject.id
+        }
+      });
+    }
+
     const projectDocuments = [];
 
     for (const [index, document] of submissionDocuments.entries()) {
@@ -361,7 +381,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         data: {
           fileUrl: "#pending",
           kind: DocumentKind.PROJECT,
-          projectId: created.id,
+          projectId: createdOrUpdated.id,
           titleEn: documentTitle(document.name, index, false),
           titleRu: documentTitle(document.name, index, true)
         }
@@ -371,7 +391,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         await tx.projectDocument.update({
           where: { id: createdDocument.id },
           data: {
-            fileUrl: `/api/projects/${created.id}/documents/${createdDocument.id}?source=${index}`
+            fileUrl: `/api/projects/${createdOrUpdated.id}/documents/${createdDocument.id}?source=${index}`
           }
         })
       );
@@ -381,7 +401,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       where: { id: submission.id },
       data: {
         adminNote: data.note,
-        projectId: created.id,
+        projectId: createdOrUpdated.id,
         status: "APPROVED"
       }
     });
@@ -390,48 +410,52 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       data: [
         {
           actorId: session?.user?.id,
-          action: "project.submission.prepare",
+          action: linkedProject ? "project.submission.prepare_revision" : "project.submission.prepare",
           entityId: submission.id,
           entityType: "ProjectSubmission",
           payload: {
             from: submission.status,
             note: data.note,
             participantEmail: submission.user.email,
-            projectId: created.id,
-            projectSlug: created.slug,
+            projectId: createdOrUpdated.id,
+            projectSlug: createdOrUpdated.slug,
             publishedDocuments: projectDocuments.map((document) => document.titleRu),
-            expectedReturnRu: created.expectedReturnRu,
-            expectedYieldRu: created.expectedYieldRu,
-            payoutFrequency: created.payoutFrequency,
+            expectedReturnRu: createdOrUpdated.expectedReturnRu,
+            expectedYieldRu: createdOrUpdated.expectedYieldRu,
+            payoutFrequency: createdOrUpdated.payoutFrequency,
             to: "APPROVED"
           }
         },
         {
           actorId: session?.user?.id,
-          action: "project.create.from_submission",
-          entityId: created.id,
+          action: linkedProject ? "project.update.from_submission" : "project.create.from_submission",
+          entityId: createdOrUpdated.id,
           entityType: "Project",
           payload: {
             participantEmail: submission.user.email,
-            projectSlug: created.slug,
-            status: created.status,
+            projectSlug: createdOrUpdated.slug,
+            status: createdOrUpdated.status,
             submissionId: submission.id,
-            payoutFrequency: created.payoutFrequency,
-            targetUsdt: created.targetUsdt.toString()
+            payoutFrequency: createdOrUpdated.payoutFrequency,
+            targetUsdt: createdOrUpdated.targetUsdt.toString()
           }
         }
       ]
     });
 
-    return created;
+    return createdOrUpdated;
   });
 
   return NextResponse.json({
-    title: localeRu ? "Проект создан для каталога" : "Catalog project created",
+    title: linkedProject ? (localeRu ? "Изменения применены" : "Changes applied") : localeRu ? "Проект создан для каталога" : "Catalog project created",
     message:
-      localeRu
-        ? "Заявка одобрена, проект создан в админке. Статус проекта можно менять в управлении проектами."
-        : "The submission was approved and a project was created in admin. Project status can be changed in project management.",
+      linkedProject
+        ? localeRu
+          ? "Правки по опубликованному проекту одобрены и применены к действующему листингу."
+          : "Changes to the published project were approved and applied to the existing listing."
+        : localeRu
+          ? "Заявка одобрена, проект создан в админке. Статус проекта можно менять в управлении проектами."
+          : "The submission was approved and a project was created in admin. Project status can be changed in project management.",
     projectId: project.id,
     tone: "success"
   });

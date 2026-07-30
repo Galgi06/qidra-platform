@@ -2,6 +2,25 @@ import { OrganizationLeadStatus, OrganizationMemberRole, OrganizationStatus, Pri
 import { prisma } from "@/lib/prisma";
 import type { Locale } from "@/lib/i18n";
 
+const organizationMembershipInclude = {
+  organization: {
+    include: {
+      documents: true,
+      _count: {
+        select: {
+          members: true,
+          projects: true,
+          projectSubmissions: true
+        }
+      }
+    }
+  }
+} satisfies Prisma.OrganizationMemberInclude;
+
+type OrganizationMembershipRecord = Prisma.OrganizationMemberGetPayload<{
+  include: typeof organizationMembershipInclude;
+}>;
+
 export function companyStatusLabel(status: OrganizationStatus, locale: Locale) {
   const labels: Record<OrganizationStatus, Record<Locale, string>> = {
     DRAFT: { ru: "Черновик", en: "Draft" },
@@ -46,6 +65,10 @@ export function canManageCompanyLeads(role: OrganizationMemberRole) {
   return role === OrganizationMemberRole.OWNER || role === OrganizationMemberRole.ADMIN || role === OrganizationMemberRole.EDITOR;
 }
 
+export function canManageCompanyDividends(role: OrganizationMemberRole) {
+  return role === OrganizationMemberRole.OWNER || role === OrganizationMemberRole.ADMIN;
+}
+
 export function isOrganizationSchemaUnavailable(error: unknown) {
   return (
     error instanceof Prisma.PrismaClientInitializationError ||
@@ -55,11 +78,8 @@ export function isOrganizationSchemaUnavailable(error: unknown) {
 
 export async function getPrimaryOrganizationForUser(userId: string) {
   try {
-    const membership = await prisma.organizationMember.findFirst({
-      where: { userId },
-      orderBy: [{ role: "asc" }, { createdAt: "asc" }],
-      include: { organization: true }
-    });
+    const memberships = await getAccessibleOrganizationMemberships(userId);
+    const membership = memberships[0] ?? null;
 
     return membership?.organization ?? null;
   } catch (error) {
@@ -73,28 +93,8 @@ export async function getPrimaryOrganizationForUser(userId: string) {
 
 export async function getOrganizationMembership(userId: string, organizationId?: string | null) {
   try {
-    const membership = await prisma.organizationMember.findFirst({
-      where: {
-        userId,
-        ...(organizationId ? { organizationId } : {})
-      },
-      include: {
-        organization: {
-          include: {
-            documents: true,
-            _count: {
-              select: {
-                members: true,
-                projects: true,
-                projectSubmissions: true
-              }
-            }
-          }
-        }
-      }
-    });
-
-    return membership ?? null;
+    const memberships = await getAccessibleOrganizationMemberships(userId, organizationId);
+    return memberships[0] ?? null;
   } catch (error) {
     if (isOrganizationSchemaUnavailable(error)) {
       return null;
@@ -102,6 +102,118 @@ export async function getOrganizationMembership(userId: string, organizationId?:
 
     throw error;
   }
+}
+
+export async function getOrganizationMemberships(userId: string) {
+  try {
+    return getAccessibleOrganizationMemberships(userId);
+  } catch (error) {
+    if (isOrganizationSchemaUnavailable(error)) {
+      return [];
+    }
+
+    throw error;
+  }
+}
+
+export async function getAccessibleOrganizationMemberships(userId: string, organizationId?: string | null) {
+  const [user, directMemberships] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true }
+    }),
+    prisma.organizationMember.findMany({
+      where: {
+        userId,
+        ...(organizationId ? { organizationId } : {})
+      },
+      include: organizationMembershipInclude
+    })
+  ]);
+
+  const normalizedEmail = user?.email?.trim().toLowerCase();
+  const directIds = new Set(directMemberships.map((membership) => membership.organizationId));
+
+  let recoveredMemberships: OrganizationMembershipRecord[] = [];
+
+  if (normalizedEmail) {
+    const fallbackOrganizations = await prisma.organization.findMany({
+      where: {
+        contactEmail: {
+          equals: normalizedEmail,
+          mode: "insensitive"
+        },
+        ...(organizationId ? { id: organizationId } : {})
+      },
+      include: organizationMembershipInclude.organization.include
+    });
+
+    recoveredMemberships = fallbackOrganizations
+      .filter((organization) => !directIds.has(organization.id))
+      .map((organization) => ({
+        id: `recovered:${organization.id}:${userId}`,
+        organizationId: organization.id,
+        userId,
+        role: OrganizationMemberRole.OWNER,
+        createdAt: organization.createdAt,
+        updatedAt: organization.updatedAt,
+        organization
+      }));
+  }
+
+  return sortOrganizationMemberships([...directMemberships, ...recoveredMemberships]);
+}
+
+function sortOrganizationMemberships<
+  T extends {
+    createdAt: Date;
+    role: OrganizationMemberRole;
+    organization: {
+      status: OrganizationStatus;
+      _count?: {
+        projects?: number;
+        projectSubmissions?: number;
+      };
+    };
+  }
+>(memberships: T[]) {
+  const rolePriority: Record<OrganizationMemberRole, number> = {
+    OWNER: 0,
+    ADMIN: 1,
+    EDITOR: 2,
+    ANALYST: 3
+  };
+  const statusPriority: Record<OrganizationStatus, number> = {
+    APPROVED: 0,
+    REVIEW: 1,
+    DRAFT: 2,
+    REJECTED: 3
+  };
+
+  return [...memberships].sort((left, right) => {
+    const leftProjectWeight = (left.organization._count?.projects ?? 0) + (left.organization._count?.projectSubmissions ?? 0);
+    const rightProjectWeight = (right.organization._count?.projects ?? 0) + (right.organization._count?.projectSubmissions ?? 0);
+
+    if (leftProjectWeight !== rightProjectWeight) {
+      return rightProjectWeight - leftProjectWeight;
+    }
+
+    const leftStatus = statusPriority[left.organization.status];
+    const rightStatus = statusPriority[right.organization.status];
+
+    if (leftStatus !== rightStatus) {
+      return leftStatus - rightStatus;
+    }
+
+    const leftRole = rolePriority[left.role];
+    const rightRole = rolePriority[right.role];
+
+    if (leftRole !== rightRole) {
+      return leftRole - rightRole;
+    }
+
+    return left.createdAt.getTime() - right.createdAt.getTime();
+  });
 }
 
 export function companyHomeNextStep(status: OrganizationStatus, locale: Locale) {

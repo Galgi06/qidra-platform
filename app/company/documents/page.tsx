@@ -18,9 +18,11 @@ const documentKinds = [
 ] as const;
 
 export default async function CompanyDocumentsPage({ searchParams }: { searchParams?: Promise<SearchParams> }) {
+  const params = await searchParams;
   const locale = await getLocale(searchParams);
   const isRu = locale === "ru";
-  const { membership } = await requireCompanyAccess(locale, "/company/documents");
+  const selectedOrganizationId = Array.isArray(params?.organization) ? params.organization[0] : params?.organization;
+  const { membership, memberships } = await requireCompanyAccess(locale, "/company/documents", selectedOrganizationId);
   const organization = membership.organization;
   const documents = [...organization.documents].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
@@ -43,7 +45,7 @@ export default async function CompanyDocumentsPage({ searchParams }: { searchPar
         </section>
 
         <section className="px-5 py-12 sm:px-8 lg:px-11 lg:py-16">
-          <CompanyWorkspace activePath="/company/documents" locale={locale}>
+          <CompanyWorkspace activePath="/company/documents" locale={locale} memberships={memberships} selectedOrganizationId={membership.organizationId}>
             <div className="grid gap-8 xl:grid-cols-[0.92fr_1.08fr]">
               <FeedbackForm
                 className="premium-card grid gap-5 p-6 sm:p-8"

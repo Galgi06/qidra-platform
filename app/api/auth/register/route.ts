@@ -4,6 +4,7 @@ import { z } from "zod";
 import { sendEmail, getAppBaseUrl } from "@/lib/email";
 import { isStrongPassword, passwordPolicyDescription } from "@/lib/password-policy";
 import { prisma } from "@/lib/prisma";
+import { isValidNormalizedPublicSlug, normalizePublicSlug } from "@/lib/public-slug";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { createRawToken, expiresInMinutes, hashToken } from "@/lib/tokens";
 
@@ -15,21 +16,70 @@ const registerSchema = z.object({
   companySlug: z
     .string()
     .trim()
-    .toLowerCase()
-    .max(120)
-    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
+    .max(200)
+    .transform(normalizePublicSlug)
+    .refine(isValidNormalizedPublicSlug, "company_slug_invalid")
     .optional(),
   inviteToken: z.string().trim().max(255).optional(),
   name: z.string().trim().min(2).max(120),
   email: z.string().trim().email().max(255),
-  password: z.string().max(128).refine(isStrongPassword)
+  password: z.string().max(128).refine(isStrongPassword),
+  passwordConfirm: z.string().max(128)
 }).superRefine((data, ctx) => {
   if (data.accountType === "company" && !data.inviteToken) {
     if (!data.companyName) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["companyName"], message: "company_name_required" });
     if (!data.companySlug) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["companySlug"], message: "company_slug_required" });
     if (!data.companyCountry) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["companyCountry"], message: "company_country_required" });
   }
+
+  if (data.password !== data.passwordConfirm) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["passwordConfirm"], message: "password_mismatch" });
+  }
 });
+
+function registerFieldErrors(localeRu: boolean, error: z.ZodError) {
+  const fieldErrors = error.flatten().fieldErrors as Record<string, string[] | undefined>;
+  const nextFieldErrors: Record<string, string> = {};
+
+  if (fieldErrors.name?.length) {
+    nextFieldErrors.name = localeRu ? "Введите имя не короче 2 символов." : "Enter a name with at least 2 characters.";
+  }
+
+  if (fieldErrors.email?.length) {
+    nextFieldErrors.email = localeRu ? "Введите корректный email." : "Enter a valid email.";
+  }
+
+  if (fieldErrors.password?.length) {
+    nextFieldErrors.password = localeRu ? passwordPolicyDescription.ru : passwordPolicyDescription.en;
+  }
+
+  if (fieldErrors.passwordConfirm?.length) {
+    nextFieldErrors.passwordConfirm =
+      fieldErrors.passwordConfirm.some((message) => message === "password_mismatch")
+        ? localeRu
+          ? "Пароли должны совпадать."
+          : "Passwords must match."
+        : localeRu
+          ? "Повторите пароль."
+          : "Confirm the password.";
+  }
+
+  if (fieldErrors.companyName?.length) {
+    nextFieldErrors.companyName = localeRu ? "Укажите юридическое название компании." : "Enter the legal company name.";
+  }
+
+  if (fieldErrors.companySlug?.length) {
+    nextFieldErrors.companySlug = localeRu
+      ? "Введите публичный адрес компании в свободной форме. Система сама подготовит ссылку."
+      : "Enter the public company address in free form. The system will prepare the public link automatically.";
+  }
+
+  if (fieldErrors.companyCountry?.length) {
+    nextFieldErrors.companyCountry = localeRu ? "Укажите страну регистрации." : "Enter the country of registration.";
+  }
+
+  return Object.keys(nextFieldErrors).length ? nextFieldErrors : undefined;
+}
 
 function isRu(request: NextRequest) {
   return request.nextUrl.searchParams.get("lang") !== "en";
@@ -42,6 +92,7 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json(
       {
+        fieldErrors: registerFieldErrors(localeRu, parsed.error),
         title: localeRu ? "Проверьте данные" : "Check the details",
         message: localeRu
           ? `Заполните имя, корректный email и пароль. Для компании также укажите название, slug и страну регистрации. ${passwordPolicyDescription.ru}`
@@ -97,7 +148,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           title: localeRu ? "Slug компании уже занят" : "Company slug is taken",
-          message: localeRu ? "Выберите другой публичный адрес компании." : "Choose another public company address."
+          message: localeRu ? "Такой публичный адрес уже используется. Укажите другой вариант." : "This public address is already in use. Enter another value."
         },
         { status: 409 }
       );

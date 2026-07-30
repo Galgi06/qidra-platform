@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { SupportQueue, SupportThreadStatus } from "@prisma/client";
@@ -10,6 +10,7 @@ import { SupportQueue, SupportThreadStatus } from "@prisma/client";
 type Locale = "ru" | "en";
 
 type GuestMessage = {
+  attachments?: { href: string; name: string }[];
   body: string;
   createdAt: string;
   id: string;
@@ -59,6 +60,8 @@ export function GuestSupportChatWidget({
   const [loadingThread, setLoadingThread] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [thread, setThread] = useState<GuestThreadPayload | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [form, setForm] = useState<GuestFormState>(() => {
     if (typeof window === "undefined") {
       return {
@@ -177,14 +180,8 @@ export function GuestSupportChatWidget({
     setError(null);
 
     const token = typeof window === "undefined" ? null : window.localStorage.getItem(storageKey);
-    const payload = {
-      ...form,
-      token: token || undefined
-    };
-
     const response = await fetch(`/api/support/guest?lang=${locale}`, {
-      body: JSON.stringify(payload),
-      headers: { "Content-Type": "application/json" },
+      body: createGuestFormData(form, files, token || undefined),
       method: "POST"
     });
     const data = (await response.json().catch(() => null)) as { clearToken?: boolean; message?: string; thread?: GuestThreadPayload } | null;
@@ -214,6 +211,10 @@ export function GuestSupportChatWidget({
     );
     setThread(data.thread);
     setForm((current) => ({ ...current, body: "" }));
+    setFiles([]);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   };
 
   return (
@@ -255,6 +256,21 @@ export function GuestSupportChatWidget({
                   <div key={message.id} className={`max-w-[88%] rounded-[16px] px-4 py-3 text-14 ${own ? "ml-auto bg-qidra-dark text-white" : "bg-white text-qidra-dark"}`}>
                     <p className={`text-12 font-medium ${own ? "text-white/70" : "text-qidra-grayBlue"}`}>{message.senderName || (own ? form.name || "Guest" : "Qidra")}</p>
                     <p className="mt-2 whitespace-pre-wrap">{message.body}</p>
+                    {message.attachments?.length ? (
+                      <div className="mt-3 grid gap-2">
+                        {message.attachments.map((attachment) => (
+                          <a
+                            key={attachment.href}
+                            className={`inline-flex w-fit items-center gap-2 rounded-qidra px-3 py-2 text-12 font-medium transition-colors ${own ? "bg-white/12 text-white hover:bg-white/18" : "bg-qidra-grayLight text-qidra-dark hover:text-qidra-accent"}`}
+                            href={attachment.href}
+                            rel="noreferrer"
+                            target="_blank"
+                          >
+                            <span>{attachment.name}</span>
+                          </a>
+                        ))}
+                      </div>
+                    ) : null}
                     <p className={`mt-2 text-11 ${own ? "text-white/70" : "text-qidra-grayBlue"}`}>{formatDateTime(message.createdAt, locale)}</p>
                   </div>
                 );
@@ -309,6 +325,24 @@ export function GuestSupportChatWidget({
               onChange={(event) => setForm((current) => ({ ...current, body: event.target.value }))}
             />
           </label>
+          <label className="grid gap-2 text-14 font-semibold text-qidra-dark">
+            <span>{isRu ? "Скриншоты или документы" : "Screenshots or documents"}</span>
+            <input
+              ref={fileInputRef}
+              accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp,.txt"
+              className="field-shell h-12 rounded-qidra px-4 py-3 text-14 outline-none file:mr-3 file:rounded-qidra file:border-0 file:bg-qidra-dark file:px-3 file:py-2 file:text-12 file:font-semibold file:text-white"
+              multiple
+              onChange={(event) => setFiles(Array.from(event.target.files || []).slice(0, 5))}
+              type="file"
+            />
+            <span className="text-12 font-normal text-qidra-grayBlue">
+              {files.length
+                ? files.map((file) => file.name).join(", ")
+                : isRu
+                  ? "До 5 файлов: PDF, DOC, DOCX, JPG, PNG, WEBP, TXT. До 12 МБ каждый."
+                  : "Up to 5 files: PDF, DOC, DOCX, JPG, PNG, WEBP, TXT. Up to 12 MB each."}
+            </span>
+          </label>
 
           {thread ? (
             <p className="text-12 text-qidra-grayBlue">
@@ -342,4 +376,19 @@ function formatDateTime(value: string, locale: Locale) {
     minute: "2-digit",
     month: "short"
   }).format(new Date(value));
+}
+
+function createGuestFormData(form: GuestFormState, files: File[], token?: string) {
+  const formData = new FormData();
+  formData.set("body", form.body);
+  formData.set("contact", form.contact);
+  formData.set("email", form.email);
+  formData.set("name", form.name);
+  formData.set("queue", form.queue);
+  formData.set("subject", form.subject);
+  if (token) formData.set("token", token);
+  for (const file of files) {
+    formData.append("attachments", file);
+  }
+  return formData;
 }

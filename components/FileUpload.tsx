@@ -56,6 +56,7 @@ export function FileUpload({
   const removeText = removeLabel ?? (selectedLabel === "Выбрано" ? "Удалить" : "Remove");
   const pickerText = isMultiple ? (hasAnyFiles ? addMoreText : chooseText) : hasAnyFiles ? replaceText : chooseText;
   const useCustomRequiredValidation = required || suppressNativeRequired;
+  const fallbackRequiredMessage = requiredMessage ?? (selectedLabel === "Выбрано" ? `Добавьте файл в поле «${label}».` : `Add a file for “${label}”.`);
 
   useEffect(() => {
     if (!name) return;
@@ -194,7 +195,7 @@ export function FileUpload({
         accept={accept}
         className="sr-only"
         data-required-file={useCustomRequiredValidation ? "true" : undefined}
-        data-required-message={requiredMessage}
+        data-required-message={fallbackRequiredMessage}
         id={`${inputId}-${inputVersion}`}
         multiple={isMultiple}
         onChange={handleChange}

@@ -14,6 +14,7 @@
     "restore:database": "node scripts/restore-database.mjs",
     "test:smtp": "node scripts/test-smtp.mjs",
     "test:storage": "node scripts/test-s3-storage.mjs",
+    "test:dividends": "node --test tests/dividend-calculator.test.mjs",
     "changes:last-day": "node scripts/report-last-day-changes.mjs",
     "import:al-amana-gold": "node scripts/import-al-amana-gold.mjs",
     "prisma:generate": "prisma generate",

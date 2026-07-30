@@ -3,7 +3,7 @@ import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { NotificationCard } from "@/components/NotificationCard";
 import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 import { getLocale, type SearchParams } from "@/lib/i18n";
 import { passwordPolicyDescription } from "@/lib/password-policy";
 import { readParam } from "@/lib/tokens";
@@ -40,7 +40,22 @@ export default async function ResetPasswordPage({ searchParams }: { searchParams
             <h1 className="subtitle-28">{locale === "ru" ? "Новый пароль" : "New password"}</h1>
             <input name="email" type="hidden" value={email} />
             <input name="token" type="hidden" value={token} />
-            <Input label={locale === "ru" ? "Пароль" : "Password"} name="password" type="password" placeholder="********" required />
+            <PasswordInput
+              hideLabel={locale === "ru" ? "Скрыть пароль" : "Hide password"}
+              label={locale === "ru" ? "Пароль" : "Password"}
+              name="password"
+              placeholder="********"
+              required
+              showLabel={locale === "ru" ? "Показать пароль" : "Show password"}
+            />
+            <PasswordInput
+              hideLabel={locale === "ru" ? "Скрыть пароль" : "Hide password"}
+              label={locale === "ru" ? "Повторите пароль" : "Confirm password"}
+              name="passwordConfirm"
+              placeholder="********"
+              required
+              showLabel={locale === "ru" ? "Показать пароль" : "Show password"}
+            />
             <p className="text-14 text-qidra-grayBlue">{locale === "ru" ? passwordPolicyDescription.ru : passwordPolicyDescription.en}</p>
             <Button type="submit">{locale === "ru" ? "Сохранить пароль" : "Save password"}</Button>
           </FeedbackForm>

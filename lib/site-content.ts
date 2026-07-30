@@ -303,8 +303,8 @@ const defaultSiteContent: SiteContentSnapshot = {
   },
   footer: {
     socialLinks: {
-      telegram: "#",
-      instagram: "#",
+      telegram: "https://t.me/qidra",
+      instagram: "https://www.instagram.com/qidra.io?igsh=M3J1eTZsNmR2cmFr",
       whatsapp: "#"
     },
     projectLinks: [

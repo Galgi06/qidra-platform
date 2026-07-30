@@ -12,9 +12,11 @@ import { prisma } from "@/lib/prisma";
 const leadStatuses = ["NEW", "CONTACT_ATTEMPT", "CONTACTED", "QUALIFIED", "PROPOSAL_SENT", "NEGOTIATION", "WON", "LOST", "CLOSED"] as const;
 
 export default async function CompanyLeadsPage({ searchParams }: { searchParams?: Promise<SearchParams> }) {
+  const params = await searchParams;
   const locale = await getLocale(searchParams);
   const isRu = locale === "ru";
-  const { membership } = await requireCompanyAccess(locale, "/company/leads");
+  const selectedOrganizationId = Array.isArray(params?.organization) ? params.organization[0] : params?.organization;
+  const { membership, memberships } = await requireCompanyAccess(locale, "/company/leads", selectedOrganizationId);
   const leads = await prisma.organizationLead.findMany({
     where: { organizationId: membership.organizationId },
     include: {
@@ -44,7 +46,7 @@ export default async function CompanyLeadsPage({ searchParams }: { searchParams?
         </section>
 
         <section className="px-5 py-12 sm:px-8 lg:px-11 lg:py-16">
-          <CompanyWorkspace activePath="/company/leads" locale={locale}>
+          <CompanyWorkspace activePath="/company/leads" locale={locale} memberships={memberships} selectedOrganizationId={membership.organizationId}>
             <div className="grid gap-5">
               <div className="grid gap-5 md:grid-cols-3 xl:grid-cols-6">
                 <MetricCard label={isRu ? "В работе" : "Open pipeline"} value={openPipelineCount.toString()} />

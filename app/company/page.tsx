@@ -9,9 +9,11 @@ import { companyHomeNextStep, companyLeadStatusLabel, companyMemberRoleLabel, co
 import { prisma } from "@/lib/prisma";
 
 export default async function CompanyPage({ searchParams }: { searchParams?: Promise<SearchParams> }) {
+  const params = await searchParams;
   const locale = await getLocale(searchParams);
   const isRu = locale === "ru";
-  const { membership, session } = await requireCompanyAccess(locale, "/company");
+  const selectedOrganizationId = Array.isArray(params?.organization) ? params.organization[0] : params?.organization;
+  const { membership, memberships, session } = await requireCompanyAccess(locale, "/company", selectedOrganizationId);
   const organization = membership.organization;
   const userId = session.user?.id ?? "";
   const [submissionCount, activeProjects, memberCount, leadCount, newLeadCount, documentCount] = await Promise.all([
@@ -33,7 +35,17 @@ export default async function CompanyPage({ searchParams }: { searchParams?: Pro
             <div className="premium-card grid gap-7 p-6 sm:p-8 lg:grid-cols-[1fr_auto] lg:items-end">
               <div>
                 <p className="eyebrow">{isRu ? "Кабинет компании" : "Company workspace"}</p>
-                <h1 className="mt-3 text-[40px] font-medium leading-tight tracking-[0] text-qidra-dark sm:text-[54px]">{organization.displayName}</h1>
+                <h1 className="mt-3 max-w-5xl break-words text-[34px] font-medium leading-tight tracking-[0] text-qidra-dark sm:text-[46px]">
+                  {workspaceCompanyTitle(organization)}
+                </h1>
+                {organization.displayName && organization.displayName.trim() !== workspaceCompanyTitle(organization) ? (
+                  <p className="mt-3 text-16 font-medium text-qidra-accent">{organization.displayName}</p>
+                ) : null}
+                <div className="mt-4 flex flex-wrap gap-3 text-14 text-qidra-grayBlue">
+                  {organization.publicSlug ? <span className="rounded-full bg-qidra-grayLight px-3 py-1">{organization.publicSlug}</span> : null}
+                  {organization.country ? <span className="rounded-full bg-qidra-grayLight px-3 py-1">{organization.country}</span> : null}
+                  {organization.city ? <span className="rounded-full bg-qidra-grayLight px-3 py-1">{organization.city}</span> : null}
+                </div>
                 <p className="mt-3 max-w-4xl text-18 text-qidra-grayBlue">
                   {organization.valueProposition ||
                     (isRu
@@ -45,6 +57,12 @@ export default async function CompanyPage({ searchParams }: { searchParams?: Pro
                 <ButtonLink href={withLocale(nextStep.href, locale)} className="h-12 min-w-44">
                   {nextStep.buttonLabel}
                 </ButtonLink>
+                <ButtonLink href={withOrganizationParam("/company/projects", locale, membership.organizationId)} variant="outline" className="h-12 min-w-44">
+                  {isRu ? "Проекты компании" : "Company projects"}
+                </ButtonLink>
+                <ButtonLink href={withLocale("/investor", locale)} variant="outline" className="h-12 min-w-44">
+                  {isRu ? "Профиль участника" : "Participant profile"}
+                </ButtonLink>
                 <ButtonLink href={withLocale(`/companies/${organization.publicSlug}`, locale)} variant="outline" className="h-12 min-w-44">
                   {isRu ? "Открыть публичную страницу" : "Open public page"}
                 </ButtonLink>
@@ -54,7 +72,7 @@ export default async function CompanyPage({ searchParams }: { searchParams?: Pro
         </section>
 
         <section className="px-5 py-12 sm:px-8 lg:px-11 lg:py-16">
-          <CompanyWorkspace activePath="/company" locale={locale}>
+          <CompanyWorkspace activePath={`/company?organization=${membership.organizationId}`} locale={locale} memberships={memberships} selectedOrganizationId={membership.organizationId}>
             <div className="grid gap-8">
               <div className="grid gap-5 md:grid-cols-4">
                 <MetricCard label={isRu ? "Статус компании" : "Company status"} value={companyStatusLabel(organization.status, locale)} />
@@ -79,6 +97,12 @@ export default async function CompanyPage({ searchParams }: { searchParams?: Pro
                       label={documentCount.toString()}
                       text={isRu ? "Загружайте регистрационные документы, product sheets, compliance-файлы и материалы для модерации." : "Upload registration docs, product sheets, compliance files, and moderation materials."}
                       title={isRu ? "Документы компании" : "Company documents"}
+                    />
+                    <ActionRow
+                      href={withLocale("/company/projects", locale)}
+                      label={activeProjects.toString()}
+                      text={isRu ? "Смотрите опубликованные проекты компании, статусы сбора и график выплат." : "View published company projects, raise statuses and payout schedules."}
+                      title={isRu ? "Проекты компании" : "Company projects"}
                     />
                     <ActionRow
                       href={withLocale("/investor/projects/new", locale)}
@@ -140,6 +164,15 @@ export default async function CompanyPage({ searchParams }: { searchParams?: Pro
   );
 }
 
+function workspaceCompanyTitle(organization: { displayName: string; legalName: string; publicSlug: string }) {
+  const legalName = organization.legalName?.trim();
+  const displayName = organization.displayName?.trim();
+
+  if (legalName) return legalName;
+  if (displayName) return displayName;
+  return organization.publicSlug;
+}
+
 function MetricCard({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-[18px] bg-white p-5 shadow-[0_0_0_1px_rgba(18,20,23,0.08)]">
@@ -168,4 +201,11 @@ function InfoRow({ label, value }: { label: string; value: string }) {
       <p className="mt-1 font-medium text-qidra-dark">{value}</p>
     </div>
   );
+}
+
+function withOrganizationParam(href: string, locale: "ru" | "en", organizationId: string) {
+  const localized = withLocale(href, locale);
+  const url = new URL(localized, "https://qidra.io");
+  url.searchParams.set("organization", organizationId);
+  return `${url.pathname}${url.search}`;
 }

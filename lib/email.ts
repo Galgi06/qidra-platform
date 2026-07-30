@@ -12,7 +12,27 @@ type ResendResponse = {
 };
 
 export function getAppBaseUrl() {
-  return process.env.NEXTAUTH_URL || "http://localhost:8091";
+  const publicBaseUrl = process.env.QIDRA_PUBLIC_BASE_URL?.trim();
+
+  if (publicBaseUrl) {
+    return publicBaseUrl;
+  }
+
+  const nextAuthUrl = process.env.NEXTAUTH_URL?.trim();
+
+  if (nextAuthUrl) {
+    if (process.env.NODE_ENV === "production" && nextAuthUrl.includes(".run.app")) {
+      return "https://qidra.io";
+    }
+
+    return nextAuthUrl;
+  }
+
+  if (process.env.NODE_ENV === "production") {
+    return "https://qidra.io";
+  }
+
+  return "http://localhost:8091";
 }
 
 function getEmailProvider() {

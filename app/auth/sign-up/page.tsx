@@ -5,6 +5,7 @@ import { SocialAuthButtons } from "@/components/auth/SocialAuthButtons";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 import { getLocale, type SearchParams } from "@/lib/i18n";
 import { passwordPolicyDescription } from "@/lib/password-policy";
 import { getSocialAuthConfig } from "@/lib/social-auth";
@@ -102,13 +103,42 @@ export default async function SignUpPage({ searchParams }: { searchParams?: Prom
                 <div className="grid gap-4 md:grid-cols-2">
                   <Input label={isRu ? "Имя" : "Name"} name="name" placeholder={isRu ? "Ваше имя" : "Your name"} required />
                   <Input label="Email" name="email" type="email" placeholder="name@example.com" required />
-                  <div className="md:col-span-2">
-                    <Input label={isRu ? "Пароль" : "Password"} name="password" type="password" placeholder="********" required />
+                  <div>
+                    <PasswordInput
+                      hideLabel={isRu ? "Скрыть пароль" : "Hide password"}
+                      label={isRu ? "Пароль" : "Password"}
+                      name="password"
+                      placeholder="********"
+                      required
+                      showLabel={isRu ? "Показать пароль" : "Show password"}
+                    />
+                  </div>
+                  <div>
+                    <PasswordInput
+                      hideLabel={isRu ? "Скрыть пароль" : "Hide password"}
+                      label={isRu ? "Повторите пароль" : "Confirm password"}
+                      name="passwordConfirm"
+                      placeholder="********"
+                      required
+                      showLabel={isRu ? "Показать пароль" : "Show password"}
+                    />
                   </div>
                   {!inviteMode && accountType === "company" ? (
                     <>
-                      <Input label={isRu ? "Юридическое название компании" : "Legal company name"} name="companyName" placeholder={isRu ? "Например: AM Capital LLC-FZ" : "Example: AM Capital LLC-FZ"} required />
-                      <Input label={isRu ? "Публичный адрес компании" : "Public company slug"} name="companySlug" placeholder="am-capital" required />
+                      <Input
+                        hint={isRu ? "Укажите название компании или фонда. Не вводите здесь адрес." : "Enter the company or fund name. Do not put an address here."}
+                        label={isRu ? "Юридическое название компании" : "Legal company name"}
+                        name="companyName"
+                        placeholder={isRu ? "Например: AM Capital LLC-FZ" : "Example: AM Capital LLC-FZ"}
+                        required
+                      />
+                      <Input
+                        hint={isRu ? "Адрес можно писать свободно: система сама создаст техническую ссылку." : "The address can be entered freely: the system will create the technical link automatically."}
+                        label={isRu ? "Публичный адрес компании" : "Public company address"}
+                        name="companySlug"
+                        placeholder={isRu ? "Например: Дубай, Бизнес Бей, Даунтаун" : "Example: Dubai, Business Bay, Downtown"}
+                        required
+                      />
                       <Input label={isRu ? "Страна регистрации" : "Country of registration"} name="companyCountry" placeholder={isRu ? "ОАЭ" : "UAE"} required />
                       <Input label={isRu ? "Ваша роль в компании" : "Your role in the company"} name="companyRole" placeholder={isRu ? "Управляющий партнёр" : "Managing partner"} />
                     </>

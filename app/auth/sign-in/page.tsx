@@ -7,14 +7,15 @@ import { getSocialAuthConfig } from "@/lib/social-auth";
 import { readParam } from "@/lib/tokens";
 
 type SignInSearchParams = SearchParams & {
+  account?: string | string[];
   blocked?: string | string[];
   error?: string | string[];
   next?: string | string[];
 };
 
-function safeNextPath(value?: string) {
+function safeNextPath(value: string | undefined, accountType: "company" | "investor") {
   if (!value || !value.startsWith("/") || value.startsWith("//")) {
-    return "/investor";
+    return accountType === "company" ? "/company" : "/investor";
   }
 
   return value;
@@ -23,7 +24,8 @@ function safeNextPath(value?: string) {
 export default async function SignInPage({ searchParams }: { searchParams?: Promise<SignInSearchParams> }) {
   const params = await searchParams;
   const locale = await getLocale(params);
-  const nextPath = safeNextPath(readParam(params?.next));
+  const accountType = readParam(params?.account) === "company" ? "company" : "investor";
+  const nextPath = safeNextPath(readParam(params?.next), accountType);
   const blocked = readParam(params?.blocked) === "1" || readParam(params?.error) === "AccessDenied";
   const socialAuth = getSocialAuthConfig();
 
@@ -43,7 +45,7 @@ export default async function SignInPage({ searchParams }: { searchParams?: Prom
             />
           </div>
         ) : null}
-        <SignInForm googleEnabled={socialAuth.googleEnabled} locale={locale} nextPath={nextPath} telegramEnabled={socialAuth.telegramEnabled} />
+        <SignInForm googleEnabled={socialAuth.googleEnabled} locale={locale} nextPath={nextPath} preferredAccountType={accountType} telegramEnabled={socialAuth.telegramEnabled} />
       </main>
       <Footer locale={locale} />
     </>

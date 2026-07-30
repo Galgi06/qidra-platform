@@ -197,6 +197,13 @@ export default async function AdminInvestmentsPage({ searchParams }: { searchPar
                         <p className="mt-2">{[lead.firstName, lead.lastName].filter(Boolean).join(" ") || request.user.name || request.user.email}</p>
                         <p>{lead.phone || "Phone not set"} / {lead.whatsapp || "WhatsApp not set"}</p>
                         <p>{lead.contactCountry || (locale === "ru" ? "Страна не указана" : "Country not set")}</p>
+                        {typeof lead.managerFeeUsdt === "number" && typeof lead.totalPayableUsdt === "number" ? (
+                          <p className="mt-2">
+                            {locale === "ru"
+                              ? `Комиссия управляющего: ${lead.managerFeeUsdt.toLocaleString()} USDT. Итого к оплате: ${lead.totalPayableUsdt.toLocaleString()} USDT.`
+                              : `Manager fee: ${lead.managerFeeUsdt.toLocaleString()} USDT. Total payable: ${lead.totalPayableUsdt.toLocaleString()} USDT.`}
+                          </p>
+                        ) : null}
                         {lead.comment ? <p className="mt-2 whitespace-pre-wrap">{lead.comment}</p> : null}
                       </div>
                     ) : null}

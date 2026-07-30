@@ -33,6 +33,26 @@ export async function saveOrganizationFile(file: File, organizationId: string) {
   };
 }
 
+export async function saveProjectReportFile(file: File, projectId: string) {
+  const safeName = sanitizeCompanyFileName(file.name);
+  const storedName = `${Date.now()}-${randomUUID()}-${safeName}`;
+  const type = file.type || "application/octet-stream";
+
+  const storagePath = await saveUploadedFile({
+    contentType: type,
+    directory: `project-reports/${projectId}`,
+    file,
+    storedName
+  });
+
+  return {
+    name: file.name,
+    size: file.size,
+    storagePath,
+    type
+  };
+}
+
 export async function recordOrganizationEvent({
   metadata,
   organizationId,

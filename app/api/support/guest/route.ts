@@ -5,6 +5,7 @@ import { z } from "zod";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { prisma } from "@/lib/prisma";
 import { notifySupportTeamAboutGuestMessage } from "@/lib/support-alerts";
+import { readSupportAttachments, saveSupportAttachment, supportAttachmentConstraints, validateSupportAttachment } from "@/lib/support-attachments";
 
 const guestCreateSchema = z.object({
   body: z.string().trim().min(2).max(3000),
@@ -18,6 +19,17 @@ const guestCreateSchema = z.object({
 
 function isRu(request: NextRequest) {
   return request.nextUrl.searchParams.get("lang") !== "en";
+}
+
+function readText(formData: FormData, key: string) {
+  const value = formData.get(key);
+  return typeof value === "string" ? value : "";
+}
+
+function readUploadedFiles(formData: FormData, key: string) {
+  return formData
+    .getAll(key)
+    .filter((value): value is File => value instanceof File && value.size > 0);
 }
 
 export async function GET(request: NextRequest) {
@@ -59,6 +71,10 @@ export async function GET(request: NextRequest) {
       contact: thread.contact,
       email: thread.email,
       messages: thread.messages.map((message) => ({
+        attachments: readSupportAttachments(message.attachments).map((attachment, index) => ({
+          href: `/api/support/guest/messages/${message.id}/attachments/${index}?token=${encodeURIComponent(thread.publicToken)}`,
+          name: attachment.name
+        })),
         body: message.body,
         createdAt: message.createdAt.toISOString(),
         id: message.id,
@@ -88,7 +104,20 @@ export async function POST(request: NextRequest) {
     return rateLimitResponse(localeRu, rateLimit.retryAfterSeconds);
   }
 
-  const parsed = guestCreateSchema.safeParse(await request.json().catch(() => null));
+  const contentType = request.headers.get("content-type") || "";
+  const formData = contentType.includes("multipart/form-data") ? await request.formData() : null;
+  const payloadSource = formData
+    ? {
+        body: readText(formData, "body"),
+        contact: readText(formData, "contact") || undefined,
+        email: readText(formData, "email"),
+        name: readText(formData, "name"),
+        queue: readText(formData, "queue") || undefined,
+        subject: readText(formData, "subject") || undefined,
+        token: readText(formData, "token") || undefined
+      }
+    : await request.json().catch(() => null);
+  const parsed = guestCreateSchema.safeParse(payloadSource);
 
   if (!parsed.success) {
     return NextResponse.json(
@@ -98,6 +127,40 @@ export async function POST(request: NextRequest) {
       },
       { status: 400 }
     );
+  }
+
+  const uploads = formData ? readUploadedFiles(formData, "attachments") : [];
+  const { maxCount } = supportAttachmentConstraints();
+
+  if (uploads.length > maxCount) {
+    return NextResponse.json(
+      {
+        title: localeRu ? "Слишком много файлов" : "Too many files",
+        message: localeRu ? `Можно прикрепить до ${maxCount} файлов к одному сообщению.` : `You can attach up to ${maxCount} files to one message.`
+      },
+      { status: 400 }
+    );
+  }
+
+  for (const file of uploads) {
+    const error = validateSupportAttachment(file);
+
+    if (error) {
+      return NextResponse.json(
+        {
+          title: localeRu ? "Проверьте вложения" : "Check attachments",
+          message:
+            error === "size"
+              ? localeRu
+                ? "Каждый файл должен быть не больше 12 МБ."
+                : "Each file must be no larger than 12 MB."
+              : localeRu
+                ? "Поддерживаются PDF, DOC, DOCX, JPG, PNG, WEBP и TXT."
+                : "Supported formats are PDF, DOC, DOCX, JPG, PNG, WEBP and TXT."
+        },
+        { status: 400 }
+      );
+    }
   }
 
   const token = parsed.data.token;
@@ -130,9 +193,12 @@ export async function POST(request: NextRequest) {
         }
       }));
 
+    const attachments = uploads.length ? await Promise.all(uploads.map((file) => saveSupportAttachment(file, thread.id))) : [];
+
     await tx.guestSupportMessage.create({
       data: {
         body: parsed.data.body,
+        attachments: attachments.length ? attachments : undefined,
         senderKind: "guest",
         senderName: parsed.data.name,
         threadId: thread.id
@@ -195,6 +261,10 @@ export async function POST(request: NextRequest) {
           contact: thread.contact,
           email: thread.email,
           messages: thread.messages.map((message) => ({
+            attachments: readSupportAttachments(message.attachments).map((attachment, index) => ({
+              href: `/api/support/guest/messages/${message.id}/attachments/${index}?token=${encodeURIComponent(thread.publicToken)}`,
+              name: attachment.name
+            })),
             body: message.body,
             createdAt: message.createdAt.toISOString(),
             id: message.id,

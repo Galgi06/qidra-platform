@@ -1,0 +1,15 @@
+ALTER TABLE "ProjectDividendPeriod"
+ADD COLUMN "calculationMode" TEXT NOT NULL DEFAULT 'PROJECT_PROFIT',
+ADD COLUMN "companyProfitUsdt" DECIMAL(18, 6) NOT NULL DEFAULT 0,
+ADD COLUMN "roundingDifferenceUsdt" DECIMAL(18, 6) NOT NULL DEFAULT 0,
+ADD COLUMN "profitAccrualStartAt" TIMESTAMP(3),
+ADD COLUMN "draftVersion" INTEGER NOT NULL DEFAULT 1,
+ADD COLUMN "algorithmVersion" TEXT,
+ADD COLUMN "calculationSnapshot" JSONB,
+ADD COLUMN "calculatedAt" TIMESTAMP(3),
+ADD COLUMN "cancelledAt" TIMESTAMP(3);
+
+ALTER TABLE "DividendPayment"
+ADD COLUMN "rawAmountUsdt" DECIMAL(18, 6) NOT NULL DEFAULT 0,
+ADD COLUMN "sharePercent" DECIMAL(18, 6) NOT NULL DEFAULT 0,
+ADD COLUMN "eligibleStartAt" TIMESTAMP(3);
