@@ -22,6 +22,12 @@ const optionalText = z.preprocess((value) => {
 const meaningfulText = (min = 2, max = 5000, minLetters = min) => z.string().trim().min(min).max(max).refine((value) => isMeaningfulText(value, { allowDigits: true, minLetters }));
 const detailedText = (min = 20, max = 100000, minLetters = 12, minWords = 6) => z.string().trim().min(min).max(max).refine((value) => isDetailedText(value, { minLetters, minWords }));
 const plainText = (min = 2, max = 5000) => z.string().trim().min(min).max(max);
+const optionalEnumValue = <T extends readonly [string, ...string[]]>(values: T) =>
+  z.preprocess((value) => {
+    if (typeof value !== "string") return undefined;
+    const trimmed = value.trim();
+    return trimmed ? trimmed : undefined;
+  }, z.enum(values).optional());
 
 const dateSchema = z.preprocess((value) => {
   if (typeof value !== "string" || !value.trim()) return value;
@@ -59,8 +65,8 @@ const projectSubmissionSchema = z.object({
   propertyCity: optionalText,
   propertyDistrict: optionalText,
   propertyAddress: z.string().trim().max(240).optional(),
-  propertyType: z.enum(propertyTypeOptions).optional(),
-  propertyStatus: z.enum(propertyStatusOptions).optional(),
+  propertyType: optionalEnumValue(propertyTypeOptions),
+  propertyStatus: optionalEnumValue(propertyStatusOptions),
   propertyShortDescription: z.string().trim().max(300).optional(),
   propertyFullDescription: z.string().trim().max(100000).optional(),
   propertyVehicleName: optionalText,
