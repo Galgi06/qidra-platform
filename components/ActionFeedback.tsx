@@ -625,6 +625,7 @@ function collectDraftSnapshot(form: HTMLFormElement) {
   for (const element of Array.from(form.elements)) {
     if (!(element instanceof HTMLInputElement || element instanceof HTMLSelectElement || element instanceof HTMLTextAreaElement)) continue;
     if (!element.name) continue;
+    if (element.dataset.draftIgnore === "true") continue;
     if (element instanceof HTMLInputElement && ["file", "password", "submit", "button", "reset"].includes(element.type)) continue;
 
     const key = draftFieldKey(element);
@@ -649,6 +650,7 @@ function applyDraftSnapshot(form: HTMLFormElement, snapshot: DraftSnapshot) {
   for (const element of Array.from(form.elements)) {
     if (!(element instanceof HTMLInputElement || element instanceof HTMLSelectElement || element instanceof HTMLTextAreaElement)) continue;
     if (!element.name) continue;
+    if (element.dataset.draftIgnore === "true") continue;
     if (element instanceof HTMLInputElement && ["file", "password", "submit", "button", "reset"].includes(element.type)) continue;
 
     const saved = snapshot[draftFieldKey(element)];

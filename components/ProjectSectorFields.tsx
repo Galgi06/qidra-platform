@@ -63,7 +63,7 @@ export function ProjectSectorFields({
 
   return (
     <div className={`grid gap-4 ${className}`}>
-      <input name="sectorCurrent" type="hidden" value={sector} />
+      <input data-draft-ignore="true" name="sectorCurrent" type="hidden" value={sector} />
       <Select
         label={isRu ? "Отрасль" : "Sector"}
         name="sector"

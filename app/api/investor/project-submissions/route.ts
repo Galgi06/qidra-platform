@@ -99,8 +99,6 @@ const projectSubmissionSchema = z.object({
       "propertyCountry",
       "propertyCity",
       "propertyAddress",
-      "propertyType",
-      "propertyStatus",
       "propertyShortDescription",
       "propertyFullDescription",
       "propertyEstimatedAssetValue",
