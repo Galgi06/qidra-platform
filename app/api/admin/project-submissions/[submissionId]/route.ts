@@ -26,6 +26,13 @@ const optionalPreparedText = (max: number) =>
     return trimmed ? trimmed : undefined;
   }, z.string().max(max).optional());
 
+const optionalLooseText = (max: number) =>
+  z.preprocess((value) => {
+    if (typeof value !== "string") return undefined;
+    const trimmed = value.trim();
+    return trimmed ? trimmed : undefined;
+  }, z.string().max(max).optional());
+
 const optionalText = z.preprocess((value) => {
   if (typeof value !== "string") return undefined;
   const trimmed = value.trim();
@@ -49,13 +56,13 @@ const submissionActionSchema = z.discriminatedUnion("action", [
   }),
   z.object({
     action: z.literal("prepare"),
-    confirmation: z.string().trim(),
-    descriptionEn: optionalPreparedText(5000),
-    descriptionRu: optionalPreparedText(5000),
-    expectedReturnEn: optionalPreparedText(180),
-    expectedReturnRu: optionalPreparedText(180),
-    expectedYieldEn: optionalPreparedText(180),
-    expectedYieldRu: optionalPreparedText(180),
+    confirmation: optionalLooseText(120),
+    descriptionEn: optionalLooseText(100000),
+    descriptionRu: optionalLooseText(100000),
+    expectedReturnEn: optionalLooseText(500),
+    expectedReturnRu: optionalLooseText(500),
+    expectedYieldEn: optionalLooseText(500),
+    expectedYieldRu: optionalLooseText(500),
     stageRu: optionalText,
     stageEn: optionalText,
     currentProgressRu: optionalText,
@@ -64,34 +71,22 @@ const submissionActionSchema = z.discriminatedUnion("action", [
     fundraisingEndAt: optionalDate,
     plannedLaunchAt: optionalDate,
     plannedDividendAt: optionalDate,
-    payoutFrequency: z.preprocess((value) => {
-      if (typeof value !== "string") return undefined;
-      const trimmed = value.trim();
-      return trimmed ? trimmed : undefined;
-    }, z.nativeEnum(PayoutFrequency).optional()),
+    payoutFrequency: optionalLooseText(80),
     participationTermRu: optionalText,
     participationTermEn: optionalText,
     raisePlanRu: optionalText,
     raisePlanEn: optionalText,
-    location: optionalPreparedText(120),
+    location: optionalLooseText(240),
     note: noteSchema,
-    riskLevel: optionalPreparedText(80),
-    slug: optionalPreparedText(120),
-    status: z.preprocess((value) => {
-      if (typeof value !== "string") return undefined;
-      const trimmed = value.trim();
-      return trimmed ? trimmed : undefined;
-    }, z.enum(["DRAFT", "REVIEW", "ACTIVE", "PAUSED"]).optional()),
-    structure: z.preprocess((value) => {
-      if (typeof value !== "string") return undefined;
-      const trimmed = value.trim();
-      return trimmed ? trimmed : undefined;
-    }, z.enum(["Mudaraba", "Musharaka"]).optional()),
-    summaryEn: optionalPreparedText(260),
-    summaryRu: optionalPreparedText(260),
-    targetUsdt: optionalAmountSchema,
-    titleEn: optionalPreparedText(160),
-    titleRu: optionalPreparedText(160)
+    riskLevel: optionalLooseText(120),
+    slug: optionalLooseText(160),
+    status: optionalLooseText(80),
+    structure: optionalLooseText(80),
+    summaryEn: optionalLooseText(100000),
+    summaryRu: optionalLooseText(100000),
+    targetUsdt: optionalLooseText(120),
+    titleEn: optionalLooseText(240),
+    titleRu: optionalLooseText(240)
   })
 ]);
 
@@ -127,6 +122,33 @@ function normalizeSlug(value: string | undefined, fallback: string) {
     .replace(/^-+|-+$/g, "");
 
   return candidate || `project-${Date.now()}`;
+}
+
+
+function normalizeAmount(value: string | undefined, fallback: string) {
+  const raw = (value?.trim() || fallback.trim()).replace(/,/g, ".").replace(/\s/g, "");
+
+  if (/^\d+(\.\d{1,6})?$/.test(raw)) {
+    try {
+      if (new Prisma.Decimal(raw).gt(0)) return raw;
+    } catch {}
+  }
+
+  return "1";
+}
+
+function normalizeStatus(value: string | undefined): ProjectStatus {
+  return value === "DRAFT" || value === "REVIEW" || value === "ACTIVE" || value === "PAUSED" ? value : "ACTIVE";
+}
+
+function normalizeStructure(value: string | undefined) {
+  return value === "Musharaka" ? "Musharaka" : "Mudaraba";
+}
+
+function normalizePayoutFrequency(value: string | undefined) {
+  return value === PayoutFrequency.MONTHLY || value === PayoutFrequency.QUARTERLY || value === PayoutFrequency.ANNUAL || value === PayoutFrequency.CUSTOM
+    ? value
+    : PayoutFrequency.CUSTOM;
 }
 
 function readSubmissionDocuments(value: unknown): SubmissionDocument[] {
@@ -284,7 +306,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     });
   }
 
-  if (parsed.data.confirmation !== "CONFIRM") {
+  if ((parsed.data.confirmation ?? "").trim() !== "CONFIRM") {
     return NextResponse.json(
       {
         title: localeRu ? "Нужно подтверждение" : "Confirmation required",
@@ -333,10 +355,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const location = normalizePreparedText(data.location, submission.location || "UAE", 2);
   const riskLevel = normalizePreparedText(data.riskLevel, "Moderate", 2);
   const slug = normalizeSlug(data.slug, linkedProject?.slug || titleEn || titleRu || submission.title || "project");
-  const targetUsdt = data.targetUsdt ?? submission.targetUsdt?.toString() ?? linkedProject?.targetUsdt?.toString() ?? "1";
-  const projectStatus = (data.status ?? "ACTIVE") as ProjectStatus;
-  const payoutFrequency = data.payoutFrequency ?? PayoutFrequency.CUSTOM;
-  const structure = data.structure ?? "Mudaraba";
+  const targetUsdt = normalizeAmount(data.targetUsdt, submission.targetUsdt?.toString() ?? linkedProject?.targetUsdt?.toString() ?? "1");
+  const projectStatus = normalizeStatus(data.status);
+  const payoutFrequency = normalizePayoutFrequency(data.payoutFrequency);
+  const structure = normalizeStructure(data.structure);
   const submissionDocuments = readSubmissionDocuments(submission.documents);
   const existingProject = await prisma.project.findUnique({ where: { slug } });
 
