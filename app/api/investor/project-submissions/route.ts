@@ -402,9 +402,11 @@ export async function POST(request: NextRequest) {
         }
       })
     : null;
+  const submittedSector = readText(formData, "sectorCurrent") || readText(formData, "sector");
+
   const parsed = projectSubmissionSchema.safeParse({
     title: readText(formData, "title"),
-    sector: readText(formData, "sector"),
+    sector: submittedSector,
     sectorOther: readText(formData, "sectorOther"),
     location: readText(formData, "location"),
     targetUsdt: readText(formData, "targetUsdt"),
