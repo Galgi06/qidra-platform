@@ -110,6 +110,9 @@ export default async function AdminUserDetailPage({
           },
           orderBy: { createdAt: "desc" },
           take: 50
+        }).catch((error) => {
+          console.error("[admin-user-dossier] investments failed", error);
+          return [];
         })
       : Promise.resolve([]),
     needsKycData
@@ -117,6 +120,9 @@ export default async function AdminUserDetailPage({
           where: { userId },
           orderBy: { createdAt: "desc" },
           take: 8
+        }).catch((error) => {
+          console.error("[admin-user-dossier] kyc applications failed", error);
+          return [];
         })
       : Promise.resolve([]),
     needsProjectSubmissionData
@@ -124,6 +130,9 @@ export default async function AdminUserDetailPage({
           where: { userId },
           orderBy: { createdAt: "desc" },
           take: 8
+        }).catch((error) => {
+          console.error("[admin-user-dossier] project submissions failed", error);
+          return [];
         })
       : Promise.resolve([]),
     needsSupportData
@@ -151,6 +160,9 @@ export default async function AdminUserDetailPage({
             }
           },
           orderBy: { updatedAt: "desc" }
+        }).catch((error) => {
+          console.error("[admin-user-dossier] support threads failed", error);
+          return [];
         })
       : Promise.resolve([]),
     needsWalletData
@@ -175,6 +187,9 @@ export default async function AdminUserDetailPage({
               take: 80
             }
           }
+        }).catch((error) => {
+          console.error("[admin-user-dossier] wallet failed", error);
+          return null;
         })
       : Promise.resolve(null)
   ]);
@@ -210,6 +225,9 @@ export default async function AdminUserDetailPage({
           },
           orderBy: { createdAt: "desc" },
           take: 14
+        }).catch((error) => {
+          console.error("[admin-user-dossier] audit logs failed", error);
+          return [];
         })
       : [];
 
