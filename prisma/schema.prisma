@@ -36,6 +36,7 @@ enum InvestmentStatus {
   CONFIRMED
   REJECTED
   CANCELLED
+  CLOSED
 }
 
 enum PaymentStatus {
@@ -480,6 +481,8 @@ model InvestmentApplication {
   status             InvestmentStatus @default(PENDING)
   termsAcceptedAt    DateTime?
   contractAcceptedAt DateTime?
+  closedAt           DateTime?
+  closeReason        String?          @db.Text
   contactDetails     Json?
   adminNote          String?
   createdAt          DateTime         @default(now())

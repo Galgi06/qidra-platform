@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DividendPaymentStatus, DividendPeriodStatus, InvestmentStatus, PaymentStatus, TransactionType } from "@prisma/client";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { FeedbackForm } from "@/components/ActionFeedback";
 import { DocumentItem } from "@/components/DocumentItem";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
@@ -289,6 +290,13 @@ export default async function InvestorContractPage({
                   </div>
                   <InfoBlock label={isRu ? "ID заявки" : "Application ID"} value={application.id} />
                   <InfoBlock label={isRu ? "Согласие с условиями" : "Terms accepted"} value={application.termsAcceptedAt ? formatDateTime(application.termsAcceptedAt, locale) : null} />
+                  {application.status === InvestmentStatus.CLOSED ? (
+                    <>
+                      <InfoBlock label={isRu ? "Дата закрытия" : "Closure date"} value={application.closedAt ? formatDateTime(application.closedAt, locale) : null} />
+                      <InfoBlock label={isRu ? "Причина закрытия" : "Closure reason"} value={application.closeReason} />
+                    </>
+                  ) : null}
+                  {application.status === InvestmentStatus.CONFIRMED ? <CloseContractForm applicationId={application.id} locale={locale} /> : null}
                 </Panel>
 
                 <Panel title={isRu ? "История операций" : "Operation history"}>
@@ -357,6 +365,38 @@ function InfoBlock({ label, value }: { label: string; value: string | null | und
   );
 }
 
+function CloseContractForm({ applicationId, locale }: { applicationId: string; locale: "ru" | "en" }) {
+  return (
+    <FeedbackForm
+      className="contents"
+      confirm={{
+        title: locale === "ru" ? "Закрыть контракт?" : "Close contract?",
+        text:
+          locale === "ru"
+            ? "После закрытия сумма контракта будет возвращена на доступный баланс. Повторно открыть этот контракт нельзя."
+            : "After closure, the contract amount will be returned to the available balance. This contract cannot be reopened.",
+        confirmLabel: locale === "ru" ? "Закрыть контракт" : "Close contract",
+        cancelLabel: locale === "ru" ? "Отмена" : "Cancel",
+        tone: "warning"
+      }}
+      endpoint={`/api/investments/${applicationId}?lang=${locale}`}
+      feedback={{
+        title: locale === "ru" ? "Контракт закрыт" : "Contract closed",
+        text: locale === "ru" ? "Сумма контракта возвращена на доступный баланс." : "The contract amount was returned to your available balance.",
+        buttonLabel: locale === "ru" ? "Понятно" : "Got it",
+        dismissLabel: locale === "ru" ? "Закрыть уведомление" : "Close notification",
+        tone: "success"
+      }}
+      refreshOnSuccess
+    >
+      <input name="action" type="hidden" value="close" />
+      <button className="inline-flex h-11 items-center justify-center rounded-qidra border border-qidra-grayMedium bg-white px-5 text-14 font-medium text-qidra-dark transition-colors hover:border-qidra-red hover:text-qidra-red" type="submit">
+        {locale === "ru" ? "Закрыть контракт" : "Close contract"}
+      </button>
+    </FeedbackForm>
+  );
+}
+
 function sumUsdt(values: Array<{ toString(): string }>) {
   return values.reduce<number>((sum, value) => sum + Number(value.toString()), 0);
 }
@@ -367,6 +407,7 @@ function localizedText(ru: string | null | undefined, en: string | null | undefi
 
 function investmentStatusLabel(status: InvestmentStatus, locale: "ru" | "en") {
   if (status === InvestmentStatus.CONFIRMED) return locale === "ru" ? "Активирован" : "Activated";
+  if (status === InvestmentStatus.CLOSED) return locale === "ru" ? "Закрыт" : "Closed";
   if (status === InvestmentStatus.REJECTED) return locale === "ru" ? "Отклонён" : "Rejected";
   if (status === InvestmentStatus.CANCELLED) return locale === "ru" ? "Отменён" : "Cancelled";
   return locale === "ru" ? "На проверке" : "Under review";
@@ -375,20 +416,20 @@ function investmentStatusLabel(status: InvestmentStatus, locale: "ru" | "en") {
 function investmentTone(status: InvestmentStatus): "danger" | "neutral" | "success" | "warning" {
   if (status === InvestmentStatus.CONFIRMED) return "success";
   if (status === InvestmentStatus.REJECTED) return "danger";
-  if (status === InvestmentStatus.CANCELLED) return "neutral";
+  if (status === InvestmentStatus.CANCELLED || status === InvestmentStatus.CLOSED) return "neutral";
   return "warning";
 }
 
 function investmentBadgeStatus(status: InvestmentStatus): BadgeStatus {
   if (status === InvestmentStatus.CONFIRMED) return "confirmed";
-  if (status === InvestmentStatus.REJECTED || status === InvestmentStatus.CANCELLED) return "rejected";
+  if (status === InvestmentStatus.REJECTED || status === InvestmentStatus.CANCELLED || status === InvestmentStatus.CLOSED) return "rejected";
   return "pending";
 }
 
 function transactionTitle(type: TransactionType, locale: "ru" | "en") {
   if (type === TransactionType.WITHDRAWAL) return locale === "ru" ? "Вывод" : "Withdrawal";
   if (type === TransactionType.INVESTMENT) return locale === "ru" ? "Участие" : "Participation";
-  if (type === TransactionType.RETURN) return locale === "ru" ? "Начисление" : "Accrual";
+  if (type === TransactionType.RETURN) return locale === "ru" ? "Возврат / начисление" : "Return / accrual";
   if (type === TransactionType.ADJUSTMENT) return locale === "ru" ? "Корректировка" : "Adjustment";
   return locale === "ru" ? "Пополнение" : "Deposit";
 }

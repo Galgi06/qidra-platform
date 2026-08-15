@@ -121,6 +121,7 @@ export default async function InvestmentsPage({ searchParams }: { searchParams?:
                         <ButtonLink href={withLocale(`/projects/${application.project.slug}`, locale)} variant="outline" size="sm">
                           {isRu ? "Страница проекта" : "Project page"}
                         </ButtonLink>
+                        {application.status === InvestmentStatus.CONFIRMED ? <CloseContractForm applicationId={application.id} locale={locale} /> : null}
                       </div>
                       {balanceWarning ? (
                         <div className="mt-5 grid gap-3 rounded-qidra border border-qidra-gold bg-yellow-50 p-4 lg:grid-cols-[1fr_auto_auto] lg:items-center">
@@ -211,6 +212,7 @@ function SummaryCard({ label, tone = "default", value }: { label: string; tone?:
 
 type ApplicationStats = {
   cancelledCount: number;
+  closedCount: number;
   confirmedCount: number;
   pendingCount: number;
   rejectedCount: number;
@@ -235,6 +237,9 @@ function InvestmentFilters({ locale, stats, statusFilter }: { locale: "ru" | "en
         </InvestmentFilterPill>
         <InvestmentFilterPill active={statusFilter === InvestmentStatus.CONFIRMED} href={investmentFilterHref(locale, InvestmentStatus.CONFIRMED)}>
           {locale === "ru" ? "Подтверждено" : "Confirmed"} ({formatCount(stats.confirmedCount)})
+        </InvestmentFilterPill>
+        <InvestmentFilterPill active={statusFilter === InvestmentStatus.CLOSED} href={investmentFilterHref(locale, InvestmentStatus.CLOSED)}>
+          {locale === "ru" ? "Закрыто" : "Closed"} ({formatCount(stats.closedCount)})
         </InvestmentFilterPill>
         <InvestmentFilterPill active={statusFilter === InvestmentStatus.REJECTED} href={investmentFilterHref(locale, InvestmentStatus.REJECTED)}>
           {locale === "ru" ? "Отклонено" : "Rejected"} ({formatCount(stats.rejectedCount)})
@@ -282,9 +287,41 @@ function CancelApplicationForm({ applicationId, locale }: { applicationId: strin
   );
 }
 
+function CloseContractForm({ applicationId, locale }: { applicationId: string; locale: "ru" | "en" }) {
+  return (
+    <FeedbackForm
+      className="contents"
+      confirm={{
+        title: locale === "ru" ? "Закрыть контракт?" : "Close contract?",
+        text:
+          locale === "ru"
+            ? "После закрытия сумма контракта будет возвращена на доступный баланс. Повторно открыть этот контракт нельзя."
+            : "After closure, the contract amount will be returned to the available balance. This contract cannot be reopened.",
+        confirmLabel: locale === "ru" ? "Закрыть контракт" : "Close contract",
+        cancelLabel: locale === "ru" ? "Отмена" : "Cancel",
+        tone: "warning"
+      }}
+      endpoint={`/api/investments/${applicationId}?lang=${locale}`}
+      feedback={{
+        title: locale === "ru" ? "Контракт закрыт" : "Contract closed",
+        text: locale === "ru" ? "Сумма контракта возвращена на доступный баланс." : "The contract amount was returned to your available balance.",
+        buttonLabel: locale === "ru" ? "Понятно" : "Got it",
+        dismissLabel: locale === "ru" ? "Закрыть уведомление" : "Close notification",
+        tone: "success"
+      }}
+      refreshOnSuccess
+    >
+      <input name="action" type="hidden" value="close" />
+      <button className="inline-flex h-10 items-center justify-center rounded-qidra border border-qidra-grayMedium bg-white px-4 text-14 font-medium text-qidra-dark transition-colors hover:border-qidra-red hover:text-qidra-red" type="submit">
+        {locale === "ru" ? "Закрыть контракт" : "Close contract"}
+      </button>
+    </FeedbackForm>
+  );
+}
+
 function investmentStatus(status: string): BadgeStatus {
   if (status === InvestmentStatus.CONFIRMED) return "confirmed";
-  if (status === InvestmentStatus.REJECTED || status === InvestmentStatus.CANCELLED) return "rejected";
+  if (status === InvestmentStatus.REJECTED || status === InvestmentStatus.CANCELLED || status === InvestmentStatus.CLOSED) return "rejected";
   return "pending";
 }
 
@@ -312,6 +349,7 @@ function buildApplicationStats(applications: Array<{ status: InvestmentStatus }>
 
       if (application.status === InvestmentStatus.PENDING) stats.pendingCount += 1;
       if (application.status === InvestmentStatus.CONFIRMED) stats.confirmedCount += 1;
+      if (application.status === InvestmentStatus.CLOSED) stats.closedCount += 1;
       if (application.status === InvestmentStatus.REJECTED) stats.rejectedCount += 1;
       if (application.status === InvestmentStatus.CANCELLED) stats.cancelledCount += 1;
 
@@ -319,6 +357,7 @@ function buildApplicationStats(applications: Array<{ status: InvestmentStatus }>
     },
     {
       cancelledCount: 0,
+      closedCount: 0,
       confirmedCount: 0,
       pendingCount: 0,
       rejectedCount: 0,
@@ -366,6 +405,7 @@ function parseInvestmentStatus(value: string | undefined) {
 
   if (normalized === InvestmentStatus.PENDING) return InvestmentStatus.PENDING;
   if (normalized === InvestmentStatus.CONFIRMED) return InvestmentStatus.CONFIRMED;
+  if (normalized === InvestmentStatus.CLOSED) return InvestmentStatus.CLOSED;
   if (normalized === InvestmentStatus.REJECTED) return InvestmentStatus.REJECTED;
   if (normalized === InvestmentStatus.CANCELLED) return InvestmentStatus.CANCELLED;
   return undefined;

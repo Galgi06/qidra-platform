@@ -1,4 +1,4 @@
-import { InvestmentStatus } from "@prisma/client";
+import { InvestmentStatus, PaymentStatus, TransactionType } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
@@ -6,7 +6,8 @@ import { authOptions } from "@/lib/next-auth";
 import { prisma } from "@/lib/prisma";
 
 const applicationActionSchema = z.object({
-  action: z.literal("cancel")
+  action: z.enum(["cancel", "close"]),
+  reason: z.string().trim().max(500).optional()
 });
 
 type SessionUser = {
@@ -40,13 +41,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json(
       {
         title: localeRu ? "Проверьте действие" : "Check the action",
-        message: localeRu ? "Эта операция поддерживает только отмену заявки." : "This operation only supports application cancellation."
+        message: localeRu ? "Эта операция поддерживает отмену заявки или закрытие контракта." : "This operation supports application cancellation or contract closure."
       },
       { status: 400 }
     );
   }
 
   const { applicationId } = await params;
+  const action = parsed.data.action;
   const application = await prisma.investmentApplication.findFirst({
     where: {
       id: applicationId,
@@ -63,6 +65,100 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       },
       { status: 404 }
     );
+  }
+
+  if (action === "close") {
+    if (application.status !== InvestmentStatus.CONFIRMED) {
+      return NextResponse.json(
+        {
+          title: localeRu ? "Контракт нельзя закрыть" : "Contract cannot be closed",
+          message: localeRu ? "Закрыть можно только активированный контракт." : "Only an activated contract can be closed."
+        },
+        { status: 409 }
+      );
+    }
+
+    const returnedUsdt = application.amountUsdt;
+    const closedAt = new Date();
+    const closeReason = parsed.data.reason || (localeRu ? "Закрыто участником" : "Closed by participant");
+
+    try {
+      await prisma.$transaction(async (tx) => {
+        const closeUpdate = await tx.investmentApplication.updateMany({
+          where: {
+            id: application.id,
+            userId,
+            status: InvestmentStatus.CONFIRMED
+          },
+          data: {
+            status: InvestmentStatus.CLOSED,
+            reservedUsdt: 0,
+            closedAt,
+            closeReason,
+            adminNote: closeReason
+          }
+        });
+
+        if (closeUpdate.count !== 1) {
+          throw new Error("contract_already_closed");
+        }
+
+        const wallet = application.user.wallet
+          ? await tx.wallet.update({
+              where: { id: application.user.wallet.id },
+              data: {
+                availableUsdt: { increment: returnedUsdt }
+              }
+            })
+          : await tx.wallet.create({
+              data: {
+                userId,
+                availableUsdt: returnedUsdt
+              }
+            });
+
+        await tx.walletTransaction.create({
+          data: {
+            walletId: wallet.id,
+            type: TransactionType.RETURN,
+            status: PaymentStatus.CONFIRMED,
+            amountUsdt: returnedUsdt,
+            note: `${application.id} · contract principal returned`
+          }
+        });
+
+        await tx.adminAuditLog.create({
+          data: {
+            actorId: userId,
+            action: "investment.contract.close",
+            entityType: "InvestmentApplication",
+            entityId: application.id,
+            payload: {
+              amountUsdt: returnedUsdt.toString(),
+              projectId: application.projectId,
+              reason: closeReason
+            }
+          }
+        });
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message === "contract_already_closed") {
+        return NextResponse.json(
+          {
+            title: localeRu ? "Контракт уже обработан" : "Contract already processed",
+            message: localeRu ? "Обновите страницу и проверьте актуальный статус контракта." : "Refresh the page and check the current contract status."
+          },
+          { status: 409 }
+        );
+      }
+
+      throw error;
+    }
+
+    return NextResponse.json({
+      title: localeRu ? "Контракт закрыт" : "Contract closed",
+      message: localeRu ? "Сумма контракта возвращена на доступный баланс." : "The contract amount was returned to your available balance."
+    });
   }
 
   if (application.status !== InvestmentStatus.PENDING) {
