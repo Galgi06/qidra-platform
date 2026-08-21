@@ -42,6 +42,8 @@ export type TronDepositScanResult =
   | { status: "unconfigured" }
   | { status: "network_error" };
 
+export type WithdrawalPayoutSource = "qidra_wallet" | "exchange";
+
 function configuredValue(value: string | undefined) {
   const cleaned = value?.trim();
   return cleaned && !cleaned.toLowerCase().includes("replace-with") ? cleaned : "";
@@ -114,11 +116,17 @@ export async function verifyTrc20Deposit(txHash: string, expectedAmount: Prisma.
   }
 }
 
-export async function verifyTrc20Withdrawal(txHash: string, expectedAmount: Prisma.Decimal, expectedRecipientAddress?: string | null): Promise<TronVerificationResult> {
+export async function verifyTrc20Withdrawal(
+  txHash: string,
+  expectedAmount: Prisma.Decimal,
+  expectedRecipientAddress?: string | null,
+  payoutSource: WithdrawalPayoutSource = "qidra_wallet"
+): Promise<TronVerificationResult> {
   const config = getTronPaymentConfig();
   const recipientAddress = expectedRecipientAddress?.trim();
+  const requiresQidraSource = payoutSource === "qidra_wallet";
 
-  if (!config.apiKey || !config.walletAddress || !recipientAddress) {
+  if (!config.apiKey || !recipientAddress || (requiresQidraSource && !config.walletAddress)) {
     return { status: "unconfigured", verified: false };
   }
 
@@ -137,7 +145,7 @@ export async function verifyTrc20Withdrawal(txHash: string, expectedAmount: Pris
       return { status: "mismatch", verified: false, reason: "recipient", transfer };
     }
 
-    if (transfer.fromAddress !== config.walletAddress) {
+    if (requiresQidraSource && transfer.fromAddress !== config.walletAddress) {
       return { status: "mismatch", verified: false, reason: "source", transfer };
     }
 

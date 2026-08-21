@@ -10,6 +10,7 @@ import { verifyTrc20Withdrawal } from "@/lib/trongrid";
 const paymentActionSchema = z.object({
   action: z.enum(["confirm", "reject"]),
   note: z.string().trim().max(300).optional(),
+  payoutSource: z.enum(["qidra_wallet", "exchange"]).optional(),
   txHash: z.string().trim().optional()
 });
 
@@ -93,12 +94,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   const nextStatus = parsed.data.action === "confirm" ? PaymentStatus.CONFIRMED : PaymentStatus.REJECTED;
   const outgoingTxHash = parsed.data.txHash?.trim().toLowerCase() || undefined;
+  const payoutSource = parsed.data.payoutSource === "exchange" ? "exchange" : "qidra_wallet";
   const auditPayload: Prisma.InputJsonObject = {
     type: transaction.type,
     status: nextStatus,
     amountUsdt: transaction.amountUsdt.toString(),
     ...(transaction.destinationAddress ? { destinationAddress: transaction.destinationAddress } : {}),
     ...(outgoingTxHash ? { txHash: outgoingTxHash } : {}),
+    ...(transaction.type === TransactionType.WITHDRAWAL && nextStatus === PaymentStatus.CONFIRMED ? { payoutSource } : {}),
     ...(parsed.data.note ? { note: parsed.data.note } : {})
   };
 
@@ -138,7 +141,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return duplicateHashResponse(localeRu);
     }
 
-    const verification = await verifyTrc20Withdrawal(outgoingTxHash, transaction.amountUsdt, transaction.destinationAddress);
+    const verification = await verifyTrc20Withdrawal(outgoingTxHash, transaction.amountUsdt, transaction.destinationAddress, payoutSource);
 
     if (verification.status === "unconfigured") {
       return NextResponse.json(
@@ -146,8 +149,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           title: localeRu ? "Автопроверка вывода не настроена" : "Withdrawal auto verification is not configured",
           message:
             localeRu
-              ? "Для подтверждения вывода нужны TRONGRID_API_KEY и QIDRA_TRON_WALLET_ADDRESS в переменных окружения."
-              : "TRONGRID_API_KEY and QIDRA_TRON_WALLET_ADDRESS environment variables are required before confirming withdrawals."
+              ? payoutSource === "exchange"
+                ? "Для подтверждения вывода через биржу нужны TRONGRID_API_KEY и адрес получателя в заявке."
+                : "Для подтверждения вывода нужны TRONGRID_API_KEY и QIDRA_TRON_WALLET_ADDRESS в переменных окружения."
+              : payoutSource === "exchange"
+                ? "TRONGRID_API_KEY and the request recipient address are required before confirming exchange payouts."
+                : "TRONGRID_API_KEY and QIDRA_TRON_WALLET_ADDRESS environment variables are required before confirming withdrawals."
         },
         { status: 503 }
       );
@@ -254,7 +261,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   return NextResponse.json({
     title: responseTitle(transaction.type, nextStatus, localeRu),
-    message: responseMessage(transaction.type, nextStatus, localeRu)
+    message: responseMessage(transaction.type, nextStatus, localeRu, payoutSource)
   });
 }
 
@@ -357,8 +364,14 @@ function responseTitle(type: TransactionType, status: PaymentStatus, localeRu: b
       : "Payment rejected";
 }
 
-function responseMessage(type: TransactionType, status: PaymentStatus, localeRu: boolean) {
+function responseMessage(type: TransactionType, status: PaymentStatus, localeRu: boolean, payoutSource?: "qidra_wallet" | "exchange") {
   if (type === TransactionType.WITHDRAWAL && status === PaymentStatus.CONFIRMED) {
+    if (payoutSource === "exchange") {
+      return localeRu
+        ? "Hash, USDT TRC20, адрес получателя и сумма совпали. Источник отправки отмечен как биржа; кошелёк отправителя Qidra не сверялся."
+        : "Hash, USDT TRC20, recipient and amount matched. The source is marked as an exchange payout; the Qidra sender wallet was not matched.";
+    }
+
     return localeRu
       ? "Сумма окончательно списана с ожидающего баланса участника."
       : "The amount was permanently deducted from the participant's pending balance.";

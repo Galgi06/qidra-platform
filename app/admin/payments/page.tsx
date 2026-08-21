@@ -444,13 +444,31 @@ function PaymentActionForm({ action, endpoint, locale, type }: { action: "confir
     >
       <input name="action" type="hidden" value={action} />
       {confirm && withdrawal ? (
-        <Input
-          label={locale === "ru" ? "Hash отправки" : "Outgoing hash"}
-          name="txHash"
-          pattern="[a-fA-F0-9]{64}"
-          placeholder={locale === "ru" ? "64 символа TRON transaction hash" : "64-character TRON transaction hash"}
-          required
-        />
+        <>
+          <label className="grid gap-2 text-14 font-medium text-qidra-dark">
+            {locale === "ru" ? "Режим отправки" : "Payout mode"}
+            <select
+              className="h-11 rounded-qidra border border-qidra-grayLight bg-white px-3 text-14 text-qidra-dark outline-none transition-colors focus:border-qidra-accent"
+              name="payoutSource"
+              defaultValue="qidra_wallet"
+            >
+              <option value="qidra_wallet">{locale === "ru" ? "Отправлено с кошелька Qidra" : "Sent from Qidra wallet"}</option>
+              <option value="exchange">{locale === "ru" ? "Отправлено через биржу / exchange payout" : "Sent via exchange payout"}</option>
+            </select>
+          </label>
+          <p className="text-12 leading-relaxed text-qidra-grayBlue">
+            {locale === "ru"
+              ? "Для KuCoin или другой биржи выберите exchange payout: система проверит hash, USDT TRC20, адрес получателя и сумму без сверки кошелька отправителя."
+              : "For KuCoin or another exchange, choose exchange payout: the system will verify the hash, USDT TRC20, recipient and amount without matching the sender wallet."}
+          </p>
+          <Input
+            label={locale === "ru" ? "Hash отправки" : "Outgoing hash"}
+            name="txHash"
+            pattern="[a-fA-F0-9]{64}"
+            placeholder={locale === "ru" ? "64 символа TRON transaction hash" : "64-character TRON transaction hash"}
+            required
+          />
+        </>
       ) : null}
       <ButtonLike confirm={confirm} locale={locale} />
     </FeedbackForm>
