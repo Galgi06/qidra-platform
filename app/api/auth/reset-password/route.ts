@@ -4,7 +4,7 @@ import { z } from "zod";
 import { isStrongPassword, passwordPolicyDescription } from "@/lib/password-policy";
 import { prisma } from "@/lib/prisma";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
-import { hashToken } from "@/lib/tokens";
+import { expiresInMinutes, hashToken } from "@/lib/tokens";
 
 const resetPasswordSchema = z.object({
   email: z.string().trim().email().max(255),
@@ -47,6 +47,26 @@ function resetPasswordFieldErrors(localeRu: boolean, error: z.ZodError) {
   return Object.keys(nextFieldErrors).length ? nextFieldErrors : undefined;
 }
 
+function resetSuccessResponse(localeRu: boolean) {
+  return NextResponse.json({
+    title: localeRu ? "Пароль обновлен" : "Password updated",
+    message: localeRu ? "Теперь вы можете войти в Qidra с новым паролем." : "You can now sign in to Qidra with your new password.",
+    redirectTo: `/auth/sign-in?lang=${localeRu ? "ru" : "en"}`
+  });
+}
+
+function invalidLinkResponse(localeRu: boolean) {
+  return NextResponse.json(
+    {
+      title: localeRu ? "Ссылка недействительна" : "Invalid link",
+      message: localeRu
+        ? "Ссылка восстановления недействительна или уже была использована. Запросите новую ссылку и откройте только последнее письмо."
+        : "The reset link is invalid or has already been used. Request a new link and open only the latest email."
+    },
+    { status: 400 }
+  );
+}
+
 export async function POST(request: NextRequest) {
   const localeRu = isRu(request);
   const parsed = resetPasswordSchema.safeParse(await request.json().catch(() => null));
@@ -76,25 +96,17 @@ export async function POST(request: NextRequest) {
 
   const tokenHash = hashToken(parsed.data.token);
   const identifier = `password-reset:${email}`;
+  const usedIdentifier = `password-reset-used:${email}`;
   const verificationToken = await prisma.verificationToken.findUnique({
-    where: {
-      identifier_token: {
-        identifier,
-        token: tokenHash
-      }
-    }
+    where: { token: tokenHash }
   });
 
-  if (!verificationToken || verificationToken.expires < new Date()) {
-    return NextResponse.json(
-      {
-        title: localeRu ? "Ссылка недействительна" : "Invalid link",
-        message: localeRu
-          ? "Ссылка восстановления недействительна или уже была использована. Запросите новую ссылку и откройте только последнее письмо."
-          : "The reset link is invalid or has already been used. Request a new link and open only the latest email."
-      },
-      { status: 400 }
-    );
+  if (verificationToken?.identifier === usedIdentifier && verificationToken.expires >= new Date()) {
+    return resetSuccessResponse(localeRu);
+  }
+
+  if (!verificationToken || verificationToken.identifier !== identifier || verificationToken.expires < new Date()) {
+    return invalidLinkResponse(localeRu);
   }
 
   const existingUser = await prisma.user.findUnique({
@@ -117,21 +129,43 @@ export async function POST(request: NextRequest) {
 
   const passwordHash = await bcrypt.hash(parsed.data.password, 12);
 
-  await prisma.$transaction([
-    prisma.user.update({
-      where: { email },
-      data: {
-        passwordHash,
-        emailVerified: existingUser.emailVerified ?? new Date()
-      }
-    }),
-    prisma.verificationToken.delete({
-      where: { token: tokenHash }
-    })
-  ]);
+  try {
+    await prisma.$transaction(async (tx) => {
+      const claimedToken = await tx.verificationToken.updateMany({
+        where: {
+          expires: { gte: new Date() },
+          identifier,
+          token: tokenHash
+        },
+        data: {
+          expires: expiresInMinutes(5),
+          identifier: usedIdentifier
+        }
+      });
 
-  return NextResponse.json({
-    title: localeRu ? "Пароль обновлен" : "Password updated",
-    message: localeRu ? "Теперь вы можете войти в Qidra с новым паролем." : "You can now sign in to Qidra with your new password."
-  });
+      if (claimedToken.count !== 1) {
+        throw new Error("password_reset_token_already_claimed");
+      }
+
+      await tx.user.update({
+        where: { email },
+        data: {
+          passwordHash,
+          emailVerified: existingUser.emailVerified ?? new Date()
+        }
+      });
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message === "password_reset_token_already_claimed") {
+      const claimedToken = await prisma.verificationToken.findUnique({ where: { token: tokenHash } });
+
+      if (claimedToken?.identifier === usedIdentifier && claimedToken.expires >= new Date()) {
+        return resetSuccessResponse(localeRu);
+      }
+    }
+
+    throw error;
+  }
+
+  return resetSuccessResponse(localeRu);
 }

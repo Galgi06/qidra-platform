@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ComponentProps, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ComponentProps, type FormEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 
@@ -175,6 +175,7 @@ export function FeedbackForm({
   const [activeFeedback, setActiveFeedback] = useState(feedback);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const submissionInFlightRef = useRef(false);
   const pendingFormRef = useState(() => ({ current: null as HTMLFormElement | null }))[0];
   const pendingSubmitterRef = useState(() => ({ current: null as { name: string; value: string } | null }))[0];
   const formRef = useState(() => ({ current: null as HTMLFormElement | null }))[0];
@@ -251,6 +252,9 @@ export function FeedbackForm({
 
   async function submitForm(form: HTMLFormElement, submitter: { name: string; value: string } | null) {
     if (endpoint) {
+      if (submissionInFlightRef.current) return;
+
+      submissionInFlightRef.current = true;
       setSubmitting(true);
       clearFieldErrors(form);
 
@@ -335,6 +339,7 @@ export function FeedbackForm({
         setOpen(true);
         return;
       } finally {
+        submissionInFlightRef.current = false;
         setSubmitting(false);
       }
     } else {

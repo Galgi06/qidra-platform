@@ -53,13 +53,14 @@ export async function POST(request: NextRequest) {
 
   const rawToken = createRawToken();
   const identifier = `password-reset:${email}`;
+  const usedIdentifier = `password-reset-used:${email}`;
   const resetUrl = new URL("/auth/reset-password", getAppBaseUrl());
   resetUrl.searchParams.set("email", email);
   resetUrl.searchParams.set("token", rawToken);
   resetUrl.searchParams.set("lang", localeRu ? "ru" : "en");
 
   await prisma.$transaction([
-    prisma.verificationToken.deleteMany({ where: { identifier } }),
+    prisma.verificationToken.deleteMany({ where: { identifier: { in: [identifier, usedIdentifier] } } }),
     prisma.verificationToken.create({
       data: {
         identifier,
