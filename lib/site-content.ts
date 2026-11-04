@@ -308,8 +308,7 @@ const defaultSiteContent: SiteContentSnapshot = {
       whatsapp: "#"
     },
     projectLinks: [
-      { href: "/projects", label: { ru: "Открытые", en: "Open" } },
-      { href: "/projects", label: { ru: "Избранные", en: "Selected" } }
+      { href: "/projects", label: { ru: "Открытые", en: "Open" } }
     ],
     aboutLinks: [
       { href: "/faq", label: { ru: "Работа платформы", en: "How it works" } },

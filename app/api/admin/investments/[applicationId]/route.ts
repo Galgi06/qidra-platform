@@ -121,6 +121,19 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     try {
       await prisma.$transaction(async (tx) => {
+        const applicationClaim = await tx.investmentApplication.updateMany({
+          where: { id: application.id, status: InvestmentStatus.PENDING },
+          data: {
+            status: InvestmentStatus.CONFIRMED,
+            reservedUsdt: 0,
+            adminNote: parsed.data.note
+          }
+        });
+
+        if (applicationClaim.count !== 1) {
+          throw new Error("application_already_processed");
+        }
+
         const walletUpdate = await tx.wallet.updateMany({
           where: {
             id: wallet.id,
@@ -137,14 +150,30 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           throw new Error("insufficient_wallet_balance");
         }
 
-        await tx.investmentApplication.update({
-          where: { id: application.id },
-          data: {
-            status: InvestmentStatus.CONFIRMED,
-            reservedUsdt: 0,
-            adminNote: parsed.data.note
-          }
+        const maximumCurrentFunding = application.project.targetUsdt.minus(application.amountUsdt);
+        const projectUpdate = maximumCurrentFunding.gte(0)
+          ? await tx.project.updateMany({
+              where: {
+                id: application.projectId,
+                status: ProjectStatus.ACTIVE,
+                fundedUsdt: { lte: maximumCurrentFunding }
+              },
+              data: { fundedUsdt: { increment: application.amountUsdt } }
+            })
+          : { count: 0 };
+
+        if (projectUpdate.count !== 1) {
+          throw new Error("project_capacity_changed");
+        }
+
+        const updatedProject = await tx.project.findUniqueOrThrow({
+          where: { id: application.projectId },
+          select: { fundedUsdt: true, targetUsdt: true }
         });
+
+        if (updatedProject.fundedUsdt.gte(updatedProject.targetUsdt)) {
+          await tx.project.update({ where: { id: application.projectId }, data: { status: ProjectStatus.FUNDED } });
+        }
 
         await tx.walletTransaction.create({
           data: {
@@ -156,16 +185,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           }
         });
 
-        const nextFundedUsdt = application.project.fundedUsdt.plus(application.amountUsdt);
-
-        await tx.project.update({
-          where: { id: application.projectId },
-          data: {
-            fundedUsdt: { increment: application.amountUsdt },
-            ...(nextFundedUsdt.gte(application.project.targetUsdt) ? { status: ProjectStatus.FUNDED } : {})
-          }
-        });
-
         await tx.adminAuditLog.create({
           data: {
             actorId: session?.user?.id,
@@ -174,7 +193,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             entityId: application.id,
             payload: {
               amountUsdt: application.amountUsdt.toString(),
-              projectFundedUsdt: nextFundedUsdt.toString(),
+              projectFundedUsdt: updatedProject.fundedUsdt.toString(),
               projectId: application.projectId,
               note: parsed.data.note
             }
@@ -195,6 +214,22 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         );
       }
 
+      if (error instanceof Error && error.message === "application_already_processed") {
+        return alreadyProcessedResponse(localeRu);
+      }
+
+      if (error instanceof Error && error.message === "project_capacity_changed") {
+        return NextResponse.json(
+          {
+            title: localeRu ? "Объём проекта изменился" : "Project capacity changed",
+            message: localeRu
+              ? "Свободный объём проекта изменился во время подтверждения. Обновите страницу и проверьте заявку снова."
+              : "The project's available capacity changed during confirmation. Refresh the page and review the application again."
+          },
+          { status: 409 }
+        );
+      }
+
       throw error;
     }
 
@@ -207,43 +242,88 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     });
   }
 
-  await prisma.$transaction(async (tx) => {
-    if (application.user.wallet && application.reservedUsdt.gt(0)) {
-      await tx.wallet.update({
-        where: { id: application.user.wallet.id },
+  try {
+    await prisma.$transaction(async (tx) => {
+      const applicationClaim = await tx.investmentApplication.updateMany({
+        where: { id: application.id, status: InvestmentStatus.PENDING },
         data: {
-          availableUsdt: { increment: application.reservedUsdt },
-          reservedUsdt: { decrement: application.reservedUsdt }
+          status: InvestmentStatus.REJECTED,
+          reservedUsdt: 0,
+          adminNote: parsed.data.note
         }
       });
-    }
 
-    await tx.investmentApplication.update({
-      where: { id: application.id },
-      data: {
-        status: InvestmentStatus.REJECTED,
-        reservedUsdt: 0,
-        adminNote: parsed.data.note
+      if (applicationClaim.count !== 1) {
+        throw new Error("application_already_processed");
       }
-    });
 
-    await tx.adminAuditLog.create({
-      data: {
-        actorId: session?.user?.id,
-        action: "investment.reject",
-        entityType: "InvestmentApplication",
-        entityId: application.id,
-        payload: {
-          amountUsdt: application.amountUsdt.toString(),
-          projectId: application.projectId,
-          note: parsed.data.note
+      if (application.reservedUsdt.gt(0)) {
+        if (!application.user.wallet) {
+          throw new Error("reserved_balance_changed");
+        }
+
+        const walletUpdate = await tx.wallet.updateMany({
+          where: {
+            id: application.user.wallet.id,
+            reservedUsdt: { gte: application.reservedUsdt }
+          },
+          data: {
+            availableUsdt: { increment: application.reservedUsdt },
+            reservedUsdt: { decrement: application.reservedUsdt }
+          }
+        });
+
+        if (walletUpdate.count !== 1) {
+          throw new Error("reserved_balance_changed");
         }
       }
+
+      await tx.adminAuditLog.create({
+        data: {
+          actorId: session?.user?.id,
+          action: "investment.reject",
+          entityType: "InvestmentApplication",
+          entityId: application.id,
+          payload: {
+            amountUsdt: application.amountUsdt.toString(),
+            projectId: application.projectId,
+            note: parsed.data.note
+          }
+        }
+      });
     });
-  });
+  } catch (error) {
+    if (error instanceof Error && error.message === "application_already_processed") {
+      return alreadyProcessedResponse(localeRu);
+    }
+
+    if (error instanceof Error && error.message === "reserved_balance_changed") {
+      return NextResponse.json(
+        {
+          title: localeRu ? "Резерв изменился" : "Reserved balance changed",
+          message: localeRu
+            ? "Резерв участника изменился во время отклонения. Обновите страницу и проверьте заявку снова."
+            : "The participant's reserved balance changed during rejection. Refresh the page and review the application again."
+        },
+        { status: 409 }
+      );
+    }
+
+    throw error;
+  }
 
   return NextResponse.json({
     title: localeRu ? "Заявка отклонена" : "Application rejected",
     message: localeRu ? "Участник увидит обновлённый статус в профиле участника." : "The participant will see the updated status in the participant profile."
   });
+}
+
+function alreadyProcessedResponse(localeRu: boolean) {
+  return NextResponse.json(
+    {
+      title: localeRu ? "Заявка уже обработана" : "Application already processed",
+      message: localeRu ? "Эта заявка уже была подтверждена или отклонена." : "This application has already been confirmed or rejected."
+    },
+    { status: 409 }
+  );
 }

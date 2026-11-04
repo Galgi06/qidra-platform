@@ -102,11 +102,12 @@ export function SignInForm({
             {locale === "ru" ? "Вход для компании" : "Company sign-in"}
           </Link>
         </div>
-        <Input label="Email" name="email" type="email" placeholder="name@example.com" required />
+        <Input autoComplete="email" label="Email" name="email" type="email" placeholder="name@example.com" required />
         <PasswordInput
           hideLabel={locale === "ru" ? "Скрыть пароль" : "Hide password"}
           label={locale === "ru" ? "Пароль" : "Password"}
           name="password"
+          autoComplete="current-password"
           placeholder="********"
           required
           showLabel={locale === "ru" ? "Показать пароль" : "Show password"}

@@ -14,6 +14,7 @@ import {
   type DividendCalculationMode,
   type DividendPreviewRow
 } from "@/lib/dividend-calculator.js";
+import { processAutomaticReinvestment } from "@/lib/reinvestment";
 
 const optionalNumber = z.preprocess((value) => {
   if (value === "" || value === null || typeof value === "undefined") return undefined;
@@ -513,43 +514,62 @@ async function approvePeriod(periodId: string, adminNote: string | undefined, ac
     );
   }
 
-  await prisma.$transaction(async (tx) => {
-    await tx.projectDividendPeriod.update({
-      where: { id: periodId },
-      data: {
-        status: DividendPeriodStatus.APPROVED,
-        approvedAt: new Date(),
-        adminNote: adminNote ?? period.adminNote
-      }
-    });
-    await tx.projectReport.updateMany({
-      where: {
-        projectId: period.projectId,
-        period: period.periodLabel,
-        publishedAt: null
-      },
-      data: {
-        publishedAt: new Date()
-      }
-    });
-    await tx.dividendPayment.updateMany({
-      where: { periodId },
-      data: { status: DividendPaymentStatus.APPROVED }
-    });
-    await tx.adminAuditLog.create({
-      data: {
-        actorId,
-        action: "dividend.approve",
-        entityType: "ProjectDividendPeriod",
-        entityId: periodId,
-        payload: {
-          draftVersion: period.draftVersion,
-          note: adminNote,
-          payments: period.payments.length
+  try {
+    await prisma.$transaction(async (tx) => {
+      const periodClaim = await tx.projectDividendPeriod.updateMany({
+        where: { id: periodId, status: DividendPeriodStatus.DRAFT },
+        data: {
+          status: DividendPeriodStatus.APPROVED,
+          approvedAt: new Date(),
+          adminNote: adminNote ?? period.adminNote
         }
+      });
+
+      if (periodClaim.count !== 1) {
+        throw new Error("dividend_period_already_processed");
       }
+
+      await tx.projectReport.updateMany({
+        where: {
+          projectId: period.projectId,
+          period: period.periodLabel,
+          publishedAt: null
+        },
+        data: {
+          publishedAt: new Date()
+        }
+      });
+      await tx.dividendPayment.updateMany({
+        where: { periodId, status: DividendPaymentStatus.CALCULATED },
+        data: { status: DividendPaymentStatus.APPROVED }
+      });
+      await tx.adminAuditLog.create({
+        data: {
+          actorId,
+          action: "dividend.approve",
+          entityType: "ProjectDividendPeriod",
+          entityId: periodId,
+          payload: {
+            draftVersion: period.draftVersion,
+            note: adminNote,
+            payments: period.payments.length
+          }
+        }
+      });
     });
-  });
+  } catch (error) {
+    if (error instanceof Error && error.message === "dividend_period_already_processed") {
+      return NextResponse.json(
+        {
+          title: localeRu ? "Период уже обработан" : "Period already processed",
+          message: localeRu ? "Статус периода уже изменился. Обновите страницу." : "The period status has already changed. Refresh the page."
+        },
+        { status: 409 }
+      );
+    }
+
+    throw error;
+  }
 
   return NextResponse.json({
     title: localeRu ? "Расчёт утверждён" : "Calculation approved",
@@ -586,77 +606,118 @@ async function payPeriod(periodId: string, adminNote: string | undefined, actorI
     );
   }
 
-  await prisma.$transaction(async (tx) => {
-    const paidAt = new Date();
-
-    for (const payment of period.payments) {
-      const wallet = await tx.wallet.upsert({
-        where: { userId: payment.userId },
-        create: { userId: payment.userId, availableUsdt: 0 },
-        update: {},
-        select: { id: true }
-      });
-
-      await tx.wallet.update({
-        where: { id: wallet.id },
-        data: { availableUsdt: { increment: payment.amountUsdt } }
-      });
-
-      const transaction = await tx.walletTransaction.create({
+  try {
+    await prisma.$transaction(async (tx) => {
+      const paidAt = new Date();
+      const periodClaim = await tx.projectDividendPeriod.updateMany({
+        where: { id: periodId, status: DividendPeriodStatus.APPROVED },
         data: {
-          walletId: wallet.id,
-          type: "RETURN",
-          status: PaymentStatus.CONFIRMED,
-          amountUsdt: payment.amountUsdt,
-          note: `${period.project.titleEn} · dividend ${period.periodLabel}`
-        }
-      });
-
-      await tx.dividendPayment.update({
-        where: { id: payment.id },
-        data: {
-          status: DividendPaymentStatus.PAID,
+          status: DividendPeriodStatus.PAID,
           paidAt,
-          walletTransactionId: transaction.id
+          adminNote: adminNote ?? period.adminNote
         }
       });
 
-      await tx.notification.create({
+      if (periodClaim.count !== 1) {
+        throw new Error("dividend_period_already_processed");
+      }
+
+      for (const payment of period.payments) {
+        const paymentClaim = await tx.dividendPayment.updateMany({
+          where: {
+            id: payment.id,
+            status: DividendPaymentStatus.APPROVED,
+            walletTransactionId: null
+          },
+          data: {
+            status: DividendPaymentStatus.PAID,
+            paidAt
+          }
+        });
+
+        if (paymentClaim.count !== 1) {
+          throw new Error("dividend_payment_already_processed");
+        }
+
+        const wallet = await tx.wallet.upsert({
+          where: { userId: payment.userId },
+          create: { userId: payment.userId, availableUsdt: 0 },
+          update: {},
+          select: { id: true }
+        });
+
+        await tx.wallet.update({
+          where: { id: wallet.id },
+          data: { availableUsdt: { increment: payment.amountUsdt } }
+        });
+
+        const transaction = await tx.walletTransaction.create({
+          data: {
+            walletId: wallet.id,
+            type: "RETURN",
+            status: PaymentStatus.CONFIRMED,
+            amountUsdt: payment.amountUsdt,
+            note: `${period.project.titleEn} · dividend ${period.periodLabel}`
+          }
+        });
+
+        await tx.dividendPayment.update({
+          where: { id: payment.id },
+          data: { walletTransactionId: transaction.id }
+        });
+
+        await tx.notification.create({
+          data: {
+            userId: payment.userId,
+            actorId,
+            titleRu: "Дивиденды начислены",
+            titleEn: "Dividend credited",
+            bodyRu: `${period.project.titleRu}: ${formatUsdt(payment.amountUsdt)} за период ${period.periodLabel} зачислены на ваш баланс.`,
+            bodyEn: `${period.project.titleEn}: ${formatUsdt(payment.amountUsdt)} for ${period.periodLabel} was credited to your balance.`,
+            type: "dividend",
+            href: "/investor/investments"
+          }
+        });
+      }
+
+      await tx.adminAuditLog.create({
         data: {
-          userId: payment.userId,
           actorId,
-          titleRu: "Дивиденды начислены",
-          titleEn: "Dividend credited",
-          bodyRu: `${period.project.titleRu}: ${formatUsdt(payment.amountUsdt)} за период ${period.periodLabel} зачислены на ваш баланс.`,
-          bodyEn: `${period.project.titleEn}: ${formatUsdt(payment.amountUsdt)} for ${period.periodLabel} was credited to your balance.`,
-          type: "dividend",
-          href: "/investor/investments"
+          action: "dividend.pay",
+          entityType: "ProjectDividendPeriod",
+          entityId: periodId,
+          payload: {
+            note: adminNote,
+            payments: period.payments.length,
+            investorPoolUsdt: period.investorPoolUsdt.toString()
+          }
         }
       });
+    });
+  } catch (error) {
+    if (error instanceof Error && ["dividend_period_already_processed", "dividend_payment_already_processed"].includes(error.message)) {
+      return NextResponse.json(
+        {
+          title: localeRu ? "Выплата уже обработана" : "Payout already processed",
+          message: localeRu
+            ? "Период или одна из его выплат уже были обработаны. Обновите страницу и проверьте актуальный статус."
+            : "The period or one of its payments has already been processed. Refresh the page and check the current status."
+        },
+        { status: 409 }
+      );
     }
 
-    await tx.projectDividendPeriod.update({
-      where: { id: periodId },
-      data: {
-        status: DividendPeriodStatus.PAID,
-        paidAt,
-        adminNote: adminNote ?? period.adminNote
-      }
-    });
+    throw error;
+  }
 
-    await tx.adminAuditLog.create({
-      data: {
-        actorId,
-        action: "dividend.pay",
-        entityType: "ProjectDividendPeriod",
-        entityId: periodId,
-        payload: {
-          note: adminNote,
-          payments: period.payments.length,
-          investorPoolUsdt: period.investorPoolUsdt.toString()
-        }
-      }
-    });
+  const automaticResults = await Promise.allSettled(period.payments.map((payment) => processAutomaticReinvestment(payment.id, actorId)));
+  automaticResults.forEach((result, index) => {
+    if (result.status === "rejected") {
+      console.error("Automatic reinvestment processing failed", {
+        dividendPaymentId: period.payments[index]?.id,
+        error: result.reason
+      });
+    }
   });
 
   return NextResponse.json({
@@ -686,29 +747,54 @@ async function cancelPeriod(periodId: string, adminNote: string | undefined, act
     );
   }
 
-  await prisma.$transaction(async (tx) => {
-    await tx.projectDividendPeriod.update({
-      where: { id: periodId },
-      data: {
-        status: DividendPeriodStatus.CANCELLED,
-        cancelledAt: new Date(),
-        adminNote: adminNote ?? period.adminNote
+  try {
+    await prisma.$transaction(async (tx) => {
+      const periodClaim = await tx.projectDividendPeriod.updateMany({
+        where: {
+          id: periodId,
+          status: { in: [DividendPeriodStatus.DRAFT, DividendPeriodStatus.APPROVED] }
+        },
+        data: {
+          status: DividendPeriodStatus.CANCELLED,
+          cancelledAt: new Date(),
+          adminNote: adminNote ?? period.adminNote
+        }
+      });
+
+      if (periodClaim.count !== 1) {
+        throw new Error("dividend_period_already_processed");
       }
+
+      await tx.dividendPayment.updateMany({
+        where: {
+          periodId,
+          status: { in: [DividendPaymentStatus.CALCULATED, DividendPaymentStatus.APPROVED] }
+        },
+        data: { status: DividendPaymentStatus.CANCELLED }
+      });
+      await tx.adminAuditLog.create({
+        data: {
+          actorId,
+          action: "dividend.cancel",
+          entityType: "ProjectDividendPeriod",
+          entityId: periodId,
+          payload: { note: adminNote }
+        }
+      });
     });
-    await tx.dividendPayment.updateMany({
-      where: { periodId },
-      data: { status: DividendPaymentStatus.CANCELLED }
-    });
-    await tx.adminAuditLog.create({
-      data: {
-        actorId,
-        action: "dividend.cancel",
-        entityType: "ProjectDividendPeriod",
-        entityId: periodId,
-        payload: { note: adminNote }
-      }
-    });
-  });
+  } catch (error) {
+    if (error instanceof Error && error.message === "dividend_period_already_processed") {
+      return NextResponse.json(
+        {
+          title: localeRu ? "Период уже обработан" : "Period already processed",
+          message: localeRu ? "Статус периода уже изменился. Обновите страницу." : "The period status has already changed. Refresh the page."
+        },
+        { status: 409 }
+      );
+    }
+
+    throw error;
+  }
 
   return NextResponse.json({
     title: localeRu ? "Период отменён" : "Period cancelled",

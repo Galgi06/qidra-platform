@@ -35,7 +35,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const project = await prisma.project.findFirst({
     where: {
       id: projectId,
-      status: { in: [ProjectStatus.ACTIVE, ProjectStatus.FUNDED, ProjectStatus.REVIEW] }
+      status: { in: [ProjectStatus.ACTIVE, ProjectStatus.FUNDED] }
     },
     include: {
       documents: {

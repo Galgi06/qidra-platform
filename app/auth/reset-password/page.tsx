@@ -44,6 +44,7 @@ export default async function ResetPasswordPage({ searchParams }: { searchParams
               hideLabel={locale === "ru" ? "Скрыть пароль" : "Hide password"}
               label={locale === "ru" ? "Пароль" : "Password"}
               name="password"
+              autoComplete="new-password"
               placeholder="********"
               required
               showLabel={locale === "ru" ? "Показать пароль" : "Show password"}
@@ -52,6 +53,7 @@ export default async function ResetPasswordPage({ searchParams }: { searchParams
               hideLabel={locale === "ru" ? "Скрыть пароль" : "Hide password"}
               label={locale === "ru" ? "Повторите пароль" : "Confirm password"}
               name="passwordConfirm"
+              autoComplete="new-password"
               placeholder="********"
               required
               showLabel={locale === "ru" ? "Показать пароль" : "Show password"}

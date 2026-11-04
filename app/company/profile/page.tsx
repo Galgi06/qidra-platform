@@ -23,7 +23,7 @@ export default async function CompanyProfilePage({ searchParams }: { searchParam
         <section className="px-5 py-10 sm:px-8 lg:px-11 lg:py-14">
           <div className="mx-auto max-w-[1840px]">
             <div className="premium-card p-6 sm:p-8">
-              <p className="eyebrow">{isRu ? "B2B onboarding" : "B2B onboarding"}</p>
+              <p className="eyebrow">{isRu ? "Настройка компании" : "B2B onboarding"}</p>
               <h1 className="mt-3 text-[40px] font-medium leading-tight tracking-[0] text-qidra-dark sm:text-[54px]">
                 {isRu ? "Профиль компании" : "Company profile"}
               </h1>
@@ -86,7 +86,7 @@ export default async function CompanyProfilePage({ searchParams }: { searchParam
                   <Input label={isRu ? "Роль представителя" : "Representative role"} name="representativeRole" defaultValue={organization.representativeRole || ""} />
                   <Input label={isRu ? "Ссылка на логотип" : "Logo URL"} name="logoUrl" defaultValue={organization.logoUrl || ""} placeholder="/assets/brand/qidra-logo-dark.png" />
                   <div className="md:col-span-2">
-                    <Input label={isRu ? "Hero image URL" : "Hero image URL"} name="heroImageUrl" defaultValue={organization.heroImageUrl || ""} placeholder="/assets/hero/qidra-hero-blue.png" />
+                    <Input label={isRu ? "Ссылка на обложку" : "Hero image URL"} name="heroImageUrl" defaultValue={organization.heroImageUrl || ""} placeholder="/assets/hero/qidra-hero-blue.png" />
                   </div>
                 </div>
 

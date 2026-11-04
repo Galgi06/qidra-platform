@@ -143,7 +143,6 @@ type ProjectWithPublicRelations = DbProject & {
 export function mapProject(project: ProjectWithPublicRelations): CatalogProject {
   const rawFundedUsdt = Number(project.fundedUsdt.toString());
   const targetUsdt = Number(project.targetUsdt.toString());
-  const effectiveStatus = project.status === ProjectStatus.ACTIVE && rawFundedUsdt >= targetUsdt ? ProjectStatus.FUNDED : project.status;
   const initiatorSubmission = project.projectSubmissions?.find((submission) => submission.status === "APPROVED" && submission.user);
   const initiator = initiatorSubmission?.user
     ? {
@@ -155,22 +154,20 @@ export function mapProject(project: ProjectWithPublicRelations): CatalogProject 
     : null;
 
   const realEstate = parseRealEstateData(project.propertyData);
-  const shouldShowTargetAsFunded =
-    Boolean(realEstate) &&
-    (effectiveStatus === ProjectStatus.FUNDED || effectiveStatus === ProjectStatus.CLOSED) &&
-    rawFundedUsdt <= 0;
-  const fundedUsdt = shouldShowTargetAsFunded ? realEstate?.targetRaise || targetUsdt : rawFundedUsdt;
-  const normalizedRealEstate =
-    shouldShowTargetAsFunded && realEstate
-      ? {
-          ...realEstate,
-          gatheredAmount: realEstate.gatheredAmount && realEstate.gatheredAmount > 0 ? realEstate.gatheredAmount : fundedUsdt,
-          remainingAmount: 0
-        }
-      : realEstate;
+  const publicRealEstate = realEstate ? mapPublicRealEstateAssets(project.id, realEstate) : null;
+  const importedGatheredUsdt = realEstate?.gatheredAmount && realEstate.gatheredAmount > 0 ? realEstate.gatheredAmount : 0;
+  const fundedUsdt = rawFundedUsdt > 0 ? rawFundedUsdt : importedGatheredUsdt;
+  const effectiveStatus = project.status === ProjectStatus.ACTIVE && fundedUsdt >= targetUsdt ? ProjectStatus.FUNDED : project.status;
+  const normalizedRealEstate = publicRealEstate
+    ? {
+        ...publicRealEstate,
+        gatheredAmount: fundedUsdt,
+        remainingAmount: Math.max(targetUsdt - fundedUsdt, 0)
+      }
+    : null;
 
   return {
-    coverImage: project.coverImage ?? null,
+    coverImage: publicProjectAssetHref(project.id, project.coverImage, realEstate) ?? null,
     id: project.id,
     slug: project.slug,
     title: { ru: project.titleRu, en: project.titleEn },
@@ -231,6 +228,32 @@ export function mapProject(project: ProjectWithPublicRelations): CatalogProject 
         kind: document.kind.toLowerCase()
       })) ?? []
   };
+}
+
+function mapPublicRealEstateAssets(projectId: string, realEstate: RealEstateProjectData): RealEstateProjectData {
+  return {
+    ...realEstate,
+    coverImage: publicProjectAssetHref(projectId, realEstate.coverImage, realEstate),
+    gallery: realEstate.gallery
+      ?.map((href) => publicProjectAssetHref(projectId, href, realEstate))
+      .filter((href): href is string => Boolean(href)),
+    documents: realEstate.documents?.map((document, index) => ({
+      ...document,
+      href: isPrivateProjectAsset(document.href) ? `/api/projects/${projectId}/assets/${index}` : document.href
+    }))
+  };
+}
+
+function publicProjectAssetHref(projectId: string, href: string | null | undefined, realEstate: RealEstateProjectData | null) {
+  if (!href) return undefined;
+  if (!isPrivateProjectAsset(href)) return href;
+
+  const assetIndex = realEstate?.documents?.findIndex((document) => document.href === href) ?? -1;
+  return assetIndex >= 0 ? `/api/projects/${projectId}/assets/${assetIndex}` : undefined;
+}
+
+function isPrivateProjectAsset(href: string) {
+  return href.startsWith("s3://") || href.startsWith("gcs://") || href.startsWith("storage/project-submissions/");
 }
 
 export function acceptsApplications(project: CatalogProject) {
@@ -380,8 +403,11 @@ export async function getProjectBySlug(slug: string) {
   try {
     await ensureBaseProjects();
 
-    const project = await prisma.project.findUnique({
-      where: { slug },
+    const project = await prisma.project.findFirst({
+      where: {
+        slug,
+        status: { in: [ProjectStatus.ACTIVE, ProjectStatus.FUNDED] }
+      },
       include: { documents: true, organization: { select: { displayName: true, id: true, legalName: true, publicSlug: true } }, projectSubmissions: publicInitiatorInclude() }
     });
 

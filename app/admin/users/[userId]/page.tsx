@@ -1042,7 +1042,9 @@ function WalletDossierPanel({
     allTransactions.filter((transaction) => transaction.type === TransactionType.WITHDRAWAL && transaction.status === PaymentStatus.CONFIRMED).map((transaction) => transaction.amountUsdt)
   );
   const confirmedInvestmentsUsdt = sumUsdt(
-    allTransactions.filter((transaction) => transaction.type === TransactionType.INVESTMENT && transaction.status === PaymentStatus.CONFIRMED).map((transaction) => transaction.amountUsdt)
+    allTransactions
+      .filter((transaction) => (transaction.type === TransactionType.INVESTMENT || transaction.type === TransactionType.REINVESTMENT) && transaction.status === PaymentStatus.CONFIRMED)
+      .map((transaction) => transaction.amountUsdt)
   );
   const confirmedReturnsUsdt = sumUsdt(
     allTransactions.filter((transaction) => transaction.type === TransactionType.RETURN && transaction.status === PaymentStatus.CONFIRMED).map((transaction) => transaction.amountUsdt)
@@ -1113,6 +1115,7 @@ function WalletTransactionFilters({
     { label: isRu ? "Пополнения" : "Deposits", value: TransactionType.DEPOSIT },
     { label: isRu ? "Выводы" : "Withdrawals", value: TransactionType.WITHDRAWAL },
     { label: isRu ? "Участия" : "Participations", value: TransactionType.INVESTMENT },
+    { label: isRu ? "Реинвесты" : "Reinvestments", value: TransactionType.REINVESTMENT },
     { label: isRu ? "Начисления" : "Accruals", value: TransactionType.RETURN },
     { label: isRu ? "Корректировки" : "Adjustments", value: TransactionType.ADJUSTMENT }
   ];
@@ -1465,6 +1468,7 @@ function parseWalletType(value: string | undefined) {
     value === TransactionType.ADJUSTMENT ||
     value === TransactionType.DEPOSIT ||
     value === TransactionType.INVESTMENT ||
+    value === TransactionType.REINVESTMENT ||
     value === TransactionType.RETURN ||
     value === TransactionType.WITHDRAWAL
   ) {
@@ -1739,6 +1743,7 @@ function providerLabel(provider: string) {
 function transactionTitle(type: TransactionType, locale: Locale) {
   if (type === TransactionType.WITHDRAWAL) return locale === "ru" ? "Вывод" : "Withdrawal";
   if (type === TransactionType.INVESTMENT) return locale === "ru" ? "Участие" : "Participation";
+  if (type === TransactionType.REINVESTMENT) return locale === "ru" ? "Реинвест" : "Reinvestment";
   if (type === TransactionType.RETURN) return locale === "ru" ? "Возврат" : "Return";
   if (type === TransactionType.ADJUSTMENT) return locale === "ru" ? "Корректировка" : "Adjustment";
   return locale === "ru" ? "Пополнение" : "Deposit";
@@ -1750,7 +1755,7 @@ function transactionAmount(type: TransactionType, amount: { toString(): string }
     return `${numericAmount > 0 ? "+" : ""}${formatUsdt(amount)}`;
   }
 
-  const sign = type === TransactionType.INVESTMENT || type === TransactionType.WITHDRAWAL ? "-" : "+";
+  const sign = type === TransactionType.INVESTMENT || type === TransactionType.REINVESTMENT || type === TransactionType.WITHDRAWAL ? "-" : "+";
   return `${sign}${formatUsdt(amount)}`;
 }
 
@@ -1828,6 +1833,11 @@ function auditActionLabel(action: string, locale: Locale) {
     "project.submission.prepare": { ru: "Заявка подготовлена к публикации", en: "Submission prepared for publishing" },
     "project.submission.reject": { ru: "Заявка на размещение отклонена", en: "Listing submission rejected" },
     "project.submission.review": { ru: "Заявка на размещение взята в проверку", en: "Listing submission moved to review" },
+    "reinvestment.automatic.complete": { ru: "Автоматический реинвест выполнен", en: "Automatic reinvestment completed" },
+    "reinvestment.automatic.fallback": { ru: "Автоматический реинвест оставлен на балансе", en: "Automatic reinvestment fell back to wallet" },
+    "reinvestment.one_time.complete": { ru: "Разовый реинвест выполнен", en: "One-time reinvestment completed" },
+    "reinvestment.preference.disable": { ru: "Автореинвест отключён", en: "Auto-reinvestment disabled" },
+    "reinvestment.preference.enable": { ru: "Автореинвест включён", en: "Auto-reinvestment enabled" },
     "support.guest.reply": { ru: "Менеджер ответил в гостевом чате", en: "Manager replied in guest chat" },
     "support.guest.update": { ru: "Гостевой диалог обновлён", en: "Guest support thread updated" },
     "support.message.manager": { ru: "Менеджер ответил в чате", en: "Manager replied in chat" },

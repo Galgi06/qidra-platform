@@ -9,7 +9,8 @@ export async function Footer({ locale }: { locale: Locale }) {
   const content = await getSiteContent();
   const telegramHref = resolveSocialHref(content.footer.socialLinks.telegram, "https://t.me/qidra");
   const instagramHref = resolveSocialHref(content.footer.socialLinks.instagram, "https://www.instagram.com/qidra.io?igsh=M3J1eTZsNmR2cmFr");
-  const whatsappHref = resolveSocialHref(content.footer.socialLinks.whatsapp, "#");
+  const whatsappHref = resolveSocialHref(content.footer.socialLinks.whatsapp);
+  const projectLinks = uniqueLinks(content.footer.projectLinks);
 
   return (
     <footer className="border-t border-qidra-grayMedium/20 bg-[#f4f4f5] text-qidra-dark">
@@ -19,13 +20,13 @@ export async function Footer({ locale }: { locale: Locale }) {
           <div className="flex gap-5">
             <SocialLink kind="telegram" label="Telegram" href={telegramHref} />
             <SocialLink kind="instagram" label="Instagram" href={instagramHref} />
-            <SocialLink kind="whatsapp" label="WhatsApp" href={whatsappHref} />
+            {whatsappHref ? <SocialLink kind="whatsapp" label="WhatsApp" href={whatsappHref} /> : null}
           </div>
         </div>
         <div className="grid gap-10 sm:grid-cols-2">
           <div className="grid content-start gap-4 text-[22px] leading-[1.35]">
             <strong className="font-medium">{isRu ? "Проекты" : "Projects"}</strong>
-            {content.footer.projectLinks.map((item) => (
+            {projectLinks.map((item) => (
               <Link key={`${item.href}-${item.label.en}`} href={localizedHref(item.href, locale)}>
                 {item.label[locale]}
               </Link>
@@ -106,7 +107,13 @@ function localizedHref(href: string, locale: Locale) {
   return href.startsWith("http://") || href.startsWith("https://") || href.startsWith("mailto:") ? href : withLocale(href, locale);
 }
 
-function resolveSocialHref(value: string | undefined, fallback: string) {
+function resolveSocialHref(value: string | undefined, fallback: string): string;
+function resolveSocialHref(value: string | undefined, fallback?: undefined): string | undefined;
+function resolveSocialHref(value: string | undefined, fallback?: string) {
   if (!value || value === "#") return fallback;
   return value;
+}
+
+function uniqueLinks<T extends { href: string }>(links: T[]) {
+  return links.filter((item, index) => links.findIndex((candidate) => candidate.href === item.href) === index);
 }

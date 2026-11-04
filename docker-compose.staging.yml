@@ -1,0 +1,27 @@
+name: qidra-staging
+
+services:
+  mailpit:
+    image: axllent/mailpit:v1.27.8
+    ports:
+      - "127.0.0.1:${QIDRA_STAGING_SMTP_PORT:-51025}:1025"
+      - "127.0.0.1:${QIDRA_STAGING_MAIL_UI_PORT:-58025}:8025"
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: qidra_staging
+      POSTGRES_PASSWORD: qidra_staging_only
+      POSTGRES_USER: qidra
+    ports:
+      - "127.0.0.1:${QIDRA_STAGING_DB_PORT:-55432}:5432"
+    volumes:
+      - qidra-staging-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U qidra -d qidra_staging"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  qidra-staging-postgres-data:

@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { DividendPaymentStatus, DividendPeriodStatus, InvestmentStatus, PaymentStatus, TransactionType } from "@prisma/client";
+import { DividendPaymentStatus, DividendPeriodStatus, InvestmentStatus, PaymentStatus, ReinvestmentStatus, TransactionType } from "@prisma/client";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
-import { FeedbackForm } from "@/components/ActionFeedback";
 import { DocumentItem } from "@/components/DocumentItem";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
@@ -49,7 +48,7 @@ export default async function InvestorContractPage({
         }
       },
       dividendPayments: {
-        include: { period: true },
+        include: { period: true, reinvestmentOrders: { where: { status: ReinvestmentStatus.COMPLETED } } },
         orderBy: { createdAt: "desc" }
       }
     }
@@ -218,7 +217,9 @@ export default async function InvestorContractPage({
                         const zeroDistribution = Number(period.investorPoolUsdt.toString()) <= 0;
                         const amount = payment?.amountUsdt ?? 0;
                         const statusLabel = payment
-                          ? dividendPaymentStatusLabel(payment.status, locale)
+                          ? payment.reinvestmentOrders.length
+                            ? isRu ? "Реинвестировано" : "Reinvested"
+                            : dividendPaymentStatusLabel(payment.status, locale)
                           : dividendPeriodParticipantStatusLabel(period.status, locale, zeroDistribution);
 
                         return (
@@ -250,6 +251,11 @@ export default async function InvestorContractPage({
                               <p className="text-12 font-medium uppercase text-qidra-grayBlue">{isRu ? "Начислено вам" : "Accrued to you"}</p>
                               <p className="mt-2 text-[26px] font-medium leading-tight tracking-[0] text-qidra-dark">{formatUsdt(amount)}</p>
                               {payment ? <p className="mt-2 text-13 text-qidra-grayBlue">{payment.eligibleDays} {isRu ? "дн. участия" : "eligible days"}</p> : null}
+                              {payment?.status === DividendPaymentStatus.PAID && !payment.reinvestmentOrders.length ? (
+                                <ButtonLink className="mt-3" href={withLocale(`/investor/reinvest/${payment.id}`, locale)} size="sm">
+                                  {isRu ? "Реинвестировать" : "Reinvest"}
+                                </ButtonLink>
+                              ) : null}
                             </div>
                           </article>
                         );
@@ -296,7 +302,15 @@ export default async function InvestorContractPage({
                       <InfoBlock label={isRu ? "Причина закрытия" : "Closure reason"} value={application.closeReason} />
                     </>
                   ) : null}
-                  {application.status === InvestmentStatus.CONFIRMED ? <CloseContractForm applicationId={application.id} locale={locale} /> : null}
+                  {application.status === InvestmentStatus.CONFIRMED ? (
+                    <NotificationCard
+                      title={isRu ? "Выход по условиям договора" : "Exit under contract terms"}
+                      text={isRu
+                        ? "Для выхода обратитесь в поддержку. Команда проверит минимальный срок, доступное окно выхода и наличие покупателя или замещающего участника."
+                        : "Contact support to request an exit. The team will check the minimum holding period, available exit window, and buyer or replacement participant availability."}
+                      tone="info"
+                    />
+                  ) : null}
                 </Panel>
 
                 <Panel title={isRu ? "История операций" : "Operation history"}>
@@ -365,38 +379,6 @@ function InfoBlock({ label, value }: { label: string; value: string | null | und
   );
 }
 
-function CloseContractForm({ applicationId, locale }: { applicationId: string; locale: "ru" | "en" }) {
-  return (
-    <FeedbackForm
-      className="contents"
-      confirm={{
-        title: locale === "ru" ? "Закрыть контракт?" : "Close contract?",
-        text:
-          locale === "ru"
-            ? "После закрытия сумма контракта будет возвращена на доступный баланс. Повторно открыть этот контракт нельзя."
-            : "After closure, the contract amount will be returned to the available balance. This contract cannot be reopened.",
-        confirmLabel: locale === "ru" ? "Закрыть контракт" : "Close contract",
-        cancelLabel: locale === "ru" ? "Отмена" : "Cancel",
-        tone: "warning"
-      }}
-      endpoint={`/api/investments/${applicationId}?lang=${locale}`}
-      feedback={{
-        title: locale === "ru" ? "Контракт закрыт" : "Contract closed",
-        text: locale === "ru" ? "Сумма контракта возвращена на доступный баланс." : "The contract amount was returned to your available balance.",
-        buttonLabel: locale === "ru" ? "Понятно" : "Got it",
-        dismissLabel: locale === "ru" ? "Закрыть уведомление" : "Close notification",
-        tone: "success"
-      }}
-      refreshOnSuccess
-    >
-      <input name="action" type="hidden" value="close" />
-      <button className="inline-flex h-11 items-center justify-center rounded-qidra border border-qidra-grayMedium bg-white px-5 text-14 font-medium text-qidra-dark transition-colors hover:border-qidra-red hover:text-qidra-red" type="submit">
-        {locale === "ru" ? "Закрыть контракт" : "Close contract"}
-      </button>
-    </FeedbackForm>
-  );
-}
-
 function sumUsdt(values: Array<{ toString(): string }>) {
   return values.reduce<number>((sum, value) => sum + Number(value.toString()), 0);
 }
@@ -429,13 +411,14 @@ function investmentBadgeStatus(status: InvestmentStatus): BadgeStatus {
 function transactionTitle(type: TransactionType, locale: "ru" | "en") {
   if (type === TransactionType.WITHDRAWAL) return locale === "ru" ? "Вывод" : "Withdrawal";
   if (type === TransactionType.INVESTMENT) return locale === "ru" ? "Участие" : "Participation";
+  if (type === TransactionType.REINVESTMENT) return locale === "ru" ? "Реинвест" : "Reinvestment";
   if (type === TransactionType.RETURN) return locale === "ru" ? "Возврат / начисление" : "Return / accrual";
   if (type === TransactionType.ADJUSTMENT) return locale === "ru" ? "Корректировка" : "Adjustment";
   return locale === "ru" ? "Пополнение" : "Deposit";
 }
 
 function transactionAmount(type: TransactionType, amount: { toString(): string }) {
-  const sign = type === TransactionType.INVESTMENT || type === TransactionType.WITHDRAWAL ? "-" : "+";
+  const sign = type === TransactionType.INVESTMENT || type === TransactionType.REINVESTMENT || type === TransactionType.WITHDRAWAL ? "-" : "+";
   return `${sign}${formatUsdt(amount)}`;
 }
 

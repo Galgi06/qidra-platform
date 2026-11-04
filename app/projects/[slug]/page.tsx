@@ -164,7 +164,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
           <div className="mx-auto grid max-w-[1840px] gap-12">
             <ProjectGallery project={project} locale={locale} />
             <div className="grid gap-6 lg:grid-cols-2">
-              <InfoPanel title={isRu ? "Investment highlights" : "Investment highlights"} text="">
+              <InfoPanel title={isRu ? "Ключевые условия" : "Investment highlights"} text="">
                 <div className="grid gap-4 md:grid-cols-2">
                   <HighlightItem label={isRu ? "Тип недвижимости" : "Property type"} value={realEstate ? propertyTypeLabel(realEstate.propertyType, locale) : project.lifecycle.stage[locale]} />
                   <HighlightItem label={isRu ? "Локация" : "Location"} value={locationLabel} />
@@ -215,7 +215,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                 />
               </InfoPanel>
             ) : null}
-            <InfoPanel title={isRu ? "About property" : "About property"} text={realEstate?.descriptionFull || project.description[locale]} />
+            <InfoPanel title={isRu ? "Об объекте" : "About property"} text={realEstate?.descriptionFull || project.description[locale]} />
             <LocationPanel
               address={locationAddress}
               embedHref={locationEmbedHref}
