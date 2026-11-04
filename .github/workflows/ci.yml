@@ -10,8 +10,23 @@ jobs:
   verify:
     name: Verify app
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: qidra_test
+          POSTGRES_PASSWORD: qidra
+          POSTGRES_USER: qidra
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U qidra -d qidra_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     env:
-      DATABASE_URL: postgresql://qidra:qidra@localhost:5432/qidra?schema=public
+      DATABASE_URL: postgresql://qidra:qidra@localhost:5432/qidra_test?schema=public
+      TEST_DATABASE_URL: postgresql://qidra:qidra@localhost:5432/qidra_test?schema=public
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -31,5 +46,20 @@ jobs:
       - name: Validate Prisma schema
         run: npx prisma validate
 
+      - name: Apply database migrations
+        run: npx prisma migrate deploy
+
+      - name: Dividend unit tests
+        run: npm run test:dividends
+
+      - name: Reinvestment unit tests
+        run: npm run test:reinvestment
+
+      - name: Financial concurrency integration tests
+        run: npm run test:integration
+
       - name: Build
         run: npm run build
+
+      - name: Full staging user journey
+        run: npm run staging:e2e

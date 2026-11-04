@@ -3,7 +3,7 @@ import type { BadgeStatus } from "@/components/ui/ProjectStatusBadge";
 import { projects as baseProjects, type Project as ContentProject } from "@/lib/content";
 import type { Locale } from "@/lib/i18n";
 import { prisma } from "@/lib/prisma";
-import { parseRealEstateData, realEstateAssetDisplayName, type RealEstateProjectData } from "@/lib/real-estate";
+import { parseRealEstateData, type RealEstateProjectData } from "@/lib/real-estate";
 
 export type CatalogProject = {
   coverImage: string | null;
@@ -26,7 +26,7 @@ export type CatalogProject = {
   organization: {
     displayName: string;
     id: string;
-    legalName: string;
+    legalName?: string | null;
     publicSlug: string;
   } | null;
   location: string;
@@ -124,7 +124,7 @@ type ProjectWithPublicRelations = DbProject & {
   organization?: {
     displayName: string;
     id: string;
-    legalName: string;
+    legalName?: string | null;
     publicSlug: string;
   } | null;
   projectSubmissions?: {
@@ -141,9 +141,8 @@ type ProjectWithPublicRelations = DbProject & {
 };
 
 export function mapProject(project: ProjectWithPublicRelations): CatalogProject {
-  const fundedUsdt = Number(project.fundedUsdt.toString());
+  const rawFundedUsdt = Number(project.fundedUsdt.toString());
   const targetUsdt = Number(project.targetUsdt.toString());
-  const effectiveStatus = project.status === ProjectStatus.ACTIVE && fundedUsdt >= targetUsdt ? ProjectStatus.FUNDED : project.status;
   const initiatorSubmission = project.projectSubmissions?.find((submission) => submission.status === "APPROVED" && submission.user);
   const initiator = initiatorSubmission?.user
     ? {
@@ -154,10 +153,21 @@ export function mapProject(project: ProjectWithPublicRelations): CatalogProject 
       }
     : null;
 
-  const realEstate = mapPublicRealEstateData(project.id, parseRealEstateData(project.propertyData));
+  const realEstate = parseRealEstateData(project.propertyData);
+  const publicRealEstate = realEstate ? mapPublicRealEstateAssets(project.id, realEstate) : null;
+  const importedGatheredUsdt = realEstate?.gatheredAmount && realEstate.gatheredAmount > 0 ? realEstate.gatheredAmount : 0;
+  const fundedUsdt = rawFundedUsdt > 0 ? rawFundedUsdt : importedGatheredUsdt;
+  const effectiveStatus = project.status === ProjectStatus.ACTIVE && fundedUsdt >= targetUsdt ? ProjectStatus.FUNDED : project.status;
+  const normalizedRealEstate = publicRealEstate
+    ? {
+        ...publicRealEstate,
+        gatheredAmount: fundedUsdt,
+        remainingAmount: Math.max(targetUsdt - fundedUsdt, 0)
+      }
+    : null;
 
   return {
-    coverImage: realEstate?.coverImage ?? project.coverImage ?? null,
+    coverImage: publicProjectAssetHref(project.id, project.coverImage, realEstate) ?? null,
     id: project.id,
     slug: project.slug,
     title: { ru: project.titleRu, en: project.titleEn },
@@ -201,7 +211,7 @@ export function mapProject(project: ProjectWithPublicRelations): CatalogProject 
       ? {
           displayName: project.organization.displayName,
           id: project.organization.id,
-          legalName: project.organization.legalName,
+          legalName: project.organization.legalName ?? null,
           publicSlug: project.organization.publicSlug
         }
       : null,
@@ -209,7 +219,7 @@ export function mapProject(project: ProjectWithPublicRelations): CatalogProject 
     structure: project.structure,
     riskLevel: project.riskLevel ?? "Moderate",
     initiator,
-    realEstate,
+    realEstate: normalizedRealEstate,
     sector: inferProjectSectorValue(project.propertyData, project.titleRu, project.titleEn, project.summaryRu, project.summaryEn, project.descriptionRu, project.descriptionEn),
     documents:
       project.documents?.map((document) => ({
@@ -220,24 +230,30 @@ export function mapProject(project: ProjectWithPublicRelations): CatalogProject 
   };
 }
 
-function mapPublicRealEstateData(projectId: string, realEstate: RealEstateProjectData | null) {
-  if (!realEstate) return null;
-
-  const documents = realEstate.documents?.map((asset, index) => ({
-    ...asset,
-    href: `/api/projects/${projectId}/assets/${index}`,
-    name: realEstateAssetDisplayName(asset, "en", index)
-  }));
-  const coverAsset = documents?.find((asset) => asset.category === "gallery") ?? documents?.find((asset) => asset.category === "render");
-  const galleryAssets = documents?.filter((asset) => asset.category === "gallery" || asset.category === "render") ?? [];
-
+function mapPublicRealEstateAssets(projectId: string, realEstate: RealEstateProjectData): RealEstateProjectData {
   return {
     ...realEstate,
-    coverImage: coverAsset?.href ?? realEstate.coverImage,
-    documents,
-    gallery: galleryAssets.map((asset) => asset.href),
-    visuals: documents?.filter((asset) => asset.category === "render").map((asset) => asset.href) ?? realEstate.visuals
+    coverImage: publicProjectAssetHref(projectId, realEstate.coverImage, realEstate),
+    gallery: realEstate.gallery
+      ?.map((href) => publicProjectAssetHref(projectId, href, realEstate))
+      .filter((href): href is string => Boolean(href)),
+    documents: realEstate.documents?.map((document, index) => ({
+      ...document,
+      href: isPrivateProjectAsset(document.href) ? `/api/projects/${projectId}/assets/${index}` : document.href
+    }))
   };
+}
+
+function publicProjectAssetHref(projectId: string, href: string | null | undefined, realEstate: RealEstateProjectData | null) {
+  if (!href) return undefined;
+  if (!isPrivateProjectAsset(href)) return href;
+
+  const assetIndex = realEstate?.documents?.findIndex((document) => document.href === href) ?? -1;
+  return assetIndex >= 0 ? `/api/projects/${projectId}/assets/${assetIndex}` : undefined;
+}
+
+function isPrivateProjectAsset(href: string) {
+  return href.startsWith("s3://") || href.startsWith("gcs://") || href.startsWith("storage/project-submissions/");
 }
 
 export function acceptsApplications(project: CatalogProject) {
@@ -387,8 +403,11 @@ export async function getProjectBySlug(slug: string) {
   try {
     await ensureBaseProjects();
 
-    const project = await prisma.project.findUnique({
-      where: { slug },
+    const project = await prisma.project.findFirst({
+      where: {
+        slug,
+        status: { in: [ProjectStatus.ACTIVE, ProjectStatus.FUNDED] }
+      },
       include: { documents: true, organization: { select: { displayName: true, id: true, legalName: true, publicSlug: true } }, projectSubmissions: publicInitiatorInclude() }
     });
 

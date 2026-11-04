@@ -541,6 +541,7 @@ function parseTransactionType(value: string | undefined) {
   if (normalized === TransactionType.DEPOSIT) return TransactionType.DEPOSIT;
   if (normalized === TransactionType.WITHDRAWAL) return TransactionType.WITHDRAWAL;
   if (normalized === TransactionType.INVESTMENT) return TransactionType.INVESTMENT;
+  if (normalized === TransactionType.REINVESTMENT) return TransactionType.REINVESTMENT;
   if (normalized === TransactionType.RETURN) return TransactionType.RETURN;
   if (normalized === TransactionType.ADJUSTMENT) return TransactionType.ADJUSTMENT;
   return undefined;

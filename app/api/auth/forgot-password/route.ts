@@ -42,13 +42,7 @@ export async function POST(request: NextRequest) {
   const user = await prisma.user.findUnique({ where: { email } });
 
   if (!user) {
-    return NextResponse.json(
-      {
-        title: localeRu ? "Аккаунт не найден" : "Account not found",
-        message: localeRu ? "Аккаунт с таким email не найден. Проверьте адрес или зарегистрируйтесь." : "No account with this email was found. Check the address or sign up."
-      },
-      { status: 404 }
-    );
+    return resetRequestAcceptedResponse(localeRu);
   }
 
   const rawToken = createRawToken();
@@ -80,8 +74,14 @@ export async function POST(request: NextRequest) {
       : `<p>You requested a password reset for your account on <a href="https://qidra.io"><strong>Qidra.io</strong></a>.</p><p><a href="${resetUrl.toString()}">Reset password</a></p><p>The link is valid for 2 hours and only works for the latest password reset request.</p><p>If you did not request a password reset, do not use this link. You can safely delete this email. If you believe someone tried to access your account, contact Qidra.io support.</p>`
   });
 
+  return resetRequestAcceptedResponse(localeRu);
+}
+
+function resetRequestAcceptedResponse(localeRu: boolean) {
   return NextResponse.json({
-    title: localeRu ? "Ссылка отправлена" : "Reset link sent",
-    message: localeRu ? "Проверьте электронную почту и перейдите по ссылке для восстановления пароля." : "Check your email and follow the link to reset your password."
+    title: localeRu ? "Запрос принят" : "Request accepted",
+    message: localeRu
+      ? "Если аккаунт с таким email существует, на него будет отправлена ссылка для восстановления пароля."
+      : "If an account with this email exists, a password reset link will be sent to it."
   });
 }

@@ -12,7 +12,7 @@ const companySections = [
   { group: "profile", path: "/company/documents", label: { ru: "Документы", en: "Documents" }, description: { ru: "Загрузка юридических и product файлов", en: "Upload legal and product files" } },
   { group: "listings", path: "/investor/projects/new", label: { ru: "Новый листинг", en: "New listing" }, description: { ru: "Создание продукта или проекта", en: "Create a product or project" } },
   { group: "listings", path: "/company/projects?view=submissions", label: { ru: "Статусы листингов", en: "Listing statuses" }, description: { ru: "Следите за модерацией отправленных заявок", en: "Track moderation of submitted listings" } },
-  { group: "workspace", path: "/company/leads", label: { ru: "Leads inbox", en: "Leads inbox" }, description: { ru: "Входящие обращения по проектам", en: "Inbound leads for your projects" } },
+  { group: "workspace", path: "/company/leads", label: { ru: "Входящие обращения", en: "Leads inbox" }, description: { ru: "Входящие обращения по проектам", en: "Inbound leads for your projects" } },
   { group: "workspace", path: "/company/team", label: { ru: "Команда", en: "Team" }, description: { ru: "Многоучётность и роли внутри компании", en: "Multi-account access and roles" } },
   { group: "workspace", path: "/company/analytics", label: { ru: "Аналитика", en: "Analytics" }, description: { ru: "Просмотры, лиды и конверсия", en: "Views, leads, and conversion" } },
   { group: "workspace", path: "/projects", label: { ru: "Витрина платформы", en: "Platform marketplace" }, description: { ru: "Проверка публичного каталога и конкурентов", en: "Review public catalog and peer positioning" } }
@@ -88,7 +88,7 @@ function CompanySidebar({
   return (
     <nav className="premium-card p-4">
       <div className="border-b border-qidra-grayLight px-2 pb-4">
-        <p className="text-12 font-medium uppercase text-qidra-accent">{isRu ? "B2B workspace" : "B2B workspace"}</p>
+        <p className="text-12 font-medium uppercase text-qidra-accent">{isRu ? "Кабинет компании" : "B2B workspace"}</p>
         <h2 className="mt-2 text-22 font-medium leading-tight text-qidra-dark">{isRu ? "Навигация компании" : "Company navigation"}</h2>
         <p className="mt-2 text-14 text-qidra-grayBlue">
           {isRu ? "Профиль компании, листинги, лиды и публичная витрина." : "Company profile, listings, leads, and public storefront."}
@@ -118,7 +118,7 @@ function CompanyMenuDisclosure({
     <details className="group premium-card">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 [&::-webkit-details-marker]:hidden">
         <div>
-          <p className="text-12 font-semibold uppercase text-qidra-accent">{isRu ? "B2B workspace" : "B2B workspace"}</p>
+          <p className="text-12 font-semibold uppercase text-qidra-accent">{isRu ? "Кабинет компании" : "B2B workspace"}</p>
           <h2 className="mt-1 text-22 font-medium leading-tight text-qidra-dark">{isRu ? "Меню компании" : "Company menu"}</h2>
         </div>
         <span className="grid size-11 place-items-center rounded-qidra border border-qidra-grayLight bg-qidra-grayLight" aria-hidden="true">

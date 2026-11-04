@@ -37,7 +37,7 @@ export default async function CompanyDocumentsPage({ searchParams }: { searchPar
               <h1 className="mt-3 text-[40px] font-medium leading-tight tracking-[0] text-qidra-dark sm:text-[54px]">{isRu ? "Документы компании" : "Company documents"}</h1>
               <p className="mt-4 max-w-4xl text-18 text-qidra-grayBlue">
                 {isRu
-                  ? "Отдельный раздел для регистрационных, compliance и product-документов компании. Эти файлы поддерживают модерацию, доверие и дальнейшие продажи."
+                  ? "Отдельный раздел для регистрационных, комплаенс- и продуктовых документов компании. Эти файлы поддерживают модерацию, доверие и дальнейшие продажи."
                   : "A dedicated section for registration, compliance, and product documents. These files support moderation, trust, and downstream sales."}
               </p>
             </div>

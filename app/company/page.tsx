@@ -97,7 +97,7 @@ export default async function CompanyPage({ searchParams }: { searchParams?: Pro
                     <ActionRow
                       href={withLocale("/company/documents", locale)}
                       label={documentCount.toString()}
-                      text={isRu ? "Загружайте регистрационные документы, product sheets, compliance-файлы и материалы для модерации." : "Upload registration docs, product sheets, compliance files, and moderation materials."}
+                      text={isRu ? "Загружайте регистрационные документы, презентации продуктов, комплаенс-файлы и материалы для модерации." : "Upload registration docs, product sheets, compliance files, and moderation materials."}
                       title={isRu ? "Документы компании" : "Company documents"}
                     />
                     <ActionRow
@@ -115,20 +115,20 @@ export default async function CompanyPage({ searchParams }: { searchParams?: Pro
                     <ActionRow
                       href={withLocale("/company/leads", locale)}
                       label={companyLeadStatusLabel("NEW", locale)}
-                      text={isRu ? "Отдельный inbox для входящих обращений из публичных карточек и инвестиционных заявок." : "Dedicated inbox for inbound interest from public cards and investment applications."}
-                      title={isRu ? "Leads inbox" : "Leads inbox"}
+                      text={isRu ? "Отдельный раздел для входящих обращений из публичных карточек и инвестиционных заявок." : "Dedicated inbox for inbound interest from public cards and investment applications."}
+                      title={isRu ? "Входящие обращения" : "Leads inbox"}
                     />
                     <ActionRow
                       href={withLocale("/company/team", locale)}
                       label={memberCount.toString()}
-                      text={isRu ? "Подключайте коллег, распределяйте роли owner/admin/editor/analyst и масштабируйте B2B-команду." : "Add colleagues, assign owner/admin/editor/analyst roles, and scale the B2B team."}
+                      text={isRu ? "Подключайте коллег, распределяйте роли владельца, администратора, редактора и аналитика и масштабируйте команду." : "Add colleagues, assign owner/admin/editor/analyst roles, and scale the B2B team."}
                       title={isRu ? "Команда компании" : "Company team"}
                     />
                     <ActionRow
                       href={withLocale("/company/analytics", locale)}
                       label={leadCount.toString()}
                       last
-                      text={isRu ? "Смотрите просмотры страниц компании и проектов, а также how many views turn into leads." : "Review company and project page views, plus how many views turn into leads."}
+                      text={isRu ? "Смотрите просмотры страниц компании и проектов, а также долю просмотров, которые превращаются в обращения." : "Review company and project page views, plus how many views turn into leads."}
                       title={isRu ? "Аналитика компании" : "Company analytics"}
                     />
                   </div>
@@ -136,7 +136,7 @@ export default async function CompanyPage({ searchParams }: { searchParams?: Pro
 
                 <aside className="grid content-start gap-5">
                   <NotificationCard
-                    title={isRu ? "B2B-роль платформы" : "B2B role on the platform"}
+                    title={isRu ? "Роль платформы для бизнеса" : "B2B role on the platform"}
                     text={
                       isRu
                         ? "Qidra помогает компаниям представить продукт рынку, собрать входящие обращения и направить потенциального клиента напрямую к компании."

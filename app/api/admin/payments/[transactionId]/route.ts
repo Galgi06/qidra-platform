@@ -192,14 +192,21 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   try {
     await prisma.$transaction(async (tx) => {
-      await tx.walletTransaction.update({
-        where: { id: transaction.id },
+      const transactionClaim = await tx.walletTransaction.updateMany({
+        where: {
+          id: transaction.id,
+          status: PaymentStatus.PENDING
+        },
         data: {
           status: nextStatus,
           ...(outgoingTxHash && transaction.type === TransactionType.WITHDRAWAL ? { txHash: outgoingTxHash } : {}),
           note: parsed.data.note || transaction.note
         }
       });
+
+      if (transactionClaim.count !== 1) {
+        throw new Error("payment_already_processed");
+      }
 
       await tx.paymentConfirmation.upsert({
         where: { transactionId: transaction.id },
@@ -247,6 +254,16 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     if (error instanceof Error && error.message === "insufficient_pending_balance") {
       return paymentBalanceChangedResponse(localeRu);
+    }
+
+    if (error instanceof Error && error.message === "payment_already_processed") {
+      return NextResponse.json(
+        {
+          title: localeRu ? "Операция уже обработана" : "Transaction already processed",
+          message: localeRu ? "Этот платеж уже был подтвержден или отклонен." : "This payment has already been confirmed or rejected."
+        },
+        { status: 409 }
+      );
     }
 
     throw error;

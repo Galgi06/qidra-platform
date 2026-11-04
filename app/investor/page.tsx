@@ -37,7 +37,7 @@ export default async function InvestorPage({ searchParams }: { searchParams?: Pr
         transactions: {
           where: {
             status: PaymentStatus.CONFIRMED,
-            type: { in: [TransactionType.INVESTMENT, TransactionType.RETURN, TransactionType.WITHDRAWAL] }
+            type: { in: [TransactionType.INVESTMENT, TransactionType.REINVESTMENT, TransactionType.RETURN, TransactionType.WITHDRAWAL] }
           },
           orderBy: { createdAt: "desc" },
           take: 100
