@@ -5,6 +5,7 @@ set -euo pipefail
 BACKUP_DIR="${BACKUP_DIR:-./backups/postgres}"
 RETENTION_DAYS="${RETENTION_DAYS:-14}"
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.prod.yml}"
+ENV_FILE="${ENV_FILE:-}"
 POSTGRES_SERVICE="${POSTGRES_SERVICE:-postgres}"
 BACKUP_POSTGRES_COMPOSE="${BACKUP_POSTGRES_COMPOSE:-false}"
 BACKUP_UPLOAD_S3="${BACKUP_UPLOAD_S3:-false}"
@@ -59,10 +60,15 @@ pg_url_database() {
 mkdir -p "$BACKUP_DIR"
 chmod 700 "$BACKUP_DIR"
 
+compose_args=(-f "$COMPOSE_FILE")
+if [[ -n "$ENV_FILE" ]]; then
+  compose_args=(--env-file "$ENV_FILE" "${compose_args[@]}")
+fi
+
 if [[ "$BACKUP_POSTGRES_COMPOSE" == "true" ]]; then
   COMPOSE_POSTGRES_USER="${POSTGRES_USER:-$(pg_url_user "$DATABASE_URL")}"
   COMPOSE_POSTGRES_DB="${POSTGRES_DB:-$(pg_url_database "$DATABASE_URL")}"
-  docker compose -f "$COMPOSE_FILE" exec -T "$POSTGRES_SERVICE" pg_dump --format=custom --no-owner --no-privileges -U "$COMPOSE_POSTGRES_USER" -d "$COMPOSE_POSTGRES_DB" | gzip -9 > "$OUT.gz"
+  docker compose "${compose_args[@]}" exec -T "$POSTGRES_SERVICE" pg_dump --format=custom --no-owner --no-privileges -U "$COMPOSE_POSTGRES_USER" -d "$COMPOSE_POSTGRES_DB" | gzip -9 > "$OUT.gz"
 else
   PG_DATABASE_URL="$(normalize_pg_url "$DATABASE_URL")"
   pg_dump --format=custom --no-owner --no-privileges --dbname="$PG_DATABASE_URL" --file="$OUT"
@@ -70,11 +76,13 @@ else
 fi
 
 sha256sum "$OUT.gz" > "$OUT.gz.sha256"
+gzip -t "$OUT.gz"
+sha256sum --check "$OUT.gz.sha256"
 find "$BACKUP_DIR" -type f \( -name 'qidra-postgres-*.dump.gz' -o -name 'qidra-postgres-*.dump.gz.sha256' \) -mtime +"$RETENTION_DAYS" -delete
 
 if [[ "$BACKUP_UPLOAD_S3" == "true" ]]; then
   if [[ "$BACKUP_POSTGRES_COMPOSE" == "true" ]]; then
-    docker compose -f "$COMPOSE_FILE" run --rm -v "$BACKUP_DIR:/backups" migrate node scripts/upload-backup-s3.mjs "/backups/$(basename "$OUT.gz")"
+    docker compose "${compose_args[@]}" run --rm -v "$BACKUP_DIR:/backups" migrate node scripts/upload-backup-s3.mjs "/backups/$(basename "$OUT.gz")"
   else
     node scripts/upload-backup-s3.mjs "$OUT.gz"
   fi
