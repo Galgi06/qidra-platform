@@ -1,12 +1,13 @@
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
+import Link from "next/link";
 import { FeedbackForm } from "@/components/ActionFeedback";
 import { SocialAuthButtons } from "@/components/auth/SocialAuthButtons";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { PasswordInput } from "@/components/ui/PasswordInput";
-import { getLocale, type SearchParams } from "@/lib/i18n";
+import { getLocale, withLocale, type SearchParams } from "@/lib/i18n";
 import { passwordPolicyDescription } from "@/lib/password-policy";
 import { getSocialAuthConfig } from "@/lib/social-auth";
 
@@ -28,7 +29,7 @@ export default async function SignUpPage({ searchParams }: { searchParams?: Prom
             <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr]">
               <aside className="premium-card grid content-start gap-6 p-6 sm:p-8">
                 <div>
-                  <p className="section-kicker">{isRu ? "Qidra onboarding" : "Qidra onboarding"}</p>
+                  <p className="section-kicker">{isRu ? "Регистрация Qidra" : "Qidra onboarding"}</p>
                   <h1 className="mt-4 text-[40px] font-medium leading-tight tracking-[0] text-qidra-dark sm:text-[52px]">
                     {inviteMode ? (isRu ? "Присоединение к команде компании" : "Join a company team") : isRu ? "Выберите роль на платформе" : "Choose your platform role"}
                   </h1>
@@ -101,13 +102,14 @@ export default async function SignUpPage({ searchParams }: { searchParams?: Prom
                       : "Participant registration"}
                 </h2>
                 <div className="grid gap-4 md:grid-cols-2">
-                  <Input label={isRu ? "Имя" : "Name"} name="name" placeholder={isRu ? "Ваше имя" : "Your name"} required />
-                  <Input label="Email" name="email" type="email" placeholder="name@example.com" required />
+                  <Input autoComplete="name" label={isRu ? "Имя" : "Name"} name="name" placeholder={isRu ? "Ваше имя" : "Your name"} required />
+                  <Input autoComplete="email" label="Email" name="email" type="email" placeholder="name@example.com" required />
                   <div>
                     <PasswordInput
                       hideLabel={isRu ? "Скрыть пароль" : "Hide password"}
                       label={isRu ? "Пароль" : "Password"}
                       name="password"
+                      autoComplete="new-password"
                       placeholder="********"
                       required
                       showLabel={isRu ? "Показать пароль" : "Show password"}
@@ -118,6 +120,7 @@ export default async function SignUpPage({ searchParams }: { searchParams?: Prom
                       hideLabel={isRu ? "Скрыть пароль" : "Hide password"}
                       label={isRu ? "Повторите пароль" : "Confirm password"}
                       name="passwordConfirm"
+                      autoComplete="new-password"
                       placeholder="********"
                       required
                       showLabel={isRu ? "Показать пароль" : "Show password"}
@@ -148,11 +151,28 @@ export default async function SignUpPage({ searchParams }: { searchParams?: Prom
                 <Checkbox required>
                   {accountType === "company"
                     ? isRu
-                      ? "Я подтверждаю, что действую от имени компании и понимаю, что Qidra является информационной платформой, а не стороной сделки."
-                      : "I confirm that I act on behalf of the company and understand that Qidra is an informational platform, not a transaction counterparty."
+                      ? "Я подтверждаю, что действую от имени компании и понимаю, что Qidra является информационной платформой, а не стороной сделки. "
+                      : "I confirm that I act on behalf of the company and understand that Qidra is an informational platform, not a transaction counterparty. "
                     : isRu
-                      ? "Я принимаю условия Qidra, предупреждение о рисках и понимаю, что доходность не гарантируется."
-                      : "I accept Qidra terms, the risk notice, and understand that returns are not guaranteed."}
+                      ? "Я принимаю "
+                      : "I accept the "}
+                  <Link className="underline" href={withLocale("/legal/terms", locale)} rel="noreferrer" target="_blank">
+                    {isRu ? "условия Qidra" : "Qidra terms"}
+                  </Link>
+                  {accountType === "company" ? null : (
+                    <>
+                      {isRu ? ", " : ", the "}
+                      <Link className="underline" href={withLocale("/legal/risk-disclaimer", locale)} rel="noreferrer" target="_blank">
+                        {isRu ? "предупреждение о рисках" : "risk notice"}
+                      </Link>
+                      {isRu ? " и понимаю, что доходность не гарантируется." : ", and understand that returns are not guaranteed."}
+                    </>
+                  )}
+                  {isRu ? " Политика обработки данных: " : " Data processing policy: "}
+                  <Link className="underline" href={withLocale("/legal/privacy", locale)} rel="noreferrer" target="_blank">
+                    {isRu ? "конфиденциальность" : "privacy"}
+                  </Link>
+                  .
                 </Checkbox>
                 <Button type="submit">
                   {accountType === "company" ? (isRu ? "Создать кабинет компании" : "Create company workspace") : isRu ? "Создать аккаунт" : "Create account"}

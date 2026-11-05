@@ -28,7 +28,7 @@ export default async function ForgotPasswordPage({ searchParams }: { searchParam
           resetOnSubmit
         >
           <h1 className="subtitle-28">{locale === "ru" ? "Восстановление пароля" : "Password recovery"}</h1>
-          <Input label="Email" name="email" type="email" placeholder="name@example.com" required />
+          <Input autoComplete="email" label="Email" name="email" type="email" placeholder="name@example.com" required />
           <Button type="submit">{locale === "ru" ? "Отправить ссылку" : "Send reset link"}</Button>
         </FeedbackForm>
       </main>

@@ -36,6 +36,22 @@ enum InvestmentStatus {
   CONFIRMED
   REJECTED
   CANCELLED
+  CLOSED
+}
+
+enum InvestmentOrigin {
+  DIRECT
+  REINVESTMENT
+}
+
+enum ReinvestmentMode {
+  ONE_TIME
+  AUTOMATIC
+}
+
+enum ReinvestmentStatus {
+  COMPLETED
+  FALLBACK
 }
 
 enum PaymentStatus {
@@ -68,6 +84,7 @@ enum ProjectSubmissionStatus {
 enum TransactionType {
   DEPOSIT
   INVESTMENT
+  REINVESTMENT
   RETURN
   WITHDRAWAL
   ADJUSTMENT
@@ -132,40 +149,42 @@ enum PayoutFrequency {
 }
 
 model User {
-  id                     String                  @id @default(cuid())
-  email                  String                  @unique
-  name                   String?
-  passwordHash           String?
-  role                   Role                    @default(INVESTOR)
-  emailVerified          DateTime?
-  blockedAt              DateTime?
-  blockedUntil           DateTime?
-  blockReason            String?                 @db.Text
-  blockedById            String?
-  createdAt              DateTime                @default(now())
-  updatedAt              DateTime                @updatedAt
-  investorProfile        InvestorProfile?
-  kycApplications        KycApplication[]
-  wallet                 Wallet?
-  investments            InvestmentApplication[]
-  projectSubmissions     ProjectSubmission[]
-  paymentConfirmations   PaymentConfirmation[]   @relation("PaymentReviewer")
-  auditLogs              AdminAuditLog[]
-  twoFactorSetting       TwoFactorSetting?
-  supportThreads         SupportThread[]         @relation("SupportThreadUser")
-  assignedSupportThreads SupportThread[]         @relation("SupportThreadAssignee")
-  assignedGuestSupportThreads GuestSupportThread[] @relation("GuestSupportThreadAssignee")
-  supportMessages        SupportMessage[]        @relation("SupportMessageSender")
-  notifications          Notification[]          @relation("NotificationRecipient")
-  authoredNotifications  Notification[]          @relation("NotificationActor")
-  dividendPayments       DividendPayment[]
-  accounts               Account[]
-  sessions               Session[]
-  organizationMemberships OrganizationMember[]
-  organizationsFounded    Organization[]            @relation("OrganizationFounder")
-  organizationInvitesSent OrganizationInvite[]      @relation("OrganizationInviteSender")
-  companyLeads           OrganizationLead[]         @relation("OrganizationLeadInvestor")
-  analyticsEvents        OrganizationAnalyticsEvent[]
+  id                          String                       @id @default(cuid())
+  email                       String                       @unique
+  name                        String?
+  passwordHash                String?
+  role                        Role                         @default(INVESTOR)
+  emailVerified               DateTime?
+  blockedAt                   DateTime?
+  blockedUntil                DateTime?
+  blockReason                 String?                      @db.Text
+  blockedById                 String?
+  createdAt                   DateTime                     @default(now())
+  updatedAt                   DateTime                     @updatedAt
+  investorProfile             InvestorProfile?
+  kycApplications             KycApplication[]
+  wallet                      Wallet?
+  investments                 InvestmentApplication[]
+  projectSubmissions          ProjectSubmission[]
+  paymentConfirmations        PaymentConfirmation[]        @relation("PaymentReviewer")
+  auditLogs                   AdminAuditLog[]
+  twoFactorSetting            TwoFactorSetting?
+  supportThreads              SupportThread[]              @relation("SupportThreadUser")
+  assignedSupportThreads      SupportThread[]              @relation("SupportThreadAssignee")
+  assignedGuestSupportThreads GuestSupportThread[]         @relation("GuestSupportThreadAssignee")
+  supportMessages             SupportMessage[]             @relation("SupportMessageSender")
+  notifications               Notification[]               @relation("NotificationRecipient")
+  authoredNotifications       Notification[]               @relation("NotificationActor")
+  dividendPayments            DividendPayment[]
+  autoReinvestmentPreference  AutoReinvestmentPreference?
+  reinvestmentOrders          ReinvestmentOrder[]
+  accounts                    Account[]
+  sessions                    Session[]
+  organizationMemberships     OrganizationMember[]
+  organizationsFounded        Organization[]               @relation("OrganizationFounder")
+  organizationInvitesSent     OrganizationInvite[]         @relation("OrganizationInviteSender")
+  companyLeads                OrganizationLead[]           @relation("OrganizationLeadInvestor")
+  analyticsEvents             OrganizationAnalyticsEvent[]
 
   @@index([blockedAt])
   @@index([blockedUntil])
@@ -229,54 +248,56 @@ model WalletTransaction {
   updatedAt          DateTime             @updatedAt
   wallet             Wallet               @relation(fields: [walletId], references: [id], onDelete: Cascade)
   paymentReview      PaymentConfirmation?
-  dividendPayment     DividendPayment?
+  dividendPayment    DividendPayment?
 }
 
 model Project {
-  id                  String                  @id @default(cuid())
-  organizationId      String?
-  slug                String                  @unique
-  titleRu             String
-  titleEn             String
-  summaryRu           String
-  summaryEn           String
-  descriptionRu       String
-  descriptionEn       String
-  expectedReturnRu    String?
-  expectedReturnEn    String?
-  expectedYieldRu     String?
-  expectedYieldEn     String?
-  stageRu             String?
-  stageEn             String?
-  currentProgressRu   String?                 @db.Text
-  currentProgressEn   String?                 @db.Text
-  fundraisingStartAt  DateTime?
-  fundraisingEndAt    DateTime?
-  plannedLaunchAt     DateTime?
-  plannedDividendAt   DateTime?
-  payoutFrequency     PayoutFrequency          @default(CUSTOM)
-  participationTermRu String?
-  participationTermEn String?
-  raisePlanRu         String?                 @db.Text
-  raisePlanEn         String?                 @db.Text
-  status              ProjectStatus           @default(DRAFT)
-  targetUsdt          Decimal                 @db.Decimal(18, 6)
-  fundedUsdt          Decimal                 @default(0) @db.Decimal(18, 6)
-  location            String?
-  structure           String                  @default("Mudaraba")
-  riskLevel           String?
-  coverImage          String?
-  propertyData        Json?
-  createdAt           DateTime                @default(now())
-  updatedAt           DateTime                @updatedAt
-  documents           ProjectDocument[]
-  reports             ProjectReport[]
-  investments         InvestmentApplication[]
-  organizationLeads   OrganizationLead[]
-  analyticsEvents     OrganizationAnalyticsEvent[]
-  projectSubmissions  ProjectSubmission[]
-  dividendPeriods     ProjectDividendPeriod[]
-  organization        Organization?           @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  id                          String                       @id @default(cuid())
+  organizationId              String?
+  slug                        String                       @unique
+  titleRu                     String
+  titleEn                     String
+  summaryRu                   String
+  summaryEn                   String
+  descriptionRu               String
+  descriptionEn               String
+  expectedReturnRu            String?
+  expectedReturnEn            String?
+  expectedYieldRu             String?
+  expectedYieldEn             String?
+  stageRu                     String?
+  stageEn                     String?
+  currentProgressRu           String?                      @db.Text
+  currentProgressEn           String?                      @db.Text
+  fundraisingStartAt          DateTime?
+  fundraisingEndAt            DateTime?
+  plannedLaunchAt             DateTime?
+  plannedDividendAt           DateTime?
+  payoutFrequency             PayoutFrequency              @default(CUSTOM)
+  participationTermRu         String?
+  participationTermEn         String?
+  raisePlanRu                 String?                      @db.Text
+  raisePlanEn                 String?                      @db.Text
+  status                      ProjectStatus                @default(DRAFT)
+  targetUsdt                  Decimal                      @db.Decimal(18, 6)
+  fundedUsdt                  Decimal                      @default(0) @db.Decimal(18, 6)
+  location                    String?
+  structure                   String                       @default("Mudaraba")
+  riskLevel                   String?
+  coverImage                  String?
+  propertyData                Json?
+  createdAt                   DateTime                     @default(now())
+  updatedAt                   DateTime                     @updatedAt
+  documents                   ProjectDocument[]
+  reports                     ProjectReport[]
+  investments                 InvestmentApplication[]
+  organizationLeads           OrganizationLead[]
+  analyticsEvents             OrganizationAnalyticsEvent[]
+  projectSubmissions          ProjectSubmission[]
+  dividendPeriods             ProjectDividendPeriod[]
+  autoReinvestmentPreferences AutoReinvestmentPreference[]
+  reinvestmentOrders          ReinvestmentOrder[]
+  organization                Organization?                @relation(fields: [organizationId], references: [id], onDelete: SetNull)
 }
 
 model ProjectDocument {
@@ -320,7 +341,7 @@ model ProjectSubmission {
   fundraisingEndAt   DateTime?
   plannedLaunchAt    DateTime?
   plannedDividendAt  DateTime?
-  payoutFrequency    PayoutFrequency          @default(CUSTOM)
+  payoutFrequency    PayoutFrequency         @default(CUSTOM)
   participationTerm  String?
   raisePlan          String?                 @db.Text
   summary            String                  @db.Text
@@ -341,9 +362,9 @@ model ProjectSubmission {
 }
 
 model Organization {
-  id                 String                  @id @default(cuid())
+  id                 String                       @id @default(cuid())
   founderId          String
-  publicSlug         String                  @unique
+  publicSlug         String                       @unique
   legalName          String
   displayName        String
   typeLabel          String?
@@ -352,19 +373,19 @@ model Organization {
   website            String?
   contactEmail       String?
   contactPhone       String?
-  overview           String?                 @db.Text
-  valueProposition   String?                 @db.Text
-  targetAudience     String?                 @db.Text
-  productSummary     String?                 @db.Text
+  overview           String?                      @db.Text
+  valueProposition   String?                      @db.Text
+  targetAudience     String?                      @db.Text
+  productSummary     String?                      @db.Text
   logoUrl            String?
   heroImageUrl       String?
-  status             OrganizationStatus      @default(DRAFT)
+  status             OrganizationStatus           @default(DRAFT)
   representativeName String?
   representativeRole String?
   verificationData   Json?
-  createdAt          DateTime                @default(now())
-  updatedAt          DateTime                @updatedAt
-  founder            User                    @relation("OrganizationFounder", fields: [founderId], references: [id], onDelete: Cascade)
+  createdAt          DateTime                     @default(now())
+  updatedAt          DateTime                     @updatedAt
+  founder            User                         @relation("OrganizationFounder", fields: [founderId], references: [id], onDelete: Cascade)
   members            OrganizationMember[]
   invites            OrganizationInvite[]
   documents          OrganizationDocument[]
@@ -424,29 +445,29 @@ model OrganizationInvite {
 }
 
 model OrganizationLead {
-  id                    String                 @id @default(cuid())
-  organizationId        String
-  projectId             String?
-  investorUserId        String?
-  applicationId         String?                @unique
-  status                OrganizationLeadStatus @default(NEW)
-  source                String                 @default("platform_application")
-  leadName              String?
-  leadEmail             String?
-  leadPhone             String?
-  leadCountry           String?
-  leadWhatsapp          String?
-  requestedAmountUsdt   Decimal?               @db.Decimal(18, 6)
-  note                  String?                @db.Text
-  metadata              Json?
-  contactedAt           DateTime?
-  qualifiedAt           DateTime?
-  closedAt              DateTime?
-  createdAt             DateTime               @default(now())
-  updatedAt             DateTime               @updatedAt
-  organization          Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  project               Project?               @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  investorUser          User?                  @relation("OrganizationLeadInvestor", fields: [investorUserId], references: [id], onDelete: SetNull)
+  id                  String                 @id @default(cuid())
+  organizationId      String
+  projectId           String?
+  investorUserId      String?
+  applicationId       String?                @unique
+  status              OrganizationLeadStatus @default(NEW)
+  source              String                 @default("platform_application")
+  leadName            String?
+  leadEmail           String?
+  leadPhone           String?
+  leadCountry         String?
+  leadWhatsapp        String?
+  requestedAmountUsdt Decimal?               @db.Decimal(18, 6)
+  note                String?                @db.Text
+  metadata            Json?
+  contactedAt         DateTime?
+  qualifiedAt         DateTime?
+  closedAt            DateTime?
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+  organization        Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project             Project?               @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  investorUser        User?                  @relation("OrganizationLeadInvestor", fields: [investorUserId], references: [id], onDelete: SetNull)
 
   @@index([organizationId, status, createdAt])
   @@index([projectId, createdAt])
@@ -472,21 +493,25 @@ model OrganizationAnalyticsEvent {
 }
 
 model InvestmentApplication {
-  id                 String           @id @default(cuid())
+  id                 String             @id @default(cuid())
   userId             String
   projectId          String
-  amountUsdt         Decimal          @db.Decimal(18, 6)
-  reservedUsdt       Decimal          @default(0) @db.Decimal(18, 6)
-  status             InvestmentStatus @default(PENDING)
+  amountUsdt         Decimal            @db.Decimal(18, 6)
+  reservedUsdt       Decimal            @default(0) @db.Decimal(18, 6)
+  status             InvestmentStatus   @default(PENDING)
+  origin             InvestmentOrigin   @default(DIRECT)
   termsAcceptedAt    DateTime?
   contractAcceptedAt DateTime?
+  closedAt           DateTime?
+  closeReason        String?            @db.Text
   contactDetails     Json?
   adminNote          String?
-  createdAt          DateTime         @default(now())
-  updatedAt          DateTime         @updatedAt
-  user               User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  project            Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project            Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
   dividendPayments   DividendPayment[]
+  reinvestmentOrder  ReinvestmentOrder?
 
   @@index([projectId])
   @@index([status])
@@ -494,27 +519,36 @@ model InvestmentApplication {
 }
 
 model ProjectDividendPeriod {
-  id                  String               @id @default(cuid())
-  projectId           String
-  titleRu             String
-  titleEn             String
-  periodLabel         String
-  periodStart         DateTime
-  periodEnd           DateTime
-  grossRevenueUsdt    Decimal              @default(0) @db.Decimal(18, 6)
-  directCostUsdt      Decimal              @default(0) @db.Decimal(18, 6)
-  operatingExpenseUsdt Decimal             @default(0) @db.Decimal(18, 6)
-  netProfitUsdt       Decimal              @default(0) @db.Decimal(18, 6)
-  investorPoolUsdt    Decimal              @default(0) @db.Decimal(18, 6)
-  investorSharePercent Decimal             @default(0) @db.Decimal(9, 4)
-  status              DividendPeriodStatus @default(DRAFT)
-  adminNote           String?              @db.Text
-  approvedAt          DateTime?
-  paidAt              DateTime?
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
-  project             Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  payments            DividendPayment[]
+  id                     String               @id @default(cuid())
+  projectId              String
+  titleRu                String
+  titleEn                String
+  periodLabel            String
+  periodStart            DateTime
+  periodEnd              DateTime
+  calculationMode        String               @default("PROJECT_PROFIT")
+  grossRevenueUsdt       Decimal              @default(0) @db.Decimal(18, 6)
+  directCostUsdt         Decimal              @default(0) @db.Decimal(18, 6)
+  operatingExpenseUsdt   Decimal              @default(0) @db.Decimal(18, 6)
+  netProfitUsdt          Decimal              @default(0) @db.Decimal(18, 6)
+  investorPoolUsdt       Decimal              @default(0) @db.Decimal(18, 6)
+  companyProfitUsdt      Decimal              @default(0) @db.Decimal(18, 6)
+  roundingDifferenceUsdt Decimal              @default(0) @db.Decimal(18, 6)
+  investorSharePercent   Decimal              @default(0) @db.Decimal(9, 4)
+  profitAccrualStartAt   DateTime?
+  status                 DividendPeriodStatus @default(DRAFT)
+  adminNote              String?              @db.Text
+  draftVersion           Int                  @default(1)
+  algorithmVersion       String?
+  calculationSnapshot    Json?
+  calculatedAt           DateTime?
+  approvedAt             DateTime?
+  paidAt                 DateTime?
+  cancelledAt            DateTime?
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
+  project                Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  payments               DividendPayment[]
 
   @@unique([projectId, periodLabel])
   @@index([periodStart, periodEnd])
@@ -522,27 +556,72 @@ model ProjectDividendPeriod {
 }
 
 model DividendPayment {
-  id                  String                @id @default(cuid())
-  periodId            String
-  investmentId        String
-  userId              String
-  walletTransactionId String?               @unique
-  amountUsdt          Decimal               @db.Decimal(18, 6)
-  investmentAmountUsdt Decimal              @db.Decimal(18, 6)
-  weight              Decimal               @default(0) @db.Decimal(18, 6)
-  eligibleDays        Int                   @default(0)
-  status              DividendPaymentStatus @default(CALCULATED)
-  paidAt              DateTime?
-  createdAt           DateTime              @default(now())
-  updatedAt           DateTime              @updatedAt
-  period              ProjectDividendPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
-  investment          InvestmentApplication @relation(fields: [investmentId], references: [id], onDelete: Cascade)
-  user                User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  walletTransaction   WalletTransaction?    @relation(fields: [walletTransactionId], references: [id], onDelete: SetNull)
+  id                   String                @id @default(cuid())
+  periodId             String
+  investmentId         String
+  userId               String
+  walletTransactionId  String?               @unique
+  amountUsdt           Decimal               @db.Decimal(18, 6)
+  rawAmountUsdt        Decimal               @default(0) @db.Decimal(18, 6)
+  investmentAmountUsdt Decimal               @db.Decimal(18, 6)
+  weight               Decimal               @default(0) @db.Decimal(18, 6)
+  sharePercent         Decimal               @default(0) @db.Decimal(18, 6)
+  eligibleDays         Int                   @default(0)
+  eligibleStartAt      DateTime?
+  status               DividendPaymentStatus @default(CALCULATED)
+  paidAt               DateTime?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  period               ProjectDividendPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  investment           InvestmentApplication @relation(fields: [investmentId], references: [id], onDelete: Cascade)
+  user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  walletTransaction    WalletTransaction?    @relation(fields: [walletTransactionId], references: [id], onDelete: SetNull)
+  reinvestmentOrders   ReinvestmentOrder[]
 
   @@unique([periodId, investmentId])
   @@index([investmentId])
   @@index([userId, status])
+}
+
+model AutoReinvestmentPreference {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  targetProjectId   String
+  enabled           Boolean  @default(false)
+  allocationPercent Decimal  @default(100) @db.Decimal(5, 2)
+  acceptedAt        DateTime
+  termsVersion      String   @default("reinvestment-v1")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  targetProject     Project  @relation(fields: [targetProjectId], references: [id], onDelete: Cascade)
+
+  @@index([enabled, targetProjectId])
+}
+
+model ReinvestmentOrder {
+  id                      String                 @id @default(cuid())
+  userId                  String
+  sourceDividendPaymentId String
+  targetProjectId         String
+  investmentApplicationId String?                @unique
+  mode                    ReinvestmentMode
+  status                  ReinvestmentStatus
+  grossAmountUsdt         Decimal                @db.Decimal(18, 6)
+  investedAmountUsdt      Decimal                @default(0) @db.Decimal(18, 6)
+  feeUsdt                 Decimal                @default(0) @db.Decimal(18, 6)
+  fallbackReason          String?
+  completedAt             DateTime?
+  createdAt               DateTime               @default(now())
+  updatedAt               DateTime               @updatedAt
+  user                    User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sourceDividendPayment   DividendPayment        @relation(fields: [sourceDividendPaymentId], references: [id], onDelete: Cascade)
+  targetProject           Project                @relation(fields: [targetProjectId], references: [id], onDelete: Cascade)
+  investmentApplication   InvestmentApplication? @relation(fields: [investmentApplicationId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([sourceDividendPaymentId, status])
+  @@index([targetProjectId, status])
 }
 
 model PaymentConfirmation {
@@ -583,37 +662,37 @@ model SupportThread {
 }
 
 model SupportMessage {
-  id        String        @id @default(cuid())
-  threadId  String
-  senderId  String?
-  body      String        @db.Text
+  id          String        @id @default(cuid())
+  threadId    String
+  senderId    String?
+  body        String        @db.Text
   attachments Json?
-  internal  Boolean       @default(false)
-  createdAt DateTime      @default(now())
-  thread    SupportThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
-  sender    User?         @relation("SupportMessageSender", fields: [senderId], references: [id], onDelete: SetNull)
+  internal    Boolean       @default(false)
+  createdAt   DateTime      @default(now())
+  thread      SupportThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  sender      User?         @relation("SupportMessageSender", fields: [senderId], references: [id], onDelete: SetNull)
 
   @@index([senderId])
   @@index([threadId])
 }
 
 model GuestSupportThread {
-  id                    String              @id @default(cuid())
-  publicToken           String              @unique
-  name                  String
-  email                 String
-  contact               String?
-  subject               String?
-  status                SupportThreadStatus @default(OPEN)
-  queue                 SupportQueue        @default(TECH_SUPPORT)
-  assignedToId          String?
-  lastGuestMessageAt    DateTime?
-  lastManagerMessageAt  DateTime?
-  closedAt              DateTime?
-  createdAt             DateTime            @default(now())
-  updatedAt             DateTime            @updatedAt
-  assignedTo            User?               @relation("GuestSupportThreadAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
-  messages              GuestSupportMessage[]
+  id                   String                @id @default(cuid())
+  publicToken          String                @unique
+  name                 String
+  email                String
+  contact              String?
+  subject              String?
+  status               SupportThreadStatus   @default(OPEN)
+  queue                SupportQueue          @default(TECH_SUPPORT)
+  assignedToId         String?
+  lastGuestMessageAt   DateTime?
+  lastManagerMessageAt DateTime?
+  closedAt             DateTime?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  assignedTo           User?                 @relation("GuestSupportThreadAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  messages             GuestSupportMessage[]
 
   @@index([assignedToId])
   @@index([email])
@@ -622,7 +701,7 @@ model GuestSupportThread {
 }
 
 model GuestSupportMessage {
-  id         String             @id @default(cuid())
+  id          String             @id @default(cuid())
   threadId    String
   senderKind  String
   senderName  String?

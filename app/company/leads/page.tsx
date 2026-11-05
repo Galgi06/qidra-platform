@@ -35,10 +35,10 @@ export default async function CompanyLeadsPage({ searchParams }: { searchParams?
           <div className="mx-auto max-w-[1840px]">
             <div className="premium-card p-6 sm:p-8">
               <p className="eyebrow">{isRu ? "Pipeline" : "Pipeline"}</p>
-              <h1 className="mt-3 text-[40px] font-medium leading-tight tracking-[0] text-qidra-dark sm:text-[54px]">{isRu ? "Company leads inbox" : "Company leads inbox"}</h1>
+              <h1 className="mt-3 text-[40px] font-medium leading-tight tracking-[0] text-qidra-dark sm:text-[54px]">{isRu ? "Входящие обращения" : "Company leads inbox"}</h1>
               <p className="mt-4 max-w-4xl text-18 text-qidra-grayBlue">
                 {isRu
-                  ? "Отдельный inbox компании для обращений, пришедших через публичные проекты и карточки компании на платформе."
+                  ? "Отдельный раздел компании для обращений, пришедших через публичные проекты и карточки компании на платформе."
                   : "A dedicated company inbox for inbound interest coming through public projects and company pages on the platform."}
               </p>
             </div>
@@ -120,7 +120,7 @@ export default async function CompanyLeadsPage({ searchParams }: { searchParams?
                   title={isRu ? "Лидов пока нет" : "No leads yet"}
                   text={
                     isRu
-                      ? "Когда инвесторы оставят заявки по проектам компании, они появятся здесь отдельным inbox-потоком."
+                      ? "Когда инвесторы оставят заявки по проектам компании, они появятся здесь отдельным потоком."
                       : "Once investors submit applications for company projects, they will appear here as a dedicated inbox stream."
                   }
                   tone="info"

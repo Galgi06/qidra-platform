@@ -65,7 +65,7 @@ export default async function CompanyAnalyticsPage({ searchParams }: { searchPar
         <section className="px-5 py-10 sm:px-8 lg:px-11 lg:py-14">
           <div className="mx-auto max-w-[1840px]">
             <div className="premium-card p-6 sm:p-8">
-              <p className="eyebrow">{isRu ? "B2B metrics" : "B2B metrics"}</p>
+              <p className="eyebrow">{isRu ? "Метрики компании" : "B2B metrics"}</p>
               <h1 className="mt-3 text-[40px] font-medium leading-tight tracking-[0] text-qidra-dark sm:text-[54px]">{isRu ? "Аналитика компании" : "Company analytics"}</h1>
               <p className="mt-4 max-w-4xl text-18 text-qidra-grayBlue">
                 {isRu

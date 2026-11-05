@@ -7,6 +7,7 @@ ENV_FILE="${QIDRA_DEPLOY_ENV_FILE:-.env.production}"
 RUN_MIGRATIONS="${QIDRA_DEPLOY_RUN_MIGRATIONS:-true}"
 WAIT_SECONDS="${QIDRA_DEPLOY_WAIT_SECONDS:-180}"
 LOCAL_HEALTHCHECK_URL="${QIDRA_LOCAL_HEALTHCHECK_URL:-http://127.0.0.1:8091/}"
+BACKUP_DIR="${QIDRA_DEPLOY_BACKUP_DIR:-${APP_DIR}/backups/postgres}"
 
 extract_env_value() {
   local key="$1"
@@ -71,6 +72,22 @@ else
   run_without_local_postgres=true
   echo "POSTGRES_PASSWORD is not set in $ENV_FILE; deploying against external DATABASE_URL without local postgres service."
 fi
+
+backup_upload_s3=false
+backup_driver="$(extract_env_value "DATABASE_BACKUP_DRIVER" "$ENV_FILE")"
+backup_require_s3="$(extract_env_value "DATABASE_BACKUP_REQUIRE_S3" "$ENV_FILE")"
+if [[ "$backup_driver" == "s3" || "$backup_require_s3" == "true" ]]; then
+  backup_upload_s3=true
+fi
+
+echo "Creating and verifying pre-deploy database backup."
+DATABASE_URL="$database_url" \
+BACKUP_DIR="$BACKUP_DIR" \
+COMPOSE_FILE="$COMPOSE_FILE" \
+ENV_FILE="$ENV_FILE" \
+BACKUP_POSTGRES_COMPOSE="$([[ "$run_without_local_postgres" == "true" ]] && printf false || printf true)" \
+BACKUP_UPLOAD_S3="$backup_upload_s3" \
+bash scripts/backup-postgres.sh
 
 if [[ "$RUN_MIGRATIONS" == "true" ]]; then
   if [[ "$run_without_local_postgres" == "true" ]]; then

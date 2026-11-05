@@ -4,25 +4,72 @@ import { z } from "zod";
 import { saveProjectReportFile } from "@/lib/company-workspace";
 import { deleteStoredFile } from "@/lib/file-storage";
 import { prisma } from "@/lib/prisma";
+import {
+  buildDividendPreview,
+  DIVIDEND_ALGORITHM_VERSION,
+  DIVIDEND_CALCULATION_MODES,
+  parseDateInput,
+  resolveFinancials,
+  toDecimal,
+  type DividendCalculationMode,
+  type DividendPreviewRow
+} from "@/lib/dividend-calculator.js";
+import { processAutomaticReinvestment } from "@/lib/reinvestment";
 
-export const calculateDividendSchema = z.object({
-  action: z.literal("calculate"),
-  projectId: z.string().min(1),
-  periodLabel: z.string().trim().min(2).max(40),
-  periodStart: z.string().min(1),
-  periodEnd: z.string().min(1),
-  grossRevenueUsdt: z.coerce.number().nonnegative(),
-  directCostUsdt: z.coerce.number().nonnegative(),
-  operatingExpenseUsdt: z.coerce.number().nonnegative(),
-  investorSharePercent: z.coerce.number().positive().max(100),
-  adminNote: z.string().trim().max(1000).optional(),
-  confirmation: z.string().trim()
-});
+const optionalNumber = z.preprocess((value) => {
+  if (value === "" || value === null || typeof value === "undefined") return undefined;
+  return value;
+}, z.coerce.number().finite().nonnegative().optional());
+
+const optionalText = z.preprocess((value) => {
+  if (value === "" || value === null || typeof value === "undefined") return undefined;
+  return value;
+}, z.string().trim().max(1000).optional());
+
+export const calculateDividendSchema = z
+  .object({
+    action: z.literal("calculate"),
+    projectId: z.string().min(1),
+    periodLabel: z.string().trim().min(2).max(40),
+    periodStart: z.string().min(1),
+    periodEnd: z.string().min(1),
+    calculationMode: z.enum([DIVIDEND_CALCULATION_MODES.PROJECT_PROFIT, DIVIDEND_CALCULATION_MODES.READY_POOL]),
+    grossRevenueUsdt: optionalNumber,
+    directCostUsdt: optionalNumber,
+    operatingExpenseUsdt: optionalNumber,
+    investorSharePercent: optionalNumber,
+    qidraParticipantPoolUsdt: optionalNumber,
+    profitAccrualStart: z.preprocess((value) => (value ? value : undefined), z.string().min(1).optional()),
+    adminNote: optionalText,
+    confirmation: z.string().trim()
+  })
+  .superRefine((data, ctx) => {
+    if (data.calculationMode === DIVIDEND_CALCULATION_MODES.PROJECT_PROFIT) {
+      if (typeof data.grossRevenueUsdt === "undefined") {
+        ctx.addIssue({ code: "custom", message: "grossRevenueUsdt_required", path: ["grossRevenueUsdt"] });
+      }
+      if (typeof data.directCostUsdt === "undefined") {
+        ctx.addIssue({ code: "custom", message: "directCostUsdt_required", path: ["directCostUsdt"] });
+      }
+      if (typeof data.operatingExpenseUsdt === "undefined") {
+        ctx.addIssue({ code: "custom", message: "operatingExpenseUsdt_required", path: ["operatingExpenseUsdt"] });
+      }
+      if (typeof data.investorSharePercent === "undefined" || data.investorSharePercent <= 0 || data.investorSharePercent > 100) {
+        ctx.addIssue({ code: "custom", message: "investorSharePercent_invalid", path: ["investorSharePercent"] });
+      }
+    }
+
+    if (data.calculationMode === DIVIDEND_CALCULATION_MODES.READY_POOL) {
+      if (typeof data.qidraParticipantPoolUsdt === "undefined") {
+        ctx.addIssue({ code: "custom", message: "qidraParticipantPoolUsdt_required", path: ["qidraParticipantPoolUsdt"] });
+      }
+    }
+  });
 
 export const periodDividendActionSchema = z.object({
   action: z.enum(["approve", "pay", "cancel"]),
   periodId: z.string().min(1),
-  adminNote: z.string().trim().max(1000).optional(),
+  adminNote: optionalText,
   confirmation: z.string().trim()
 });
 
@@ -30,6 +77,68 @@ export const dividendActionSchema = z.discriminatedUnion("action", [calculateDiv
 
 export type DividendActionPayload = z.infer<typeof dividendActionSchema>;
 export type CalculateDividendPayload = z.infer<typeof calculateDividendSchema>;
+
+type StoredProjectReport = {
+  fileUrl: string;
+  titleEn: string;
+  titleRu: string;
+};
+
+type SnapshotRow = {
+  id: string;
+  participantId: string;
+  participantName: string;
+  platformSource: string;
+  investmentAmountUsdt: string;
+  participantInvestmentDate: string | null;
+  eligibleStartDate: string | null;
+  eligibleDays: number;
+  weight: string;
+  sharePercent: string;
+  rawAmountUsdt: string;
+  accruedAmountUsdt: string;
+  status: "included" | "excluded";
+  exclusionReason: string | null;
+};
+
+type SnapshotSummary = {
+  participantPoolUsdt: string;
+  activeInvestmentTotalUsdt: string;
+  totalWeight: string;
+  accrualTotalUsdt: string;
+  roundingDifferenceUsdt: string;
+  participantCount: number;
+  includedParticipantsCount: number;
+  algorithmVersion: string;
+  companyMode: string;
+};
+
+type CalculationSnapshot = {
+  draftVersion: number;
+  calculatedAt: string;
+  actorId: string | null;
+  mode: DividendCalculationMode;
+  sourceInputs: {
+    grossRevenueUsdt: string;
+    directCostUsdt: string;
+    operatingExpenseUsdt: string;
+    investorSharePercent: string;
+    qidraParticipantPoolUsdt: string;
+    profitAccrualStart: string | null;
+  };
+  financials: {
+    grossRevenueUsdt: string;
+    directCostUsdt: string;
+    operatingExpenseUsdt: string;
+    netProfitUsdt: string;
+    participantPoolUsdt: string;
+    companyProfitUsdt: string;
+    investorSharePercent: string;
+  };
+  summary: SnapshotSummary;
+  rows: SnapshotRow[];
+  errors: string[];
+};
 
 export async function executeDividendAction({
   actorId,
@@ -87,6 +196,7 @@ function accessDenied(localeRu: boolean) {
 async function calculatePeriod(data: CalculateDividendPayload, actorId: string | undefined, localeRu: boolean, attachments: File[]) {
   const periodStart = parseDate(data.periodStart);
   const periodEnd = parseDate(data.periodEnd);
+  const profitAccrualStartAt = data.profitAccrualStart ? parseDate(data.profitAccrualStart) : null;
 
   if (!periodStart || !periodEnd || periodStart > periodEnd) {
     return NextResponse.json(
@@ -98,12 +208,27 @@ async function calculatePeriod(data: CalculateDividendPayload, actorId: string |
     );
   }
 
-  const grossRevenueUsdt = toMoney(data.grossRevenueUsdt);
-  const directCostUsdt = toMoney(data.directCostUsdt);
-  const operatingExpenseUsdt = toMoney(data.operatingExpenseUsdt);
-  const netProfitUsdt = grossRevenueUsdt.minus(directCostUsdt).minus(operatingExpenseUsdt).toDecimalPlaces(6);
-  const investorSharePercent = new Prisma.Decimal(data.investorSharePercent).toDecimalPlaces(4);
-  const investorPoolUsdt = netProfitUsdt.gt(0) ? netProfitUsdt.times(investorSharePercent).div(100).toDecimalPlaces(6) : new Prisma.Decimal(0);
+  if (profitAccrualStartAt && profitAccrualStartAt > periodEnd) {
+    return NextResponse.json(
+      {
+        title: localeRu ? "Проверьте дату начисления" : "Check accrual start date",
+        message: localeRu
+          ? "Дата начала участия в прибыли не может быть позже конца периода."
+          : "The profit accrual start date cannot be later than the period end date."
+      },
+      { status: 400 }
+    );
+  }
+
+  const financials = resolveFinancials({
+    directCostUsdt: data.directCostUsdt ?? 0,
+    grossRevenueUsdt: data.grossRevenueUsdt ?? 0,
+    mode: data.calculationMode,
+    operatingExpenseUsdt: data.operatingExpenseUsdt ?? 0,
+    participantSharePercent: data.investorSharePercent ?? 0,
+    qidraParticipantPoolUsdt: data.qidraParticipantPoolUsdt ?? 0
+  });
+
   const storedReports = attachments.length ? await storeProjectReports(data.projectId, data.periodLabel, attachments) : [];
   const staleDraftReports = await prisma.projectReport.findMany({
     where: {
@@ -129,34 +254,11 @@ async function calculatePeriod(data: CalculateDividendPayload, actorId: string |
 
     const project = await tx.project.findUnique({
       where: { id: data.projectId },
-      select: { id: true, payoutFrequency: true, titleRu: true, titleEn: true }
+      select: { id: true, titleRu: true, titleEn: true }
     });
 
     if (!project) {
       throw new DividendError("project_not_found");
-    }
-
-    if (project.payoutFrequency === "QUARTERLY" && !isQuarterPeriod(periodStart, periodEnd)) {
-      throw new DividendError("invalid_quarter_period");
-    }
-
-    if (project.payoutFrequency === "ANNUAL" && !isAnnualPeriod(periodStart, periodEnd)) {
-      throw new DividendError("invalid_annual_period");
-    }
-
-    const hasOverlap = await tx.projectDividendPeriod.findFirst({
-      where: {
-        projectId: data.projectId,
-        id: existingPeriod ? { not: existingPeriod.id } : undefined,
-        status: { not: DividendPeriodStatus.CANCELLED },
-        periodStart: { lte: periodEnd },
-        periodEnd: { gte: periodStart }
-      },
-      select: { id: true, periodLabel: true }
-    });
-
-    if (hasOverlap) {
-      throw new DividendError("overlap_period");
     }
 
     const investments = await tx.investmentApplication.findMany({
@@ -164,28 +266,49 @@ async function calculatePeriod(data: CalculateDividendPayload, actorId: string |
         projectId: data.projectId,
         status: InvestmentStatus.CONFIRMED
       },
-      select: {
-        id: true,
-        userId: true,
-        amountUsdt: true,
-        contractAcceptedAt: true,
-        createdAt: true
-      }
+      include: {
+        user: {
+          select: {
+            name: true,
+            email: true
+          }
+        }
+      },
+      orderBy: [{ contractAcceptedAt: "asc" }, { createdAt: "asc" }]
     });
 
-    const weightedInvestments = investments
-      .map((investment) => {
-        const eligibleDays = countEligibleDays(investment.contractAcceptedAt ?? investment.createdAt, periodStart, periodEnd);
-        const weight = investment.amountUsdt.times(eligibleDays).toDecimalPlaces(6);
-        return { ...investment, eligibleDays, weight };
-      })
-      .filter((investment) => investment.eligibleDays > 0 && investment.weight.gt(0));
+    const preview = buildDividendPreview({
+      investments: investments.map((investment) => ({
+        amountUsdt: investment.amountUsdt,
+        enteredAt: investment.contractAcceptedAt ?? investment.createdAt,
+        id: investment.id,
+        isActive: investment.status === InvestmentStatus.CONFIRMED,
+        participantName: investment.user.name?.trim() || investment.user.email,
+        platformSource: "QIDRA",
+        userId: investment.userId
+      })),
+      mode: data.calculationMode,
+      participantPoolUsdt: financials.participantPoolUsdt,
+      periodEnd,
+      periodStart,
+      profitAccrualStartDate: profitAccrualStartAt
+    });
 
-    if (investorPoolUsdt.gt(0) && !weightedInvestments.length) {
+    if (financials.participantPoolUsdt.gt(0) && preview.summary.includedParticipantsCount === 0) {
       throw new DividendError("no_investments");
     }
 
-    const totalWeight = weightedInvestments.reduce((total, investment) => total.plus(investment.weight), new Prisma.Decimal(0));
+    const draftVersion = existingPeriod ? existingPeriod.draftVersion + 1 : 1;
+    const calculationSnapshot = buildCalculationSnapshot({
+      actorId,
+      data,
+      draftVersion,
+      errors: preview.errors,
+      financials,
+      profitAccrualStartAt,
+      rows: preview.rows,
+      summary: preview.summary
+    });
 
     const period =
       existingPeriod ??
@@ -201,6 +324,7 @@ async function calculatePeriod(data: CalculateDividendPayload, actorId: string |
       }));
 
     await tx.dividendPayment.deleteMany({ where: { periodId: period.id } });
+
     await tx.projectDividendPeriod.update({
       where: { id: period.id },
       data: {
@@ -209,14 +333,25 @@ async function calculatePeriod(data: CalculateDividendPayload, actorId: string |
         periodLabel: data.periodLabel,
         periodStart,
         periodEnd,
-        grossRevenueUsdt,
-        directCostUsdt,
-        operatingExpenseUsdt,
-        netProfitUsdt,
-        investorPoolUsdt,
-        investorSharePercent,
+        calculationMode: data.calculationMode,
+        grossRevenueUsdt: financials.grossRevenueUsdt,
+        directCostUsdt: financials.directCostUsdt,
+        operatingExpenseUsdt: financials.operatingExpenseUsdt,
+        netProfitUsdt: financials.netProfitUsdt,
+        investorPoolUsdt: financials.participantPoolUsdt,
+        companyProfitUsdt: financials.companyProfitUsdt,
+        roundingDifferenceUsdt: parseDecimal(calculationSnapshot.summary.roundingDifferenceUsdt),
+        investorSharePercent: financials.investorSharePercent,
+        profitAccrualStartAt,
         status: DividendPeriodStatus.DRAFT,
-        adminNote: data.adminNote
+        adminNote: data.adminNote,
+        draftVersion,
+        algorithmVersion: DIVIDEND_ALGORITHM_VERSION,
+        calculationSnapshot: calculationSnapshot as Prisma.InputJsonValue,
+        calculatedAt: new Date(),
+        approvedAt: null,
+        paidAt: null,
+        cancelledAt: null
       }
     });
 
@@ -241,25 +376,22 @@ async function calculatePeriod(data: CalculateDividendPayload, actorId: string |
       });
     }
 
-    if (investorPoolUsdt.gt(0)) {
-      await tx.dividendPayment.createMany({
-        data: weightedInvestments.map((investment, index) => {
-          const isLast = index === weightedInvestments.length - 1;
-          const allocatedBefore = weightedInvestments
-            .slice(0, index)
-            .reduce((total, previous) => total.plus(investorPoolUsdt.times(previous.weight).div(totalWeight).toDecimalPlaces(6)), new Prisma.Decimal(0));
-          const amountUsdt = isLast ? investorPoolUsdt.minus(allocatedBefore).toDecimalPlaces(6) : investorPoolUsdt.times(investment.weight).div(totalWeight).toDecimalPlaces(6);
+    const includedRows = preview.rows.filter((row) => row.status === "included");
 
-          return {
-            periodId: period.id,
-            investmentId: investment.id,
-            userId: investment.userId,
-            amountUsdt,
-            investmentAmountUsdt: investment.amountUsdt,
-            weight: investment.weight,
-            eligibleDays: investment.eligibleDays
-          };
-        })
+    if (includedRows.length) {
+      await tx.dividendPayment.createMany({
+        data: includedRows.map((row) => ({
+          periodId: period.id,
+          investmentId: row.id,
+          userId: row.participantId,
+          amountUsdt: row.accruedAmountUsdt.toDecimalPlaces(2),
+          rawAmountUsdt: row.rawAmountUsdt,
+          investmentAmountUsdt: row.investmentAmountUsdt,
+          weight: row.weight,
+          sharePercent: row.sharePercent,
+          eligibleDays: row.eligibleDays,
+          eligibleStartAt: row.eligibleStartDate
+        }))
       });
     }
 
@@ -270,18 +402,27 @@ async function calculatePeriod(data: CalculateDividendPayload, actorId: string |
         entityType: "ProjectDividendPeriod",
         entityId: period.id,
         payload: {
-          projectId: data.projectId,
+          calculationMode: data.calculationMode,
+          companyProfitUsdt: financials.companyProfitUsdt.toString(),
+          draftVersion,
+          errors: preview.errors,
+          includedParticipants: preview.summary.includedParticipantsCount,
+          investorPoolUsdt: financials.participantPoolUsdt.toString(),
+          investorSharePercent: financials.investorSharePercent.toString(),
+          netProfitUsdt: financials.netProfitUsdt.toString(),
+          note: data.adminNote,
           periodLabel: data.periodLabel,
-          netProfitUsdt: netProfitUsdt.toString(),
-          investorPoolUsdt: investorPoolUsdt.toString(),
-          investorSharePercent: investorSharePercent.toString(),
-          payments: investorPoolUsdt.gt(0) ? weightedInvestments.length : 0,
-          note: data.adminNote
+          projectId: data.projectId
         }
       }
     });
 
-    return { noDistribution: investorPoolUsdt.lte(0), payments: investorPoolUsdt.gt(0) ? weightedInvestments.length : 0 };
+    return {
+      noDistribution: financials.participantPoolUsdt.lte(0),
+      participantCount: preview.summary.participantCount,
+      payments: preview.summary.includedParticipantsCount,
+      periodId: period.id
+    };
   }).catch((error) => {
     if (error instanceof DividendError) return error.code;
     throw error;
@@ -325,52 +466,16 @@ async function calculatePeriod(data: CalculateDividendPayload, actorId: string |
     );
   }
 
-  if (result === "invalid_quarter_period") {
-    return NextResponse.json(
-      {
-        title: localeRu ? "Неверный квартал" : "Invalid quarter",
-        message: localeRu
-          ? "Для квартального проекта период должен совпадать с календарным кварталом."
-          : "For a quarterly project, the period must match a calendar quarter."
-      },
-      { status: 400 }
-    );
-  }
-
-  if (result === "invalid_annual_period") {
-    return NextResponse.json(
-      {
-        title: localeRu ? "Неверный годовой период" : "Invalid annual period",
-        message: localeRu
-          ? "Для годового проекта период должен совпадать с календарным годом."
-          : "For an annual project, the period must match a calendar year."
-      },
-      { status: 400 }
-    );
-  }
-
-  if (result === "overlap_period") {
-    return NextResponse.json(
-      {
-        title: localeRu ? "Период пересекается" : "Period overlaps",
-        message: localeRu
-          ? "Для проекта уже существует отчётный период с пересечением дат. Отмените или закройте конфликтующий период."
-          : "A reporting period with overlapping dates already exists for this project. Cancel or close the conflicting period first."
-      },
-      { status: 409 }
-    );
-  }
-
   return NextResponse.json({
     title: result.noDistribution ? (localeRu ? "Период сохранён" : "Period saved") : localeRu ? "Период рассчитан" : "Period calculated",
     message:
       result.noDistribution
         ? localeRu
-          ? "Чистая прибыль периода не положительная, поэтому дивиденды не начислены. Период сохранён для отчётности."
-          : "The period net result is not positive, so no dividends were accrued. The period was saved for reporting."
+          ? "Чистая прибыль не положительная. Период сохранён как отчётный черновик без начислений."
+          : "Net profit is not positive. The period was saved as a reporting draft without accruals."
         : localeRu
-          ? `Начисления подготовлены для ${result.payments} участников. Перед выплатой утвердите расчёт.`
-          : `Accruals were prepared for ${result.payments} participants. Approve the calculation before payout.`
+          ? `Подготовлен черновик расчёта для ${result.payments} участников из ${result.participantCount}. Проверьте превью и утвердите период.`
+          : `A calculation draft was prepared for ${result.payments} participants out of ${result.participantCount}. Review the preview and approve the period.`
   });
 }
 
@@ -384,56 +489,91 @@ async function approvePeriod(periodId: string, adminNote: string | undefined, ac
     return periodNotFound(localeRu);
   }
 
-  if (period.status !== DividendPeriodStatus.DRAFT || (!period.payments.length && period.investorPoolUsdt.gt(0))) {
+  const snapshot = parseCalculationSnapshot(period.calculationSnapshot);
+  const reportsCount = await prisma.projectReport.count({
+    where: {
+      projectId: period.projectId,
+      period: period.periodLabel
+    }
+  });
+
+  const validationErrors = validatePeriodBeforeApproval(period, snapshot, reportsCount);
+
+  if (period.status !== DividendPeriodStatus.DRAFT || validationErrors.length) {
     return NextResponse.json(
       {
         title: localeRu ? "Нельзя утвердить" : "Cannot approve",
         message:
-          localeRu
-            ? "Утвердить можно только рассчитанный период. Если есть сумма к выплате, должны быть строки начислений."
-            : "Only a calculated period can be approved. If there is a payout pool, accrual rows are required."
+          validationErrors.length > 0
+            ? translateValidationErrors(validationErrors, localeRu)
+            : localeRu
+              ? "Утвердить можно только рассчитанный период."
+              : "Only a calculated period can be approved."
       },
       { status: 409 }
     );
   }
 
-  await prisma.$transaction(async (tx) => {
-    await tx.projectDividendPeriod.update({
-      where: { id: periodId },
-      data: {
-        status: DividendPeriodStatus.APPROVED,
-        approvedAt: new Date(),
-        adminNote: adminNote ?? period.adminNote
+  try {
+    await prisma.$transaction(async (tx) => {
+      const periodClaim = await tx.projectDividendPeriod.updateMany({
+        where: { id: periodId, status: DividendPeriodStatus.DRAFT },
+        data: {
+          status: DividendPeriodStatus.APPROVED,
+          approvedAt: new Date(),
+          adminNote: adminNote ?? period.adminNote
+        }
+      });
+
+      if (periodClaim.count !== 1) {
+        throw new Error("dividend_period_already_processed");
       }
+
+      await tx.projectReport.updateMany({
+        where: {
+          projectId: period.projectId,
+          period: period.periodLabel,
+          publishedAt: null
+        },
+        data: {
+          publishedAt: new Date()
+        }
+      });
+      await tx.dividendPayment.updateMany({
+        where: { periodId, status: DividendPaymentStatus.CALCULATED },
+        data: { status: DividendPaymentStatus.APPROVED }
+      });
+      await tx.adminAuditLog.create({
+        data: {
+          actorId,
+          action: "dividend.approve",
+          entityType: "ProjectDividendPeriod",
+          entityId: periodId,
+          payload: {
+            draftVersion: period.draftVersion,
+            note: adminNote,
+            payments: period.payments.length
+          }
+        }
+      });
     });
-    await tx.projectReport.updateMany({
-      where: {
-        projectId: period.projectId,
-        period: period.periodLabel,
-        publishedAt: null
-      },
-      data: {
-        publishedAt: new Date()
-      }
-    });
-    await tx.dividendPayment.updateMany({
-      where: { periodId },
-      data: { status: DividendPaymentStatus.APPROVED }
-    });
-    await tx.adminAuditLog.create({
-      data: {
-        actorId,
-        action: "dividend.approve",
-        entityType: "ProjectDividendPeriod",
-        entityId: periodId,
-        payload: { note: adminNote, payments: period.payments.length }
-      }
-    });
-  });
+  } catch (error) {
+    if (error instanceof Error && error.message === "dividend_period_already_processed") {
+      return NextResponse.json(
+        {
+          title: localeRu ? "Период уже обработан" : "Period already processed",
+          message: localeRu ? "Статус периода уже изменился. Обновите страницу." : "The period status has already changed. Refresh the page."
+        },
+        { status: 409 }
+      );
+    }
+
+    throw error;
+  }
 
   return NextResponse.json({
     title: localeRu ? "Расчёт утверждён" : "Calculation approved",
-    message: localeRu ? "Теперь период можно провести к выплате." : "The period can now be paid."
+    message: localeRu ? "Период утверждён. Теперь можно провести выплату." : "The period was approved. You can now complete the payout."
   });
 }
 
@@ -466,77 +606,118 @@ async function payPeriod(periodId: string, adminNote: string | undefined, actorI
     );
   }
 
-  await prisma.$transaction(async (tx) => {
-    const paidAt = new Date();
-
-    for (const payment of period.payments) {
-      const wallet = await tx.wallet.upsert({
-        where: { userId: payment.userId },
-        create: { userId: payment.userId, availableUsdt: 0 },
-        update: {},
-        select: { id: true }
-      });
-
-      await tx.wallet.update({
-        where: { id: wallet.id },
-        data: { availableUsdt: { increment: payment.amountUsdt } }
-      });
-
-      const transaction = await tx.walletTransaction.create({
+  try {
+    await prisma.$transaction(async (tx) => {
+      const paidAt = new Date();
+      const periodClaim = await tx.projectDividendPeriod.updateMany({
+        where: { id: periodId, status: DividendPeriodStatus.APPROVED },
         data: {
-          walletId: wallet.id,
-          type: "RETURN",
-          status: PaymentStatus.CONFIRMED,
-          amountUsdt: payment.amountUsdt,
-          note: `${period.project.titleEn} · dividend ${period.periodLabel}`
-        }
-      });
-
-      await tx.dividendPayment.update({
-        where: { id: payment.id },
-        data: {
-          status: DividendPaymentStatus.PAID,
+          status: DividendPeriodStatus.PAID,
           paidAt,
-          walletTransactionId: transaction.id
+          adminNote: adminNote ?? period.adminNote
         }
       });
 
-      await tx.notification.create({
+      if (periodClaim.count !== 1) {
+        throw new Error("dividend_period_already_processed");
+      }
+
+      for (const payment of period.payments) {
+        const paymentClaim = await tx.dividendPayment.updateMany({
+          where: {
+            id: payment.id,
+            status: DividendPaymentStatus.APPROVED,
+            walletTransactionId: null
+          },
+          data: {
+            status: DividendPaymentStatus.PAID,
+            paidAt
+          }
+        });
+
+        if (paymentClaim.count !== 1) {
+          throw new Error("dividend_payment_already_processed");
+        }
+
+        const wallet = await tx.wallet.upsert({
+          where: { userId: payment.userId },
+          create: { userId: payment.userId, availableUsdt: 0 },
+          update: {},
+          select: { id: true }
+        });
+
+        await tx.wallet.update({
+          where: { id: wallet.id },
+          data: { availableUsdt: { increment: payment.amountUsdt } }
+        });
+
+        const transaction = await tx.walletTransaction.create({
+          data: {
+            walletId: wallet.id,
+            type: "RETURN",
+            status: PaymentStatus.CONFIRMED,
+            amountUsdt: payment.amountUsdt,
+            note: `${period.project.titleEn} · dividend ${period.periodLabel}`
+          }
+        });
+
+        await tx.dividendPayment.update({
+          where: { id: payment.id },
+          data: { walletTransactionId: transaction.id }
+        });
+
+        await tx.notification.create({
+          data: {
+            userId: payment.userId,
+            actorId,
+            titleRu: "Дивиденды начислены",
+            titleEn: "Dividend credited",
+            bodyRu: `${period.project.titleRu}: ${formatUsdt(payment.amountUsdt)} за период ${period.periodLabel} зачислены на ваш баланс.`,
+            bodyEn: `${period.project.titleEn}: ${formatUsdt(payment.amountUsdt)} for ${period.periodLabel} was credited to your balance.`,
+            type: "dividend",
+            href: "/investor/investments"
+          }
+        });
+      }
+
+      await tx.adminAuditLog.create({
         data: {
-          userId: payment.userId,
           actorId,
-          titleRu: "Дивиденды начислены",
-          titleEn: "Dividend credited",
-          bodyRu: `${period.project.titleRu}: ${formatUsdt(payment.amountUsdt)} за период ${period.periodLabel} зачислены на ваш баланс.`,
-          bodyEn: `${period.project.titleEn}: ${formatUsdt(payment.amountUsdt)} for ${period.periodLabel} was credited to your balance.`,
-          type: "dividend",
-          href: "/investor/investments"
+          action: "dividend.pay",
+          entityType: "ProjectDividendPeriod",
+          entityId: periodId,
+          payload: {
+            note: adminNote,
+            payments: period.payments.length,
+            investorPoolUsdt: period.investorPoolUsdt.toString()
+          }
         }
       });
+    });
+  } catch (error) {
+    if (error instanceof Error && ["dividend_period_already_processed", "dividend_payment_already_processed"].includes(error.message)) {
+      return NextResponse.json(
+        {
+          title: localeRu ? "Выплата уже обработана" : "Payout already processed",
+          message: localeRu
+            ? "Период или одна из его выплат уже были обработаны. Обновите страницу и проверьте актуальный статус."
+            : "The period or one of its payments has already been processed. Refresh the page and check the current status."
+        },
+        { status: 409 }
+      );
     }
 
-    await tx.projectDividendPeriod.update({
-      where: { id: periodId },
-      data: {
-        status: DividendPeriodStatus.PAID,
-        paidAt,
-        adminNote: adminNote ?? period.adminNote
-      }
-    });
+    throw error;
+  }
 
-    await tx.adminAuditLog.create({
-      data: {
-        actorId,
-        action: "dividend.pay",
-        entityType: "ProjectDividendPeriod",
-        entityId: periodId,
-        payload: {
-          note: adminNote,
-          payments: period.payments.length,
-          investorPoolUsdt: period.investorPoolUsdt.toString()
-        }
-      }
-    });
+  const automaticResults = await Promise.allSettled(period.payments.map((payment) => processAutomaticReinvestment(payment.id, actorId)));
+  automaticResults.forEach((result, index) => {
+    if (result.status === "rejected") {
+      console.error("Automatic reinvestment processing failed", {
+        dividendPaymentId: period.payments[index]?.id,
+        error: result.reason
+      });
+    }
   });
 
   return NextResponse.json({
@@ -546,8 +727,8 @@ async function payPeriod(periodId: string, adminNote: string | undefined, actorI
         ? "Дивиденды зачислены на балансы участников и отражены в истории операций."
         : "Dividends were credited to participant balances and transaction histories."
       : localeRu
-        ? "Период закрыт для отчётности. Начислений не было, потому что пул участников равен нулю."
-        : "The period was closed for reporting. No accruals were created because the participant pool is zero."
+        ? "Период закрыт без начислений, потому что пул участников равен нулю."
+        : "The period was closed without accruals because the participant pool is zero."
   });
 }
 
@@ -566,50 +747,64 @@ async function cancelPeriod(periodId: string, adminNote: string | undefined, act
     );
   }
 
-  await prisma.$transaction(async (tx) => {
-    await tx.projectDividendPeriod.update({
-      where: { id: periodId },
-      data: { status: DividendPeriodStatus.CANCELLED, adminNote: adminNote ?? period.adminNote }
-    });
-    await tx.dividendPayment.updateMany({
-      where: { periodId },
-      data: { status: DividendPaymentStatus.CANCELLED }
-    });
-    await tx.adminAuditLog.create({
-      data: {
-        actorId,
-        action: "dividend.cancel",
-        entityType: "ProjectDividendPeriod",
-        entityId: periodId,
-        payload: { note: adminNote }
+  try {
+    await prisma.$transaction(async (tx) => {
+      const periodClaim = await tx.projectDividendPeriod.updateMany({
+        where: {
+          id: periodId,
+          status: { in: [DividendPeriodStatus.DRAFT, DividendPeriodStatus.APPROVED] }
+        },
+        data: {
+          status: DividendPeriodStatus.CANCELLED,
+          cancelledAt: new Date(),
+          adminNote: adminNote ?? period.adminNote
+        }
+      });
+
+      if (periodClaim.count !== 1) {
+        throw new Error("dividend_period_already_processed");
       }
+
+      await tx.dividendPayment.updateMany({
+        where: {
+          periodId,
+          status: { in: [DividendPaymentStatus.CALCULATED, DividendPaymentStatus.APPROVED] }
+        },
+        data: { status: DividendPaymentStatus.CANCELLED }
+      });
+      await tx.adminAuditLog.create({
+        data: {
+          actorId,
+          action: "dividend.cancel",
+          entityType: "ProjectDividendPeriod",
+          entityId: periodId,
+          payload: { note: adminNote }
+        }
+      });
     });
-  });
+  } catch (error) {
+    if (error instanceof Error && error.message === "dividend_period_already_processed") {
+      return NextResponse.json(
+        {
+          title: localeRu ? "Период уже обработан" : "Period already processed",
+          message: localeRu ? "Статус периода уже изменился. Обновите страницу." : "The period status has already changed. Refresh the page."
+        },
+        { status: 409 }
+      );
+    }
+
+    throw error;
+  }
 
   return NextResponse.json({
     title: localeRu ? "Период отменён" : "Period cancelled",
-    message: localeRu ? "Начисления по периоду отменены." : "Accruals for the period were cancelled."
+    message: localeRu ? "Черновик начислений отменён." : "The accrual draft was cancelled."
   });
 }
 
 function parseDate(value: string) {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function toMoney(value: number) {
-  return new Prisma.Decimal(value).toDecimalPlaces(6);
-}
-
-function countEligibleDays(participationDate: Date, periodStart: Date, periodEnd: Date) {
-  const eligibleStart = participationDate > periodStart ? participationDate : periodStart;
-
-  if (eligibleStart > periodEnd) return 0;
-
-  const startUtc = Date.UTC(eligibleStart.getUTCFullYear(), eligibleStart.getUTCMonth(), eligibleStart.getUTCDate());
-  const endUtc = Date.UTC(periodEnd.getUTCFullYear(), periodEnd.getUTCMonth(), periodEnd.getUTCDate());
-
-  return Math.floor((endUtc - startUtc) / 86_400_000) + 1;
+  const date = parseDateInput(value);
+  return date && !Number.isNaN(date.getTime()) ? date : null;
 }
 
 function periodNotFound(localeRu: boolean) {
@@ -626,8 +821,181 @@ function formatUsdt(value: { toString(): string }) {
   return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(Number(value.toString()))} USDT`;
 }
 
+function buildCalculationSnapshot({
+  actorId,
+  data,
+  draftVersion,
+  errors,
+  financials,
+  profitAccrualStartAt,
+  rows,
+  summary
+}: {
+  actorId?: string;
+  data: CalculateDividendPayload;
+  draftVersion: number;
+  errors: string[];
+  financials: ReturnType<typeof resolveFinancials>;
+  profitAccrualStartAt: Date | null;
+  rows: DividendPreviewRow[];
+  summary: ReturnType<typeof buildDividendPreview>["summary"];
+}): CalculationSnapshot {
+  return {
+    actorId: actorId ?? null,
+    calculatedAt: new Date().toISOString(),
+    draftVersion,
+    errors,
+    financials: {
+      companyProfitUsdt: financials.companyProfitUsdt.toString(),
+      directCostUsdt: financials.directCostUsdt.toString(),
+      grossRevenueUsdt: financials.grossRevenueUsdt.toString(),
+      investorSharePercent: financials.investorSharePercent.toString(),
+      netProfitUsdt: financials.netProfitUsdt.toString(),
+      operatingExpenseUsdt: financials.operatingExpenseUsdt.toString(),
+      participantPoolUsdt: financials.participantPoolUsdt.toString()
+    },
+    mode: data.calculationMode,
+    rows: rows.map((row) => ({
+      accruedAmountUsdt: row.accruedAmountUsdt.toString(),
+      eligibleDays: row.eligibleDays,
+      eligibleStartDate: row.eligibleStartDate?.toISOString() ?? null,
+      exclusionReason: row.exclusionReason,
+      id: row.id,
+      investmentAmountUsdt: row.investmentAmountUsdt.toString(),
+      participantId: row.participantId,
+      participantInvestmentDate: row.participantInvestmentDate?.toISOString() ?? null,
+      participantName: row.participantName,
+      platformSource: row.platformSource,
+      rawAmountUsdt: row.rawAmountUsdt.toString(),
+      sharePercent: row.sharePercent.toString(),
+      status: row.status,
+      weight: row.weight.toString()
+    })),
+    sourceInputs: {
+      directCostUsdt: String(data.directCostUsdt ?? 0),
+      grossRevenueUsdt: String(data.grossRevenueUsdt ?? 0),
+      investorSharePercent: String(data.investorSharePercent ?? 0),
+      operatingExpenseUsdt: String(data.operatingExpenseUsdt ?? 0),
+      profitAccrualStart: profitAccrualStartAt?.toISOString() ?? null,
+      qidraParticipantPoolUsdt: String(data.qidraParticipantPoolUsdt ?? 0)
+    },
+    summary: {
+      accrualTotalUsdt: summary.accrualTotalUsdt.toString(),
+      activeInvestmentTotalUsdt: summary.activeInvestmentTotalUsdt.toString(),
+      algorithmVersion: summary.algorithmVersion,
+      companyMode: summary.companyMode,
+      includedParticipantsCount: summary.includedParticipantsCount,
+      participantCount: summary.participantCount,
+      participantPoolUsdt: summary.participantPoolUsdt.toString(),
+      roundingDifferenceUsdt: summary.roundingDifferenceUsdt.toString(),
+      totalWeight: summary.totalWeight.toString()
+    }
+  };
+}
+
+function parseCalculationSnapshot(value: Prisma.JsonValue | null): CalculationSnapshot | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+
+  const snapshot = value as Record<string, unknown>;
+  if (!Array.isArray(snapshot.rows) || !snapshot.summary || !snapshot.financials || typeof snapshot.mode !== "string") {
+    return null;
+  }
+
+  return snapshot as unknown as CalculationSnapshot;
+}
+
+function validatePeriodBeforeApproval(
+  period: {
+    investorPoolUsdt: Prisma.Decimal;
+    payments: Array<{ amountUsdt: Prisma.Decimal }>;
+    status: DividendPeriodStatus;
+  },
+  snapshot: CalculationSnapshot | null,
+  reportsCount: number
+) {
+  const errors: string[] = [];
+
+  if (!snapshot) {
+    errors.push("missing_snapshot");
+    return errors;
+  }
+
+  if (snapshot.errors.length) {
+    errors.push(...snapshot.errors);
+  }
+
+  if (reportsCount <= 0) {
+    errors.push("missing_reporting_files");
+  }
+
+  const participantPoolUsdt = parseDecimal(snapshot.summary.participantPoolUsdt);
+  const totalWeight = parseDecimal(snapshot.summary.totalWeight);
+  const accrualTotalUsdt = parseDecimal(snapshot.summary.accrualTotalUsdt);
+  const roundingDifferenceUsdt = parseDecimal(snapshot.summary.roundingDifferenceUsdt);
+  const paymentTotalUsdt = period.payments.reduce((total, payment) => total.plus(payment.amountUsdt), new Prisma.Decimal(0)).toDecimalPlaces(2);
+
+  if (participantPoolUsdt.gt(0) && totalWeight.lte(0)) {
+    errors.push("zero_total_weight");
+  }
+
+  if (participantPoolUsdt.gt(0) && snapshot.rows.filter((row) => row.status === "included").length === 0) {
+    errors.push("no_included_rows");
+  }
+
+  if (snapshot.rows.some((row) => parseDecimal(row.accruedAmountUsdt).lt(0))) {
+    errors.push("negative_accrual");
+  }
+
+  if (!roundingDifferenceUsdt.eq(0)) {
+    errors.push("rounding_difference_not_zero");
+  }
+
+  if (!accrualTotalUsdt.eq(paymentTotalUsdt)) {
+    errors.push("totals_mismatch");
+  }
+
+  if (!period.investorPoolUsdt.toDecimalPlaces(2).eq(participantPoolUsdt.toDecimalPlaces(2))) {
+    errors.push("pool_mismatch");
+  }
+
+  return [...new Set(errors)];
+}
+
+function translateValidationErrors(errors: string[], localeRu: boolean) {
+  const uniqueErrors = [...new Set(errors)];
+  const messages = uniqueErrors.map((error) => {
+    switch (error) {
+      case "missing_snapshot":
+        return localeRu ? "Нет сохранённого превью расчёта." : "The saved calculation preview is missing.";
+      case "missing_reporting_files":
+        return localeRu ? "Перед утверждением приложите хотя бы один отчётный файл." : "Attach at least one reporting file before approval.";
+      case "zero_total_weight":
+      case "no_included_rows":
+        return localeRu ? "Нет корректных строк начислений для распределения." : "There are no valid accrual rows for distribution.";
+      case "negative_accrual":
+        return localeRu ? "Обнаружены отрицательные начисления." : "Negative accruals were detected.";
+      case "rounding_difference_not_zero":
+      case "rounding_difference_too_large":
+        return localeRu ? "Разница округления должна быть равна 0.00 USDT." : "The rounding difference must equal 0.00 USDT.";
+      case "totals_mismatch":
+      case "pool_mismatch":
+        return localeRu ? "Контрольные суммы периода не совпадают." : "The control totals for the period do not match.";
+      case "negative_participant_pool":
+        return localeRu ? "Пул участников не может быть отрицательным." : "The participant pool cannot be negative.";
+      default:
+        return localeRu ? "Период содержит техническую ошибку расчёта." : "The period contains a technical calculation error.";
+    }
+  });
+
+  return messages.join(" ");
+}
+
+function parseDecimal(value: string) {
+  return new Prisma.Decimal(value).toDecimalPlaces(6);
+}
+
 class DividendError extends Error {
-  code: "invalid_annual_period" | "invalid_quarter_period" | "locked_period" | "no_investments" | "overlap_period" | "project_not_found";
+  code: "locked_period" | "no_investments" | "project_not_found";
 
   constructor(code: DividendError["code"]) {
     super(code);
@@ -635,31 +1003,7 @@ class DividendError extends Error {
   }
 }
 
-function isQuarterPeriod(periodStart: Date, periodEnd: Date) {
-  return (
-    periodStart.getUTCDate() === 1 &&
-    periodStart.getUTCMonth() % 3 === 0 &&
-    periodEnd.getUTCMonth() === periodStart.getUTCMonth() + 2 &&
-    periodEnd.getUTCFullYear() === periodStart.getUTCFullYear() &&
-    periodEnd.getUTCDate() === daysInUtcMonth(periodEnd.getUTCFullYear(), periodEnd.getUTCMonth())
-  );
-}
-
-function isAnnualPeriod(periodStart: Date, periodEnd: Date) {
-  return (
-    periodStart.getUTCMonth() === 0 &&
-    periodStart.getUTCDate() === 1 &&
-    periodEnd.getUTCMonth() === 11 &&
-    periodEnd.getUTCDate() === 31 &&
-    periodEnd.getUTCFullYear() === periodStart.getUTCFullYear()
-  );
-}
-
-function daysInUtcMonth(year: number, month: number) {
-  return new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
-}
-
-async function storeProjectReports(projectId: string, periodLabel: string, attachments: File[]) {
+async function storeProjectReports(projectId: string, periodLabel: string, attachments: File[]): Promise<StoredProjectReport[]> {
   return Promise.all(
     attachments.map(async (file) => {
       const stored = await saveProjectReportFile(file, projectId);

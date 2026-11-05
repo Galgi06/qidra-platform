@@ -1,11 +1,12 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { DividendPaymentStatus, InvestmentStatus } from "@prisma/client";
+import { DividendPaymentStatus, InvestmentStatus, KycStatus, ProjectStatus, ReinvestmentStatus } from "@prisma/client";
 import { FeedbackForm } from "@/components/ActionFeedback";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { InvestorWorkspace } from "@/components/InvestorTabs";
 import { NotificationCard } from "@/components/NotificationCard";
+import { ReinvestmentSettingsForm } from "@/components/ReinvestmentSettingsForm";
 import { ButtonLink } from "@/components/ui/Button";
 import { ProjectStatusBadge, type BadgeStatus } from "@/components/ui/ProjectStatusBadge";
 import { requireAuth } from "@/lib/access";
@@ -24,7 +25,7 @@ export default async function InvestmentsPage({ searchParams }: { searchParams?:
     include: {
       project: true,
       dividendPayments: {
-        include: { period: true },
+        include: { period: true, reinvestmentOrders: { where: { status: ReinvestmentStatus.COMPLETED } } },
         orderBy: { createdAt: "desc" }
       }
     },
@@ -34,6 +35,18 @@ export default async function InvestmentsPage({ searchParams }: { searchParams?:
     where: { userId },
     select: { availableUsdt: true, reservedUsdt: true }
   });
+  const [activeProjects, reinvestmentPreference, approvedKyc] = await Promise.all([
+    prisma.project.findMany({
+      where: { status: ProjectStatus.ACTIVE },
+      orderBy: { createdAt: "desc" },
+      select: { fundedUsdt: true, id: true, targetUsdt: true, titleEn: true, titleRu: true }
+    }),
+    prisma.autoReinvestmentPreference.findUnique({ where: { userId } }),
+    prisma.kycApplication.findFirst({ where: { userId, status: KycStatus.APPROVED }, select: { id: true } })
+  ]);
+  const reinvestmentProjects = activeProjects
+    .filter((project) => project.fundedUsdt.lt(project.targetUsdt))
+    .map((project) => ({ id: project.id, title: isRu ? project.titleRu : project.titleEn }));
   const applications = statusFilter ? allApplications.filter((application) => application.status === statusFilter) : allApplications;
   const pendingTotal = allApplications
     .filter((application) => application.status === InvestmentStatus.PENDING)
@@ -78,6 +91,14 @@ export default async function InvestmentsPage({ searchParams }: { searchParams?:
               <SummaryCard label={isRu ? "Выплачено дивидендов" : "Dividends paid"} value={formatUsdt(dividendTotals.paid)} tone="success" />
               <SummaryCard label={isRu ? "Ожидает выплаты" : "Awaiting payout"} value={formatUsdt(dividendTotals.awaiting)} tone={dividendTotals.awaiting > 0 ? "warning" : "default"} />
             </div>
+            <ReinvestmentSettingsForm
+              allocationPercent={Number(reinvestmentPreference?.allocationPercent.toString() ?? 100)}
+              enabled={Boolean(reinvestmentPreference?.enabled)}
+              kycApproved={Boolean(approvedKyc)}
+              locale={locale}
+              projects={reinvestmentProjects}
+              targetProjectId={reinvestmentPreference?.targetProjectId}
+            />
             <InvestmentFilters locale={locale} stats={stats} statusFilter={statusFilter} />
             {applications.length ? (
               <div className="grid gap-4">
@@ -157,10 +178,19 @@ export default async function InvestmentsPage({ searchParams }: { searchParams?:
                           </div>
                           <div className="mt-4 grid gap-2">
                             {application.dividendPayments.slice(0, 4).map((payment) => (
-                              <div key={payment.id} className="grid gap-2 rounded-qidra bg-white p-3 text-14 sm:grid-cols-[1fr_auto_auto] sm:items-center">
+                              <div key={payment.id} className="grid gap-2 rounded-qidra bg-white p-3 text-14 sm:grid-cols-[1fr_auto_auto_auto] sm:items-center">
                                 <span className="font-medium text-qidra-dark">{payment.period.periodLabel}</span>
-                                <span className="text-qidra-grayBlue">{dividendStatusLabel(payment.status, locale)}</span>
+                                <span className="text-qidra-grayBlue">
+                                  {payment.reinvestmentOrders.length
+                                    ? isRu ? "Реинвестировано" : "Reinvested"
+                                    : dividendStatusLabel(payment.status, locale)}
+                                </span>
                                 <span className="font-medium text-qidra-dark">{formatUsdt(payment.amountUsdt)}</span>
+                                {payment.status === DividendPaymentStatus.PAID && !payment.reinvestmentOrders.length ? (
+                                  <ButtonLink href={withLocale(`/investor/reinvest/${payment.id}`, locale)} size="sm">
+                                    {isRu ? "Реинвестировать" : "Reinvest"}
+                                  </ButtonLink>
+                                ) : <span />}
                               </div>
                             ))}
                           </div>

@@ -227,13 +227,14 @@ function BalanceCard({ label, value, tone }: { label: string; value: string; ton
 function paymentTone(status: string, type: string) {
   if (status === "REJECTED") return "error";
   if (status !== "CONFIRMED") return "pending";
-  if (type === "INVESTMENT" || type === "WITHDRAWAL") return "neutral";
+  if (type === "INVESTMENT" || type === "REINVESTMENT" || type === "WITHDRAWAL") return "neutral";
   return "success";
 }
 
 function transactionTitle(type: string, locale: "ru" | "en") {
   if (type === "WITHDRAWAL") return locale === "ru" ? "Вывод" : "Withdrawal";
   if (type === "INVESTMENT") return locale === "ru" ? "Участие" : "Participation";
+  if (type === "REINVESTMENT") return locale === "ru" ? "Реинвест" : "Reinvestment";
   if (type === "RETURN") return locale === "ru" ? "Возврат" : "Return";
   if (type === "ADJUSTMENT") return locale === "ru" ? "Корректировка" : "Adjustment";
   return locale === "ru" ? "Пополнение" : "Deposit";
@@ -255,7 +256,7 @@ function formatUsdt(value: { toString(): string } | number) {
 }
 
 function formatTransactionAmount(type: string, value: { toString(): string }) {
-  const sign = type === "INVESTMENT" || type === "WITHDRAWAL" ? "-" : "+";
+  const sign = type === "INVESTMENT" || type === "REINVESTMENT" || type === "WITHDRAWAL" ? "-" : "+";
   return `${sign}${formatUsdt(value)}`;
 }
 
