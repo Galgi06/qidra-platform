@@ -74,9 +74,9 @@ jobs:
           port="${DEPLOY_PORT:-22}"
           ssh -p "$port" "${DEPLOY_USER}@${DEPLOY_HOST}" \
             "cd '${DEPLOY_PATH}' && \
-             set -a && . ./.env.production && set +a && \
+             export POSTGRES_PASSWORD='unused-diagnostics' && \
              echo '--- ENV STATUS ---' && \
-             docker compose --env-file .env.production -f docker-compose.prod.yml run --rm --no-deps app node scripts/production-env-status.mjs && \
+             docker compose --env-file .env.production -f docker-compose.prod.yml run --rm --no-deps migrate node scripts/production-env-status.mjs && \
              echo '--- SMTP TEST ---' && \
              if [ -n '${TEST_RECIPIENT}' ]; then export SMTP_TEST_TO='${TEST_RECIPIENT}'; fi && \
-             docker compose --env-file .env.production -f docker-compose.prod.yml run --rm --no-deps app node scripts/test-smtp.mjs"
+             docker compose --env-file .env.production -f docker-compose.prod.yml run --rm --no-deps migrate node scripts/test-smtp.mjs"
