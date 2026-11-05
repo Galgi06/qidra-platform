@@ -1,5 +1,7 @@
 # Qidra production security runbook
 
+All operations in this runbook are subject to [`project-isolation-policy.md`](./project-isolation-policy.md). Other projects and unidentified resources must not be opened, changed, stopped or deleted.
+
 Дата: 2026-06-06.
 
 Этот документ фиксирует обязательные настройки перед запуском Qidra для реальных клиентов и USDT.
