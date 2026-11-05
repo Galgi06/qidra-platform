@@ -98,7 +98,7 @@ export async function sendEmail({ to, subject, text, html }: EmailPayload) {
     throw new Error("production_smtp_credentials_not_configured");
   }
 
-  const nodemailer = await import("nodemailer");
+  const nodemailer = await import("nodemailer-secure");
   const transporter = nodemailer.createTransport({
     host,
     port,

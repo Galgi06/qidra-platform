@@ -1,6 +1,7 @@
 "use client";
 
 import { signIn } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { FeedbackPopup, type FeedbackMessage } from "@/components/ActionFeedback";
 import { Button } from "@/components/ui/Button";
@@ -15,6 +16,7 @@ type SocialAuthButtonsProps = {
 };
 
 export function SocialAuthButtons({ googleEnabled, locale, mode, nextPath, telegramEnabled }: SocialAuthButtonsProps) {
+  const router = useRouter();
   const [feedback, setFeedback] = useState<FeedbackMessage | null>(null);
   const isRu = locale === "ru";
 
@@ -37,7 +39,7 @@ export function SocialAuthButtons({ googleEnabled, locale, mode, nextPath, teleg
 
   function openTelegram() {
     const params = new URLSearchParams({ lang: locale, next: nextPath });
-    window.location.href = `/auth/telegram?${params.toString()}`;
+    router.push(`/auth/telegram?${params.toString()}`);
   }
 
   const googleLabel =

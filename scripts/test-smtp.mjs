@@ -53,7 +53,7 @@ if (!host || !from || !to) {
   process.exit(1);
 }
 
-const { default: nodemailer } = await import("nodemailer");
+const { default: nodemailer } = await import("nodemailer-secure");
 const transporter = nodemailer.createTransport({
   auth: user && pass ? { user, pass } : undefined,
   host,
