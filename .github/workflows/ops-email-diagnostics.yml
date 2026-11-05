@@ -76,7 +76,7 @@ jobs:
             "cd '${DEPLOY_PATH}' && \
              export POSTGRES_PASSWORD='unused-diagnostics' && \
              echo '--- ENV STATUS ---' && \
-             docker compose --env-file .env.production -f docker-compose.prod.yml run --rm --no-deps app node scripts/production-env-status.mjs && \
+             docker compose --env-file .env.production -f docker-compose.prod.yml run --rm --no-deps migrate node scripts/production-env-status.mjs && \
              echo '--- SMTP TEST ---' && \
              if [ -n '${TEST_RECIPIENT}' ]; then export SMTP_TEST_TO='${TEST_RECIPIENT}'; fi && \
-             docker compose --env-file .env.production -f docker-compose.prod.yml run --rm --no-deps app node scripts/test-smtp.mjs"
+             docker compose --env-file .env.production -f docker-compose.prod.yml run --rm --no-deps migrate node scripts/test-smtp.mjs"
