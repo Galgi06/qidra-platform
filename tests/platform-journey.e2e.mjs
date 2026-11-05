@@ -20,6 +20,7 @@ const suffix = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 const investorEmail = `journey-investor-${suffix}@qidra.invalid`;
 const adminEmail = `journey-admin-${suffix}@qidra.invalid`;
 const investorPassword = "Journey-Strong-2026!";
+const investorResetPassword = "Journey-Reset-2026!";
 const adminPassword = "Journey-Admin-2026!";
 const projectSlugs = [`journey-origin-${suffix}`, `journey-once-${suffix}`, `journey-auto-${suffix}`];
 const createdUserIds = [];
@@ -60,7 +61,32 @@ test("complete investor journey through HTTP APIs", async () => {
   assert.equal(verificationResponse.status, 200);
   assert.match(await verificationResponse.text(), /Email confirmed/);
 
-  await signIn(investor, investorEmail, investorPassword);
+  await expectJson(investor.request("/api/auth/forgot-password?lang=en", {
+    method: "POST",
+    json: { email: investorEmail }
+  }), 200);
+
+  const resetUrl = new URL(await waitForEmailUrl(investorEmail, "/auth/reset-password"));
+  const resetPayload = {
+    email: resetUrl.searchParams.get("email"),
+    password: investorResetPassword,
+    passwordConfirm: investorResetPassword,
+    token: resetUrl.searchParams.get("token")
+  };
+  assert.equal(resetPayload.email, investorEmail);
+  assert.ok(resetPayload.token);
+
+  await expectJson(investor.request("/api/auth/reset-password?lang=en", {
+    method: "POST",
+    json: resetPayload
+  }), 200);
+  await expectJson(investor.request("/api/auth/reset-password?lang=en", {
+    method: "POST",
+    json: resetPayload
+  }), 400);
+
+  await assertSignInRejected(investorEmail, investorPassword);
+  await signIn(investor, investorEmail, investorResetPassword);
   await signIn(admin, adminEmail, adminPassword);
 
   const investorUser = await prisma.user.findUniqueOrThrow({ where: { email: investorEmail } });
@@ -277,7 +303,29 @@ async function signIn(session, email, password) {
   assert.equal(payload.user?.email, email);
 }
 
+async function assertSignInRejected(email, password) {
+  const session = new HttpSession(baseUrl);
+  const csrfResponse = await session.request("/api/auth/csrf");
+  assert.equal(csrfResponse.status, 200);
+  const { csrfToken } = await csrfResponse.json();
+  const body = new URLSearchParams({ callbackUrl: `${baseUrl}/investor`, csrfToken, email, json: "true", password });
+  await session.request("/api/auth/callback/credentials?json=true", {
+    method: "POST",
+    body,
+    redirect: "manual",
+    headers: { "content-type": "application/x-www-form-urlencoded" }
+  });
+
+  const sessionResponse = await session.request("/api/auth/session");
+  const payload = await sessionResponse.json();
+  assert.equal(payload.user, undefined, "The previous password must no longer authenticate");
+}
+
 async function waitForVerificationUrl(email) {
+  return waitForEmailUrl(email, "/auth/verify-email");
+}
+
+async function waitForEmailUrl(email, pathname) {
   const encodedEmail = encodeURIComponent(email);
   for (let attempt = 0; attempt < 40; attempt += 1) {
     const listResponse = await fetch(`${mailpitApiUrl}/api/v1/messages`);
@@ -289,13 +337,16 @@ async function waitForVerificationUrl(email) {
         const detail = await detailResponse.json();
         const content = `${detail.Text || ""}\n${detail.HTML || ""}`;
         if (!content.includes(email) && !content.includes(encodedEmail)) continue;
-        const match = content.replaceAll("&amp;", "&").match(/https?:\/\/[^\s"'<>]+\/auth\/verify-email\?[^\s"'<>]+/);
-        if (match) return match[0];
+        const candidates = content.replaceAll("&amp;", "&").match(/https?:\/\/[^\s"'<>]+/g) || [];
+        for (const candidate of candidates) {
+          const url = new URL(candidate);
+          if (url.pathname === pathname && url.searchParams.get("email") === email) return url.toString();
+        }
       }
     }
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
-  throw new Error(`Verification email was not received for ${email}`);
+  throw new Error(`Email link ${pathname} was not received for ${email}`);
 }
 
 async function expectJson(responsePromise, expectedStatus) {
