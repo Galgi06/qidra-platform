@@ -1,4 +1,4 @@
-import { createHash, createHmac, timingSafeEqual } from "crypto";
+import { createHash } from "crypto";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import type { User as PrismaUser } from "@prisma/client";
 import type { NextAuthOptions } from "next-auth";
@@ -11,7 +11,6 @@ import { isSocialProviderConfigured } from "@/lib/social-auth";
 import { isUserBlocked } from "@/lib/user-access";
 
 const googleEnabled = isSocialProviderConfigured(process.env.GOOGLE_CLIENT_ID) && isSocialProviderConfigured(process.env.GOOGLE_CLIENT_SECRET);
-const telegramToken = isSocialProviderConfigured(process.env.TELEGRAM_BOT_TOKEN) ? process.env.TELEGRAM_BOT_TOKEN : undefined;
 const isProductionBuild = process.env.NEXT_PHASE === "phase-production-build";
 
 function requireAuthSecret() {
@@ -111,128 +110,6 @@ function createQidraAdapter(): Adapter {
   };
 }
 
-function isValidTelegramPayload(credentials?: Record<string, unknown>) {
-  if (!credentials || !telegramToken) {
-    return null;
-  }
-
-  const hash = String(credentials.hash ?? "");
-  const id = String(credentials.id ?? "");
-  const authDate = String(credentials.auth_date ?? "");
-
-  if (!hash || !id || !authDate || !/^[a-f0-9]{64}$/i.test(hash)) {
-    return null;
-  }
-
-  const allowedKeys = ["auth_date", "first_name", "id", "last_name", "photo_url", "username"];
-  const dataCheckString = allowedKeys
-    .filter((key) => credentials[key] !== undefined && credentials[key] !== null && String(credentials[key]) !== "")
-    .sort()
-    .map((key) => `${key}=${String(credentials[key])}`)
-    .join("\n");
-
-  const secretKey = createHash("sha256").update(telegramToken).digest();
-  const calculatedHash = createHmac("sha256", secretKey).update(dataCheckString).digest("hex");
-  const expected = Buffer.from(calculatedHash, "hex");
-  const received = Buffer.from(hash, "hex");
-
-  if (expected.length !== received.length || !timingSafeEqual(expected, received)) {
-    return null;
-  }
-
-  const authTimestamp = Number(authDate);
-  const maxAgeSeconds = 60 * 60 * 24;
-
-  if (!Number.isFinite(authTimestamp) || Date.now() / 1000 - authTimestamp > maxAgeSeconds) {
-    return null;
-  }
-
-  const firstName = String(credentials.first_name ?? "").trim();
-  const lastName = String(credentials.last_name ?? "").trim();
-  const username = String(credentials.username ?? "").trim();
-  const name = [firstName, lastName].filter(Boolean).join(" ") || username || `Telegram ${id}`;
-
-  return { id, name };
-}
-
-async function authorizeTelegram(credentials?: Record<string, unknown>) {
-  const telegramProfile = isValidTelegramPayload(credentials);
-
-  if (!telegramProfile) {
-    return null;
-  }
-
-  const provider = "telegram";
-  const providerAccountId = telegramProfile.id;
-  const existingAccount = await prisma.account.findUnique({
-    where: {
-      provider_providerAccountId: {
-        provider,
-        providerAccountId
-      }
-    },
-    include: { user: true }
-  });
-
-  if (existingAccount?.user) {
-    if (isUserBlocked(existingAccount.user)) {
-      return null;
-    }
-
-    await ensureUserRelations(existingAccount.user.id);
-    return {
-      id: existingAccount.user.id,
-      email: existingAccount.user.email,
-      name: existingAccount.user.name,
-      role: existingAccount.user.role
-    };
-  }
-
-  const email = `telegram-${providerAccountId}@telegram.qidra.local`;
-  const user = await prisma.user.upsert({
-    where: { email },
-    update: {
-      name: telegramProfile.name,
-      emailVerified: new Date()
-    },
-    create: {
-      email,
-      name: telegramProfile.name,
-      emailVerified: new Date(),
-      investorProfile: { create: {} },
-      wallet: { create: {} }
-    }
-  });
-
-  if (isUserBlocked(user)) {
-    return null;
-  }
-
-  await prisma.account.upsert({
-    where: {
-      provider_providerAccountId: {
-        provider,
-        providerAccountId
-      }
-    },
-    update: { userId: user.id },
-    create: {
-      userId: user.id,
-      type: "oauth",
-      provider,
-      providerAccountId
-    }
-  });
-  await ensureUserRelations(user.id);
-
-  return {
-    id: user.id,
-    email: user.email,
-    name: user.name,
-    role: user.role
-  };
-}
-
 export const authOptions: NextAuthOptions = {
   adapter: createQidraAdapter(),
   secret: requireAuthSecret(),
@@ -277,22 +154,6 @@ export const authOptions: NextAuthOptions = {
           name: user.name,
           role: user.role
         };
-      }
-    }),
-    CredentialsProvider({
-      id: "telegram",
-      name: "Telegram",
-      credentials: {
-        auth_date: { label: "auth_date", type: "text" },
-        first_name: { label: "first_name", type: "text" },
-        hash: { label: "hash", type: "text" },
-        id: { label: "id", type: "text" },
-        last_name: { label: "last_name", type: "text" },
-        photo_url: { label: "photo_url", type: "text" },
-        username: { label: "username", type: "text" }
-      },
-      async authorize(credentials) {
-        return authorizeTelegram(credentials);
       }
     })
   ],

@@ -6,7 +6,7 @@
 
 - Public website and investor portal.
 - Admin portal and role-based access.
-- Auth flows: email/password, Google, Telegram, password reset, support-assisted recovery.
+- Auth flows: email/password, Google, password reset, support-assisted recovery.
 - KYC upload/download and project document upload/download.
 - Wallet deposit sync, withdrawal review and TRC20 transaction handling.
 - PostgreSQL, S3/R2 file storage, S3/R2 database backups.

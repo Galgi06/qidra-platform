@@ -179,7 +179,7 @@ export default async function SignUpPage({ searchParams }: { searchParams?: Prom
                 </Button>
                 <div className="flex items-center gap-3 text-12 font-medium uppercase text-qidra-grayBlue">
                   <span className="h-px flex-1 bg-qidra-grayLight" />
-                  {isRu ? "или через Google / Telegram" : "or with Google / Telegram"}
+                  {isRu ? "или через Google" : "or with Google"}
                   <span className="h-px flex-1 bg-qidra-grayLight" />
                 </div>
                 <SocialAuthButtons
@@ -187,7 +187,6 @@ export default async function SignUpPage({ searchParams }: { searchParams?: Prom
                   locale={locale}
                   mode="signUp"
                   nextPath={accountType === "company" ? "/company" : "/investor"}
-                  telegramEnabled={socialAuth.telegramEnabled}
                 />
               </FeedbackForm>
             </div>

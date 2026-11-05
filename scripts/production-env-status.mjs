@@ -8,8 +8,12 @@ const groups = [
     title: "Core"
   },
   {
-    keys: ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "TELEGRAM_BOT_USERNAME", "TELEGRAM_BOT_TOKEN"],
+    keys: ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"],
     title: "Social auth"
+  },
+  {
+    keys: ["TELEGRAM_BOT_TOKEN", "SUPPORT_TELEGRAM_CHAT_ID", "SUPPORT_ALERT_EMAILS"],
+    title: "Support alerts"
   },
   {
     keys: ["TRONGRID_API_KEY", "TRONGRID_API_BASE_URL", "QIDRA_USDT_TRC20_CONTRACT", "QIDRA_TRON_WALLET_ADDRESS", "QIDRA_WALLET_KEY_ENCRYPTION_SECRET"],

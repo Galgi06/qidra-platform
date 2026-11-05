@@ -251,7 +251,6 @@ QIDRA_DEPLOY_RUN_MIGRATIONS=false bash scripts/deploy-remote.sh /opt/qidra-platf
 - email verification;
 - sign-in/sign-out;
 - Google OAuth callback;
-- Telegram callback;
 - password reset;
 - KYC upload/download/review;
 - project submission с несколькими документами;

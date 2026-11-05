@@ -94,18 +94,18 @@ docker compose -f docker-compose.prod.yml exec -T postgres dropdb -U qidra qidra
 
 Перед запуском с реальными деньгами нужно сделать тест: создать backup, скачать его из bucket, поднять восстановленную базу на отдельном окружении и проверить клиентов, платежи, заявки, контракты, чаты, KYC и журнал действий.
 
-## 5. OAuth callbacks
+## 5. Authentication and support alerts
 
 Google OAuth:
 
 - Authorized JavaScript origins: `https://qidra.io`
 - Authorized redirect URI: `https://qidra.io/api/auth/callback/google`
 
-Telegram:
+Telegram support alerts:
 
-- Bot domain должен соответствовать production-домену.
 - `TELEGRAM_BOT_TOKEN` хранить только в secrets.
-- `TELEGRAM_BOT_USERNAME` указывать без `@`.
+- `SUPPORT_TELEGRAM_CHAT_ID` задаёт служебный чат для уведомлений поддержки.
+- Telegram не используется для входа или регистрации пользователей.
 
 ## 6. Email delivery
 
@@ -256,7 +256,7 @@ npm run test:storage
 - проверить `/auth/sign-up`
 - проверить `/auth/sign-in`
 - проверить Google callback
-- проверить Telegram callback
+- проверить отправку служебного уведомления поддержки
 - проверить SMTP
 - проверить KYC upload/download
 - проверить project submission upload/download

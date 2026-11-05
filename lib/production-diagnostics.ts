@@ -76,8 +76,8 @@ export function productionDiagnostics(): DiagnosticGroup[] {
       key: "auth",
       title: { en: "Authentication", ru: "Аутентификация" },
       description: {
-        en: "OAuth and Telegram credentials must match the production domain.",
-        ru: "OAuth и Telegram-ключи должны соответствовать production-домену."
+        en: "Google OAuth credentials must match the production domain.",
+        ru: "Google OAuth-ключи должны соответствовать production-домену."
       },
       checks: [
         envCheck("GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_ID", {
@@ -87,14 +87,6 @@ export function productionDiagnostics(): DiagnosticGroup[] {
         envCheck("GOOGLE_CLIENT_SECRET", "GOOGLE_CLIENT_SECRET", {
           en: "Google OAuth client secret.",
           ru: "Google OAuth client secret."
-        }),
-        envCheck("TELEGRAM_BOT_USERNAME", "TELEGRAM_BOT_USERNAME", {
-          en: "Telegram bot username without @.",
-          ru: "Username Telegram-бота без @."
-        }),
-        envCheck("TELEGRAM_BOT_TOKEN", "TELEGRAM_BOT_TOKEN", {
-          en: "Telegram bot token stored only in secrets.",
-          ru: "Токен Telegram-бота хранится только в secrets."
         })
       ]
     },

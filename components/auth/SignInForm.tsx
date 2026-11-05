@@ -15,14 +15,12 @@ export function SignInForm({
   googleEnabled,
   locale,
   nextPath,
-  preferredAccountType,
-  telegramEnabled
+  preferredAccountType
 }: {
   googleEnabled: boolean;
   locale: Locale;
   nextPath: string;
   preferredAccountType: "company" | "investor";
-  telegramEnabled: boolean;
 }) {
   const [feedback, setFeedback] = useState<FeedbackMessage | null>(null);
   const [loading, setLoading] = useState(false);
@@ -117,10 +115,10 @@ export function SignInForm({
         </Button>
         <div className="flex items-center gap-3 text-12 font-medium uppercase text-qidra-grayBlue">
           <span className="h-px flex-1 bg-qidra-grayLight" />
-          {locale === "ru" ? "или через Google / Telegram" : "or with Google / Telegram"}
+          {locale === "ru" ? "или через Google" : "or with Google"}
           <span className="h-px flex-1 bg-qidra-grayLight" />
         </div>
-        <SocialAuthButtons googleEnabled={googleEnabled} locale={locale} mode="signIn" nextPath={nextPath} telegramEnabled={telegramEnabled} />
+        <SocialAuthButtons googleEnabled={googleEnabled} locale={locale} mode="signIn" nextPath={nextPath} />
         <div className="flex justify-between gap-3 text-14 text-qidra-grayBlue">
           <Link href={withLocale(`/auth/sign-up?account=${preferredAccountType}`, locale)}>{locale === "ru" ? "Регистрация" : "Create account"}</Link>
           <Link href={withLocale(`/auth/forgot-password?account=${preferredAccountType}`, locale)}>{locale === "ru" ? "Забыли пароль" : "Forgot password"}</Link>
