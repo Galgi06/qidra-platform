@@ -66,9 +66,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          if [[ -n "$TEST_RECIPIENT" && ! "$TEST_RECIPIENT" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]]; then
+            echo "::error::test_recipient must be a valid email address"
+            exit 1
+          fi
+
           port="${DEPLOY_PORT:-22}"
           ssh -p "$port" "${DEPLOY_USER}@${DEPLOY_HOST}" \
             "cd '${DEPLOY_PATH}' && \
+             set -a && . ./.env.production && set +a && \
              echo '--- ENV STATUS ---' && \
              docker compose --env-file .env.production -f docker-compose.prod.yml run --rm --no-deps app node scripts/production-env-status.mjs && \
              echo '--- SMTP TEST ---' && \
