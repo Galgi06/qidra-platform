@@ -1,0 +1,92 @@
+name: Ops Google OAuth Rotation
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rotate:
+    name: Rotate production Google OAuth
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: qidra-production-operations
+      cancel-in-progress: false
+    env:
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+      DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+      DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+      DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+      DEPLOY_COMPOSE_FILE: ${{ secrets.DEPLOY_COMPOSE_FILE }}
+      HEALTHCHECK_URL: ${{ secrets.HEALTHCHECK_URL }}
+      GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+      GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate Qidra production scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          for key in DEPLOY_HOST DEPLOY_USER DEPLOY_PATH HEALTHCHECK_URL GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET; do
+            if [[ -z "${!key:-}" ]]; then
+              echo "::error::Missing required Qidra production secret ${key}"
+              exit 1
+            fi
+          done
+          [[ "$GOOGLE_CLIENT_ID" == *.apps.googleusercontent.com ]]
+          [[ "$GOOGLE_CLIENT_SECRET" == GOCSPX-* ]]
+
+      - name: Start SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
+
+      - name: Trust Qidra deploy host
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          port="${DEPLOY_PORT:-22}"
+          if [[ -n "${DEPLOY_KNOWN_HOSTS:-}" ]]; then
+            printf '%s\n' "$DEPLOY_KNOWN_HOSTS" >> ~/.ssh/known_hosts
+          else
+            ssh-keyscan -p "$port" -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+          fi
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Upload protected OAuth rotation file
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          rotation_file="$(mktemp)"
+          trap 'rm -f "$rotation_file"' EXIT
+          printf 'GOOGLE_CLIENT_ID=%q\nGOOGLE_CLIENT_SECRET=%q\n' "$GOOGLE_CLIENT_ID" "$GOOGLE_CLIENT_SECRET" > "$rotation_file"
+          port="${DEPLOY_PORT:-22}"
+          scp -P "$port" "$rotation_file" "${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/.google-oauth-rotation.env"
+
+      - name: Rotate OAuth and restart Qidra
+        shell: bash
+        run: |
+          set -euo pipefail
+          port="${DEPLOY_PORT:-22}"
+          compose_file="${DEPLOY_COMPOSE_FILE:-docker-compose.prod.yml}"
+          ssh -p "$port" "${DEPLOY_USER}@${DEPLOY_HOST}" \
+            "set -euo pipefail; \
+             cd '${DEPLOY_PATH}'; \
+             chmod 600 .google-oauth-rotation.env; \
+             trap 'rm -f .google-oauth-rotation.env' EXIT; \
+             set -a; . ./.google-oauth-rotation.env; set +a; \
+             node scripts/rotate-google-oauth-env.mjs .env.production; \
+             export QIDRA_DEPLOY_RUN_MIGRATIONS=false COMPOSE_FILE='${compose_file}'; \
+             bash scripts/deploy-remote.sh '${DEPLOY_PATH}'"
+
+      - name: Verify public Qidra healthcheck
+        shell: bash
+        run: QIDRA_HEALTHCHECK_URL="$HEALTHCHECK_URL" node scripts/qidra-healthcheck.mjs
