@@ -14,7 +14,7 @@ Resolved runtime findings include Next.js, Zod, Axios, Sharp, Browserslist, `sou
 
 Qidra does not configure the NextAuth EmailProvider and does not call `getToken()`. Application SMTP delivery imports `nodemailer-secure`, an npm alias pinned to patched `nodemailer@10.3.1`. The older Nodemailer packages reported by npm are optional peer dependencies installed below Auth.js and are not used by Qidra mail delivery.
 
-The remaining OAuth provider-cookie advisory can only be fully removed by a tested NextAuth v5 migration. That migration must include sign-in, sign-up, Google callback, Telegram, blocked-user, session invalidation, and password-reset regression tests before release.
+The remaining OAuth provider-cookie advisory can only be fully removed by a tested NextAuth v5 migration. That migration must include sign-in, sign-up, Google callback, blocked-user, session invalidation, and password-reset regression tests before release.
 
 ### Prisma CLI
 

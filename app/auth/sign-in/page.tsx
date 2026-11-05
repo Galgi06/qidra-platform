@@ -45,7 +45,7 @@ export default async function SignInPage({ searchParams }: { searchParams?: Prom
             />
           </div>
         ) : null}
-        <SignInForm googleEnabled={socialAuth.googleEnabled} locale={locale} nextPath={nextPath} preferredAccountType={accountType} telegramEnabled={socialAuth.telegramEnabled} />
+        <SignInForm googleEnabled={socialAuth.googleEnabled} locale={locale} nextPath={nextPath} preferredAccountType={accountType} />
       </main>
       <Footer locale={locale} />
     </>
