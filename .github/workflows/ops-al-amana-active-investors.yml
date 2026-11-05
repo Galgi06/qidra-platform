@@ -1,0 +1,93 @@
+name: Ops Al Amana Active Investors
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  report:
+    name: Export active Al Amana investors
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: qidra-production-read-only-report
+      cancel-in-progress: false
+    env:
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+      DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+      DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+      DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+      DEPLOY_COMPOSE_FILE: ${{ secrets.DEPLOY_COMPOSE_FILE }}
+    steps:
+      - name: Validate Qidra production scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          for key in DEPLOY_HOST DEPLOY_USER DEPLOY_PATH; do
+            if [[ -z "${!key:-}" ]]; then
+              echo "::error::Missing required Qidra production secret ${key}"
+              exit 1
+            fi
+          done
+
+      - name: Start SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
+
+      - name: Trust Qidra deploy host
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          port="${DEPLOY_PORT:-22}"
+          if [[ -n "${DEPLOY_KNOWN_HOSTS:-}" ]]; then
+            printf '%s\n' "$DEPLOY_KNOWN_HOSTS" >> ~/.ssh/known_hosts
+          else
+            ssh-keyscan -p "$port" -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+          fi
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Export read-only production report
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          port="${DEPLOY_PORT:-22}"
+          compose_file="${DEPLOY_COMPOSE_FILE:-docker-compose.prod.yml}"
+          ssh -p "$port" "${DEPLOY_USER}@${DEPLOY_HOST}" \
+            "cd '${DEPLOY_PATH}' && \
+             docker compose --env-file .env.production -f '${compose_file}' exec -T postgres \
+             sh -lc 'psql -v ON_ERROR_STOP=1 -U \"\$POSTGRES_USER\" -d \"\$POSTGRES_DB\" --csv'" \
+            > al-amana-active-investors.csv <<'SQL'
+          SELECT
+            CASE
+              WHEN GROUPING(u.id) = 1 THEN 'ИТОГО'
+              ELSE COALESCE(NULLIF(BTRIM(u.name), ''), 'Имя не указано')
+            END AS "Инвестор",
+            COUNT(*)::integer AS "Активных договоров",
+            ROUND(SUM(ia."amountUsdt")::numeric, 2) AS "Сумма инвестиций, USDT"
+          FROM "InvestmentApplication" ia
+          JOIN "Project" p ON p.id = ia."projectId"
+          JOIN "User" u ON u.id = ia."userId"
+          WHERE p.slug = 'al-amana-gold'
+            AND p."payoutFrequency" = 'QUARTERLY'
+            AND ia.status = 'CONFIRMED'
+            AND ia."closedAt" IS NULL
+          GROUP BY GROUPING SETS ((u.id, u.name), ())
+          ORDER BY GROUPING(u.id), "Инвестор";
+          SQL
+          chmod 600 al-amana-active-investors.csv
+          test -s al-amana-active-investors.csv
+
+      - name: Upload private report
+        uses: actions/upload-artifact@v4
+        with:
+          name: al-amana-active-investors-${{ github.run_id }}
+          path: al-amana-active-investors.csv
+          if-no-files-found: error
+          retention-days: 1
