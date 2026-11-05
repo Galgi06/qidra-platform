@@ -83,7 +83,7 @@ jobs:
              chmod 600 .google-oauth-rotation.env; \
              trap 'rm -f .google-oauth-rotation.env' EXIT; \
              set -a; . ./.google-oauth-rotation.env; set +a; \
-             node scripts/rotate-google-oauth-env.mjs .env.production; \
+             bash scripts/rotate-google-oauth-env.sh .env.production; \
              export QIDRA_DEPLOY_RUN_MIGRATIONS=false COMPOSE_FILE='${compose_file}'; \
              bash scripts/deploy-remote.sh '${DEPLOY_PATH}'"
 
