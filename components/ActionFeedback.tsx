@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ComponentProps, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ComponentProps, type FormEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 
@@ -175,9 +175,9 @@ export function FeedbackForm({
   const [activeFeedback, setActiveFeedback] = useState(feedback);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const pendingFormRef = useState(() => ({ current: null as HTMLFormElement | null }))[0];
-  const pendingSubmitterRef = useState(() => ({ current: null as { name: string; value: string } | null }))[0];
-  const formRef = useState(() => ({ current: null as HTMLFormElement | null }))[0];
+  const pendingFormRef = useRef<HTMLFormElement | null>(null);
+  const pendingSubmitterRef = useRef<{ name: string; value: string } | null>(null);
+  const formRef = useRef<HTMLFormElement | null>(null);
 
   useEffect(() => {
     const form = formRef.current;
