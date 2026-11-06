@@ -179,6 +179,74 @@ jobs:
           ORDER BY pdp."periodStart", u.name;
           SQL
 
+          export_csv al-amana-reinvestment-preferences.csv <<'SQL'
+          SELECT DISTINCT
+            COALESCE(NULLIF(BTRIM(u.name), ''), 'Имя не указано') AS "Инвестор",
+            COALESCE(arp.enabled, false) AS "Автореинвест включен",
+            arp."allocationPercent" AS "Доля автореинвеста, %",
+            target.slug AS "Целевой проект",
+            arp."acceptedAt" AS "Подтверждено"
+          FROM "InvestmentApplication" ia
+          JOIN "Project" p ON p.id = ia."projectId"
+          JOIN "User" u ON u.id = ia."userId"
+          LEFT JOIN "AutoReinvestmentPreference" arp ON arp."userId" = u.id
+          LEFT JOIN "Project" target ON target.id = arp."targetProjectId"
+          WHERE p.slug = 'al-amana-gold'
+            AND p."payoutFrequency" = 'QUARTERLY'
+            AND ia.status = 'CONFIRMED'
+            AND ia."closedAt" IS NULL
+          ORDER BY "Инвестор";
+          SQL
+
+          export_csv al-amana-q3-payout-verification.csv <<'SQL'
+          SELECT
+            COALESCE(NULLIF(BTRIM(u.name), ''), 'Имя не указано') AS "Инвестор",
+            pdp."periodLabel" AS "Период",
+            pdp.status::text AS "Статус периода",
+            dp.status::text AS "Статус выплаты",
+            ROUND(dp."amountUsdt"::numeric, 2) AS "Дивиденд, USDT",
+            dp."paidAt" AS "Выплачено",
+            ROUND(w."availableUsdt"::numeric, 2) AS "Доступный баланс, USDT",
+            wt.type::text AS "Тип операции",
+            wt.status::text AS "Статус операции",
+            ROUND(wt."amountUsdt"::numeric, 2) AS "Сумма операции, USDT",
+            wt.note AS "Назначение операции",
+            COUNT(n.id)::integer AS "Уведомлений о дивиденде"
+          FROM "DividendPayment" dp
+          JOIN "ProjectDividendPeriod" pdp ON pdp.id = dp."periodId"
+          JOIN "Project" p ON p.id = pdp."projectId"
+          JOIN "User" u ON u.id = dp."userId"
+          JOIN "WalletTransaction" wt ON wt.id = dp."walletTransactionId"
+          JOIN "Wallet" w ON w.id = wt."walletId" AND w."userId" = dp."userId"
+          LEFT JOIN "Notification" n
+            ON n."userId" = dp."userId"
+           AND n.type = 'dividend'
+           AND n."bodyRu" LIKE '%' || pdp."periodLabel" || '%'
+           AND n."createdAt" BETWEEN dp."paidAt" - INTERVAL '1 minute' AND dp."paidAt" + INTERVAL '1 minute'
+          WHERE p.slug = 'al-amana-gold'
+            AND pdp."periodLabel" = '2026 Q3'
+          GROUP BY u.id, u.name, pdp."periodLabel", pdp.status, dp.id, dp.status,
+            dp."amountUsdt", dp."paidAt", w."availableUsdt", wt.id, wt.type,
+            wt.status, wt."amountUsdt", wt.note
+          ORDER BY "Инвестор";
+          SQL
+
+          export_csv al-amana-q3-admin-audit.csv <<'SQL'
+          SELECT
+            aal.action AS "Действие",
+            aal."entityType" AS "Тип объекта",
+            aal."entityId" AS "ID объекта",
+            aal.payload AS "Детали",
+            aal."createdAt" AS "Дата"
+          FROM "AdminAuditLog" aal
+          JOIN "ProjectDividendPeriod" pdp ON pdp.id = aal."entityId"
+          JOIN "Project" p ON p.id = pdp."projectId"
+          WHERE aal.action = 'dividend.pay'
+            AND p.slug = 'al-amana-gold'
+            AND pdp."periodLabel" = '2026 Q3'
+          ORDER BY aal."createdAt" DESC;
+          SQL
+
       - name: Upload private report
         uses: actions/upload-artifact@v4
         with:
