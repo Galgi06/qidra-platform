@@ -5,6 +5,7 @@ import { AdminTabs } from "@/components/AdminTabs";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { FeedbackForm } from "@/components/ActionFeedback";
 import { Footer } from "@/components/Footer";
+import { FileUpload } from "@/components/FileUpload";
 import { Header } from "@/components/Header";
 import { NotificationCard } from "@/components/NotificationCard";
 import { ProjectStatusBadge, type BadgeStatus } from "@/components/ui/ProjectStatusBadge";
@@ -294,6 +295,7 @@ function DividendAccountingPanel({
       <FeedbackForm
         className="grid gap-4 rounded-qidra border border-qidra-grayLight bg-qidra-grayLight p-4"
         endpoint={`/api/admin/dividends?lang=${locale}`}
+        payload="form-data"
         feedback={{
           title: isRu ? "Период рассчитан" : "Period calculated",
           text: isRu ? "Начисления подготовлены. Проверьте строки и утвердите расчёт перед выплатой." : "Accruals are prepared. Review the rows and approve the calculation before payout.",
@@ -304,6 +306,19 @@ function DividendAccountingPanel({
         refreshOnSuccess
       >
         <input name="action" type="hidden" value="calculate" />
+        <div className="grid gap-4 lg:grid-cols-2">
+          <label className="grid gap-2 text-14 font-medium text-qidra-dark">
+            {isRu ? "Режим расчёта" : "Calculation mode"}
+            <select className="h-14 rounded-qidra border border-qidra-grayLight bg-white px-4 text-16 font-medium text-qidra-dark outline-none transition-colors focus:border-qidra-accent" defaultValue="PROJECT_PROFIT" name="calculationMode" required>
+              <option value="PROJECT_PROFIT">{isRu ? "Из выручки и расходов" : "Revenue and costs"}</option>
+              <option value="READY_POOL">{isRu ? "Готовый пул участников" : "Ready participant pool"}</option>
+            </select>
+          </label>
+          <label className="grid gap-2 text-14 font-medium text-qidra-dark">
+            {isRu ? "Готовый пул, USDT" : "Ready pool, USDT"}
+            <input className="h-14 rounded-qidra border border-qidra-grayLight bg-white px-4 text-16 font-medium text-qidra-dark outline-none transition-colors focus:border-qidra-accent" defaultValue="0" inputMode="decimal" min="0" name="qidraParticipantPoolUsdt" required step="0.000001" type="number" />
+          </label>
+        </div>
         <div className="grid gap-4 lg:grid-cols-4">
           <label className="grid gap-2 text-14 font-medium text-qidra-dark lg:col-span-2">
             {isRu ? "Проект" : "Project"}
@@ -336,7 +351,7 @@ function DividendAccountingPanel({
           </label>
           <label className="grid gap-2 text-14 font-medium text-qidra-dark">
             {isRu ? "Выручка USDT" : "Revenue USDT"}
-            <input className="h-14 rounded-qidra border border-qidra-grayLight bg-white px-4 text-16 font-medium text-qidra-dark outline-none transition-colors focus:border-qidra-accent" inputMode="decimal" min="0" name="grossRevenueUsdt" placeholder="100000" required step="0.000001" type="number" />
+            <input className="h-14 rounded-qidra border border-qidra-grayLight bg-white px-4 text-16 font-medium text-qidra-dark outline-none transition-colors focus:border-qidra-accent" defaultValue="0" inputMode="decimal" min="0" name="grossRevenueUsdt" placeholder="100000" required step="0.000001" type="number" />
           </label>
           <label className="grid gap-2 text-14 font-medium text-qidra-dark">
             {isRu ? "Прямые расходы" : "Direct costs"}
@@ -355,6 +370,15 @@ function DividendAccountingPanel({
             placeholder={isRu ? "Например: квартальный отчёт Al Amana Gold, Q1 2026" : "Example: Al Amana Gold quarterly report, Q1 2026"}
           />
         </label>
+        <FileUpload
+          accept=".pdf,.xls,.xlsx,.csv"
+          hint={isRu ? "Приложите PDF, XLS, XLSX или CSV с итогами периода. Файл будет доступен участникам после утверждения." : "Attach a PDF, XLS, XLSX, or CSV period report. The file becomes available after approval."}
+          label={isRu ? "Отчётность периода" : "Period reporting"}
+          manyFilesLabel={isRu ? "файлов" : "files"}
+          name="attachments"
+          required
+          selectedLabel={isRu ? "Выбрано" : "Selected"}
+        />
         <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
           <label className="grid gap-2 text-14 font-medium text-qidra-dark">
             {isRu ? "Подтверждение" : "Confirmation"}

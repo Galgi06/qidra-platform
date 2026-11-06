@@ -354,6 +354,7 @@ function CompanyDividendPanel({
         refreshOnSuccess
       >
         <input name="action" type="hidden" value="calculate" />
+        <input name="calculationMode" type="hidden" value="PROJECT_PROFIT" />
         <div className="grid gap-4 lg:grid-cols-4">
           <label className="grid gap-2 text-14 font-medium text-qidra-dark lg:col-span-2">
             {isRu ? "Проект" : "Project"}
