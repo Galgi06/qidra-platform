@@ -1,4 +1,4 @@
-name: Ops Al Amana Active Investors
+name: Ops Al Amana Investor Audit
 
 on:
   workflow_dispatch:
@@ -8,7 +8,7 @@ permissions:
 
 jobs:
   report:
-    name: Export active Al Amana investors
+    name: Export Al Amana investor audit
     runs-on: ubuntu-latest
     environment: production
     concurrency:
@@ -51,22 +51,30 @@ jobs:
           fi
           chmod 600 ~/.ssh/known_hosts
 
-      - name: Export read-only production report
+      - name: Export read-only production audit
         shell: bash
         run: |
           set -euo pipefail
           umask 077
           port="${DEPLOY_PORT:-22}"
-          ssh -p "$port" "${DEPLOY_USER}@${DEPLOY_HOST}" \
-            "set -euo pipefail; \
-             container_id=\"\$(docker ps \
-               --filter 'label=com.docker.compose.project.working_dir=${DEPLOY_PATH}' \
-               --filter 'label=com.docker.compose.service=postgres' \
-               --format '{{.ID}}')\"; \
-             [[ \"\$container_id\" =~ ^[0-9a-f]+$ ]]; \
-             docker exec -i \"\$container_id\" \
-               sh -lc 'psql -v ON_ERROR_STOP=1 -U \"\$POSTGRES_USER\" -d \"\$POSTGRES_DB\" --csv'" \
-            > al-amana-active-investors.csv <<'SQL'
+
+          export_csv() {
+            local output="$1"
+            ssh -p "$port" "${DEPLOY_USER}@${DEPLOY_HOST}" \
+              "set -euo pipefail; \
+               container_id=\"\$(docker ps \
+                 --filter 'label=com.docker.compose.project.working_dir=${DEPLOY_PATH}' \
+                 --filter 'label=com.docker.compose.service=postgres' \
+                 --format '{{.ID}}')\"; \
+               [[ \"\$container_id\" =~ ^[0-9a-f]+$ ]]; \
+               docker exec -i \"\$container_id\" \
+                 sh -lc 'psql -v ON_ERROR_STOP=1 -U \"\$POSTGRES_USER\" -d \"\$POSTGRES_DB\" --csv'" \
+              > "$output"
+            chmod 600 "$output"
+            test -s "$output"
+          }
+
+          export_csv al-amana-active-investors.csv <<'SQL'
           SELECT
             CASE
               WHEN GROUPING(u.id) = 1 THEN 'ИТОГО'
@@ -84,13 +92,97 @@ jobs:
           GROUP BY GROUPING SETS ((u.id, u.name), ())
           ORDER BY GROUPING(u.id), "Инвестор";
           SQL
-          chmod 600 al-amana-active-investors.csv
-          test -s al-amana-active-investors.csv
+
+          export_csv al-amana-all-contracts.csv <<'SQL'
+          SELECT
+            COALESCE(NULLIF(BTRIM(u.name), ''), 'Имя не указано') AS "Инвестор",
+            p.slug AS "Проект slug",
+            p."titleRu" AS "Проект",
+            p."payoutFrequency"::text AS "Периодичность",
+            p.status::text AS "Статус проекта",
+            ia.status::text AS "Статус договора",
+            ROUND(ia."amountUsdt"::numeric, 2) AS "Сумма, USDT",
+            ia."contractAcceptedAt" AS "Принят договор",
+            ia."closedAt" AS "Закрыт",
+            ia."createdAt" AS "Создан",
+            ia."adminNote" AS "Источник"
+          FROM "InvestmentApplication" ia
+          JOIN "Project" p ON p.id = ia."projectId"
+          JOIN "User" u ON u.id = ia."userId"
+          WHERE p.slug ILIKE '%amana%'
+             OR p."titleRu" ILIKE '%amana%'
+             OR p."titleEn" ILIKE '%amana%'
+             OR ia."adminNote" ILIKE '%Al Amana%'
+          ORDER BY u.name, ia."createdAt";
+          SQL
+
+          export_csv al-amana-contract-summary.csv <<'SQL'
+          SELECT
+            p.slug AS "Проект slug",
+            p."titleRu" AS "Проект",
+            p."payoutFrequency"::text AS "Периодичность",
+            ia.status::text AS "Статус договора",
+            CASE WHEN ia."closedAt" IS NULL THEN 'OPEN' ELSE 'CLOSED_DATE' END AS "Закрытие",
+            COUNT(*)::integer AS "Договоров",
+            COUNT(DISTINCT ia."userId")::integer AS "Инвесторов",
+            ROUND(SUM(ia."amountUsdt")::numeric, 2) AS "Сумма, USDT"
+          FROM "InvestmentApplication" ia
+          JOIN "Project" p ON p.id = ia."projectId"
+          WHERE p.slug ILIKE '%amana%'
+             OR p."titleRu" ILIKE '%amana%'
+             OR p."titleEn" ILIKE '%amana%'
+             OR ia."adminNote" ILIKE '%Al Amana%'
+          GROUP BY p.id, p.slug, p."titleRu", p."payoutFrequency", ia.status,
+            CASE WHEN ia."closedAt" IS NULL THEN 'OPEN' ELSE 'CLOSED_DATE' END
+          ORDER BY p.slug, ia.status, "Закрытие";
+          SQL
+
+          export_csv al-amana-imported-users.csv <<'SQL'
+          SELECT
+            COALESCE(NULLIF(BTRIM(u.name), ''), 'Имя не указано') AS "Инвестор",
+            COUNT(ia.id)::integer AS "Всего договоров",
+            COUNT(ia.id) FILTER (
+              WHERE ia.status = 'CONFIRMED' AND ia."closedAt" IS NULL
+            )::integer AS "Активных подтвержденных",
+            ROUND(COALESCE(SUM(ia."amountUsdt"), 0)::numeric, 2) AS "Сумма всех договоров, USDT",
+            COALESCE(
+              STRING_AGG(DISTINCT p.slug, ', ' ORDER BY p.slug),
+              'без проекта'
+            ) AS "Проекты"
+          FROM "User" u
+          LEFT JOIN "InvestmentApplication" ia ON ia."userId" = u.id
+          LEFT JOIN "Project" p ON p.id = ia."projectId"
+          WHERE u.email ILIKE 'al-amana-%@qidra.import'
+          GROUP BY u.id, u.name
+          ORDER BY u.name;
+          SQL
+
+          export_csv al-amana-dividend-history.csv <<'SQL'
+          SELECT
+            COALESCE(NULLIF(BTRIM(u.name), ''), 'Имя не указано') AS "Инвестор",
+            p.slug AS "Проект slug",
+            pdp."periodLabel" AS "Период",
+            pdp.status::text AS "Статус периода",
+            dp.status::text AS "Статус выплаты",
+            ROUND(dp."investmentAmountUsdt"::numeric, 2) AS "Инвестиция, USDT",
+            ROUND(dp."amountUsdt"::numeric, 2) AS "Дивиденд, USDT",
+            dp."paidAt" AS "Выплачено"
+          FROM "DividendPayment" dp
+          JOIN "ProjectDividendPeriod" pdp ON pdp.id = dp."periodId"
+          JOIN "InvestmentApplication" ia ON ia.id = dp."investmentId"
+          JOIN "Project" p ON p.id = pdp."projectId"
+          JOIN "User" u ON u.id = dp."userId"
+          WHERE p.slug ILIKE '%amana%'
+             OR p."titleRu" ILIKE '%amana%'
+             OR p."titleEn" ILIKE '%amana%'
+             OR ia."adminNote" ILIKE '%Al Amana%'
+          ORDER BY pdp."periodStart", u.name;
+          SQL
 
       - name: Upload private report
         uses: actions/upload-artifact@v4
         with:
-          name: al-amana-active-investors-${{ github.run_id }}
-          path: al-amana-active-investors.csv
+          name: al-amana-investor-audit-${{ github.run_id }}
+          path: al-amana-*.csv
           if-no-files-found: error
           retention-days: 1
