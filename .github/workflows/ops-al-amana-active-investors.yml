@@ -198,6 +198,22 @@ jobs:
           ORDER BY "Инвестор";
           SQL
 
+          export_csv qidra-all-reinvestment-preferences.csv <<'SQL'
+          SELECT
+            COALESCE(NULLIF(BTRIM(u.name), ''), 'Имя не указано') AS "Инвестор",
+            u.email AS "Email",
+            arp.enabled AS "Автореинвест включен",
+            arp."allocationPercent" AS "Доля автореинвеста, %",
+            target.slug AS "Целевой проект",
+            arp."acceptedAt" AS "Подтверждено пользователем",
+            arp."termsVersion" AS "Версия условий",
+            arp."updatedAt" AS "Последнее изменение"
+          FROM "AutoReinvestmentPreference" arp
+          JOIN "User" u ON u.id = arp."userId"
+          JOIN "Project" target ON target.id = arp."targetProjectId"
+          ORDER BY arp.enabled DESC, "Инвестор";
+          SQL
+
           export_csv al-amana-q3-payout-verification.csv <<'SQL'
           SELECT
             COALESCE(NULLIF(BTRIM(u.name), ''), 'Имя не указано') AS "Инвестор",
@@ -251,6 +267,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: al-amana-investor-audit-${{ github.run_id }}
-          path: al-amana-*.csv
+          path: |
+            al-amana-*.csv
+            qidra-all-reinvestment-preferences.csv
           if-no-files-found: error
           retention-days: 1
