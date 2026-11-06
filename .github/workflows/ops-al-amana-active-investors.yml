@@ -179,6 +179,25 @@ jobs:
           ORDER BY pdp."periodStart", u.name;
           SQL
 
+          export_csv al-amana-reinvestment-preferences.csv <<'SQL'
+          SELECT DISTINCT
+            COALESCE(NULLIF(BTRIM(u.name), ''), 'Имя не указано') AS "Инвестор",
+            COALESCE(arp.enabled, false) AS "Автореинвест включен",
+            arp."allocationPercent" AS "Доля автореинвеста, %",
+            target.slug AS "Целевой проект",
+            arp."acceptedAt" AS "Подтверждено"
+          FROM "InvestmentApplication" ia
+          JOIN "Project" p ON p.id = ia."projectId"
+          JOIN "User" u ON u.id = ia."userId"
+          LEFT JOIN "AutoReinvestmentPreference" arp ON arp."userId" = u.id
+          LEFT JOIN "Project" target ON target.id = arp."targetProjectId"
+          WHERE p.slug = 'al-amana-gold'
+            AND p."payoutFrequency" = 'QUARTERLY'
+            AND ia.status = 'CONFIRMED'
+            AND ia."closedAt" IS NULL
+          ORDER BY "Инвестор";
+          SQL
+
       - name: Upload private report
         uses: actions/upload-artifact@v4
         with:
