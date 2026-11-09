@@ -38,17 +38,25 @@ export async function Header({ locale, path = "/" }: { locale: Locale; path?: st
 
   return (
     <>
-      <header className="sticky top-0 z-40 border-b border-qidra-grayLight/80 bg-white/92 backdrop-blur-xl">
+      <header className="sticky top-0 z-40 border-b border-qidra-dark/8 bg-white/94 shadow-[0_8px_28px_rgba(17,26,29,0.035)] backdrop-blur-xl">
         <div className="container-qidra flex min-h-20 items-center justify-between gap-5 py-4">
           <Link href={withLocale("/", locale)} className="flex shrink-0 items-center gap-3" aria-label="Qidra">
             <Image src="/assets/brand/qidra-logo-dark.png" alt="Qidra" width={122} height={48} priority className="h-10 w-auto object-contain" />
           </Link>
-          <nav className="hidden items-center gap-2 text-15 font-semibold text-qidra-grayBlue lg:flex">
-            {links.map((link) => (
-              <Link key={link.href} href={withLocale(link.href, locale)} className="rounded-qidra px-3 py-2 transition-colors hover:bg-qidra-grayLight hover:text-qidra-dark">
-                {link.label}
-              </Link>
-            ))}
+          <nav className="hidden items-center gap-1 text-14 font-semibold text-qidra-grayBlue lg:flex">
+            {links.map((link) => {
+              const active = path === link.href || (link.href !== "/" && path.startsWith(`${link.href}/`));
+
+              return (
+                <Link
+                  key={link.href}
+                  href={withLocale(link.href, locale)}
+                  className={`rounded-full px-3.5 py-2 transition-colors ${active ? "bg-qidra-accent8 text-qidra-accent" : "hover:bg-qidra-grayLight hover:text-qidra-dark"}`}
+                >
+                  {link.label}
+                </Link>
+              );
+            })}
           </nav>
           <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             <LanguageSwitcher locale={locale} path={path} />
@@ -72,11 +80,15 @@ export async function Header({ locale, path = "/" }: { locale: Locale; path?: st
           </div>
         </div>
         <nav className="container-qidra flex gap-2 overflow-x-auto border-t border-qidra-grayLight py-3 text-14 font-semibold text-qidra-grayBlue lg:hidden">
-          {links.map((link) => (
-            <Link key={link.href} href={withLocale(link.href, locale)} className="shrink-0 rounded-qidra bg-qidra-grayLight px-3 py-2">
-              {link.label}
-            </Link>
-          ))}
+          {links.map((link) => {
+            const active = path === link.href || (link.href !== "/" && path.startsWith(`${link.href}/`));
+
+            return (
+              <Link key={link.href} href={withLocale(link.href, locale)} className={`shrink-0 rounded-full px-3.5 py-2 ${active ? "bg-qidra-accent text-white" : "bg-qidra-grayLight"}`}>
+                {link.label}
+              </Link>
+            );
+          })}
           {!signedIn ? (
             <Link href={withLocale("/auth/sign-up", locale)} className="shrink-0 font-semibold text-qidra-accent sm:hidden">
               {t.signUp}

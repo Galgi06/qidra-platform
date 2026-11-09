@@ -1,7 +1,7 @@
 "use client";
 
-import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
+import { ProjectCoverImage } from "@/components/ProjectCoverImage";
 import type { CatalogProject } from "@/lib/project-catalog";
 import type { Locale } from "@/lib/i18n";
 
@@ -96,16 +96,15 @@ export function ProjectGallery({ project, locale }: { project: CatalogProject; l
         <div className="grid gap-4 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
           <button
             aria-label={isRu ? "Открыть галерею объекта" : "Open property gallery"}
-            className="relative min-h-[300px] min-w-0 overflow-hidden rounded-[20px] bg-[#2418f2] p-6 text-left text-white transition-transform duration-300 hover:scale-[1.01] lg:min-h-[420px]"
+            className="relative min-h-[300px] min-w-0 overflow-hidden rounded-[20px] bg-qidra-forest p-6 text-left text-white transition-transform duration-300 hover:scale-[1.01] lg:min-h-[420px]"
             onClick={() => openLightbox(selectedIndex)}
             type="button"
           >
-            <Image
-              src={mainImage}
+            <ProjectCoverImage
               alt={title}
-              fill
-              sizes="(min-width: 992px) 56vw, 100vw"
               className="object-cover object-[76%_center]"
+              sizes="(min-width: 992px) 56vw, 100vw"
+              src={mainImage}
             />
             <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(11,30,41,0.86)_0%,rgba(11,30,41,0.24)_60%,rgba(11,30,41,0.02)_100%)]" />
             <div className="relative z-10 max-w-[420px]">
@@ -125,12 +124,11 @@ export function ProjectGallery({ project, locale }: { project: CatalogProject; l
                 onClick={() => openLightbox(item.index)}
                 type="button"
               >
-                <Image
-                  src={item.image}
+                <ProjectCoverImage
                   alt={`${title} ${index + 2}`}
-                  fill
-                  sizes="(min-width: 992px) 24vw, 100vw"
                   className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                  sizes="(min-width: 992px) 24vw, 100vw"
+                  src={item.image}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-qidra-dark/35 via-transparent to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
               </button>
@@ -143,7 +141,7 @@ export function ProjectGallery({ project, locale }: { project: CatalogProject; l
                     {isRu ? "Структурированное участие" : "Structured participation"}
                   </p>
                 </div>
-                <div className="min-w-0 rounded-[20px] bg-[#2418f2] p-6 text-white">
+                <div className="min-w-0 rounded-[20px] bg-qidra-forest p-6 text-white">
                   <p className="text-14 text-white/70">{isRu ? "Проверка Qidra" : "Qidra review"}</p>
                   <p className="mt-4 break-words text-[26px] font-medium leading-tight [overflow-wrap:anywhere]">
                     {isRu ? "Сначала документы и условия" : "Documents and terms first"}
@@ -165,18 +163,17 @@ export function ProjectGallery({ project, locale }: { project: CatalogProject; l
                   aria-pressed={isActive}
                   className={`group relative min-h-[112px] overflow-hidden rounded-[18px] border bg-white transition ${
                     isActive
-                      ? "border-qidra-accent shadow-[0_0_0_3px_rgba(79,70,229,0.12)]"
+                      ? "border-qidra-accent shadow-[0_0_0_3px_rgba(13,107,91,0.12)]"
                       : "border-qidra-line hover:border-qidra-accent/45"
                   }`}
                   onClick={() => openLightbox(index)}
                   type="button"
                 >
-                  <Image
-                    src={image}
+                  <ProjectCoverImage
                     alt={`${title} ${index + 1}`}
-                    fill
-                    sizes="(min-width: 1200px) 16vw, (min-width: 768px) 24vw, 44vw"
                     className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                    sizes="(min-width: 1200px) 16vw, (min-width: 768px) 24vw, 44vw"
+                    src={image}
                   />
                   <div className={`absolute inset-0 transition-colors ${isActive ? "bg-qidra-dark/10" : "bg-qidra-dark/0 group-hover:bg-qidra-dark/10"}`} />
                 </button>
@@ -227,13 +224,12 @@ export function ProjectGallery({ project, locale }: { project: CatalogProject; l
               </>
             ) : null}
             <div className="relative h-full max-h-[82vh] w-full overflow-hidden rounded-[24px] bg-qidra-dark/40 shadow-[0_24px_80px_rgba(0,0,0,0.38)]">
-              <Image
+              <ProjectCoverImage
+                alt={`${title} ${selectedIndex + 1}`}
+                className="object-contain"
                 priority
                 src={mainImage}
-                alt={`${title} ${selectedIndex + 1}`}
-                fill
                 sizes="100vw"
-                className="object-contain"
               />
             </div>
             <div className="absolute bottom-4 left-1/2 z-20 -translate-x-1/2 rounded-full bg-qidra-dark/62 px-4 py-2 text-13 font-medium text-white/92">

@@ -73,9 +73,9 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
   return (
     <>
       <Header locale={locale} path={`/projects/${project.slug}`} />
-      <main>
-        <section className="bg-qidra-grayLight px-5 py-12 sm:px-8 lg:px-11 lg:py-16">
-          <div className="mx-auto grid max-w-[1840px] gap-8">
+      <main className="premium-page">
+        <section className="page-hero px-5 py-12 sm:px-8 lg:px-11 lg:py-16">
+          <div className="page-shell relative z-10 grid gap-8">
             <Breadcrumbs
               items={[
                 { label: "Qidra", href: withLocale("/", locale) },
@@ -86,13 +86,17 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
             <div className="grid gap-8 lg:grid-cols-[1.15fr_0.85fr] lg:items-start">
               <div className="grid gap-6">
                 <ProjectStatusBadge status={project.status} locale={locale} />
-                <h1 className="max-w-5xl text-[44px] font-medium leading-[1.1] tracking-[0] text-qidra-dark sm:text-[58px] lg:text-[72px]">
+                <h1 className="display-title text-qidra-dark">
                   {project.title[locale]}
                 </h1>
                 {realEstate?.objectName ? <p className="text-18 font-medium text-qidra-accent">{realEstate.objectName}</p> : null}
-                <p className="max-w-4xl text-20 text-qidra-grayBlue sm:text-[24px]">{realEstate?.descriptionShort || project.description[locale]}</p>
+                <p className="max-w-3xl text-18 text-qidra-grayBlue sm:text-20">{realEstate?.descriptionShort || project.description[locale]}</p>
               </div>
-              <aside className="grid gap-4 rounded-[20px] bg-white p-6 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] sm:p-8">
+              <aside className="data-surface grid gap-4 p-6 sm:p-8">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-13 font-semibold text-qidra-dark">{isRu ? "Финансирование проекта" : "Project funding"}</span>
+                  <span className="rounded-full bg-qidra-accent8 px-3 py-1 text-12 font-semibold text-qidra-accent">{progress}%</span>
+                </div>
                 <div className="grid gap-2">
                   <ProgressBar value={progress} />
                   <div className="flex justify-between text-14 text-qidra-grayBlue">
@@ -154,14 +158,14 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                         : "The project is currently unavailable for new applications."}
                   </div>
                 )}
-                <p className="text-12 text-qidra-grayBlue">{dictionary[locale].common.noFixedYield}</p>
+                <p className="rounded-qidra border border-qidra-gold/20 bg-[#f7f2e7] px-4 py-3 text-12 leading-relaxed text-qidra-grayBlue">{dictionary[locale].common.noFixedYield}</p>
               </aside>
             </div>
           </div>
         </section>
 
         <section className="px-5 py-12 sm:px-8 lg:px-11 lg:py-16">
-          <div className="mx-auto grid max-w-[1840px] gap-12">
+          <div className="page-shell grid gap-12">
             <ProjectGallery project={project} locale={locale} />
             <div className="grid gap-6 lg:grid-cols-2">
               <InfoPanel title={isRu ? "Ключевые условия" : "Investment highlights"} text="">
@@ -283,7 +287,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
         </section>
 
         <section className="px-5 pb-16 sm:px-8 lg:px-11 lg:pb-24" id="documents">
-          <div className="mx-auto grid max-w-[1840px] gap-5">
+          <div className="page-shell grid gap-5">
             <SectionHeading>
               {isRu ? "Документы проекта" : "Project documents"}
             </SectionHeading>
@@ -358,8 +362,8 @@ function BulletList({ items }: { items: string[] }) {
 
 function InfoPanel({ title, text, children }: { title: string; text: string; children?: ReactNode }) {
   return (
-    <article className="rounded-[20px] bg-qidra-grayLight p-7 sm:p-8">
-      <h3 className="text-[24px] font-medium leading-tight tracking-[0] text-qidra-dark sm:text-[28px]">{title}</h3>
+    <article className="data-surface p-7 sm:p-8">
+      <h3 className="text-[24px] font-medium leading-tight tracking-[-0.025em] text-qidra-dark sm:text-[28px]">{title}</h3>
       {text ? <p className="mt-4 text-[17px] leading-7 text-qidra-grayBlue">{text}</p> : null}
       {children ? <div className={text ? "mt-5" : "mt-5"}>{children}</div> : null}
     </article>
@@ -368,7 +372,7 @@ function InfoPanel({ title, text, children }: { title: string; text: string; chi
 
 function HighlightItem({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-qidra bg-white p-4">
+    <div className="rounded-qidra border border-qidra-dark/6 bg-qidra-grayLight p-4">
       <p className="text-13 text-qidra-grayBlue">{label}</p>
       <p className="mt-2 text-16 font-medium text-qidra-dark">{value}</p>
     </div>
@@ -390,7 +394,7 @@ function formatManagerFee(value: number | undefined, locale: "ru" | "en", emphas
 function LegalPanel({ locale }: { locale: "ru" | "en" }) {
   const isRu = locale === "ru";
   return (
-    <section className="rounded-[20px] border border-qidra-grayLight bg-white p-7 sm:p-8">
+    <section className="rounded-[18px] border border-qidra-gold/20 bg-[#f7f2e7] p-7 sm:p-8">
       <h2 className="text-[24px] font-medium leading-tight text-qidra-dark sm:text-[28px]">{isRu ? "Важная информация" : "Important information"}</h2>
       <p className="mt-4 text-[16px] leading-7 text-qidra-grayBlue">
         {isRu
@@ -417,7 +421,7 @@ function LocationPanel({
   const isRu = locale === "ru";
 
   return (
-    <article className="rounded-[20px] bg-qidra-grayLight p-7 sm:p-8">
+    <article className="data-surface p-7 sm:p-8">
       <div className="grid gap-6 xl:grid-cols-[minmax(0,0.88fr)_minmax(0,1.12fr)] xl:items-start">
         <div className="grid gap-4">
           <h3 className="text-[24px] font-medium leading-tight tracking-[0] text-qidra-dark sm:text-[28px]">{isRu ? "Локация" : "Location"}</h3>
@@ -456,7 +460,7 @@ function LocationPanel({
 }
 
 function SectionHeading({ children }: { children: ReactNode }) {
-  return <h2 className="text-[28px] font-medium leading-tight tracking-[0] text-qidra-dark sm:text-[36px]">{children}</h2>;
+  return <h2 className="section-title text-qidra-dark">{children}</h2>;
 }
 
 function buildProjectLocationAddress(project: CatalogProject, isRu: boolean) {

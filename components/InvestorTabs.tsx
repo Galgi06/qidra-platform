@@ -44,11 +44,11 @@ export function InvestorSidebar({ activePath, locale }: { activePath: string; lo
 
 export function InvestorWorkspace({ activePath, children, locale }: { activePath: string; children: ReactNode; locale: Locale }) {
   return (
-    <div className="mx-auto grid max-w-[1840px] gap-8 2xl:grid-cols-[320px_minmax(0,1fr)] 2xl:items-start">
-      <div className="2xl:hidden">
+    <div className="page-shell grid gap-7 xl:grid-cols-[280px_minmax(0,1fr)] xl:items-start">
+      <div className="xl:hidden">
         <InvestorMenuDisclosure activePath={activePath} locale={locale} />
       </div>
-      <div className="hidden 2xl:block">
+      <div className="hidden xl:block">
         <InvestorSidebar activePath={activePath} locale={locale} />
       </div>
       <div className="min-w-0">{children}</div>
@@ -60,7 +60,7 @@ function InvestorMenuDisclosure({ activePath, locale }: { activePath: string; lo
   const isRu = locale === "ru";
 
   return (
-    <details className="group premium-card">
+    <details className="group data-surface">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 [&::-webkit-details-marker]:hidden">
         <div>
           <p className="text-12 font-semibold uppercase text-qidra-accent">{isRu ? "Рабочий кабинет" : "Workspace"}</p>
@@ -85,7 +85,7 @@ function InvestorNavigationPanel({ activePath, locale }: { activePath: string; l
   const isRu = locale === "ru";
 
   return (
-    <nav className="premium-card p-4">
+    <nav className="data-surface p-3">
       <div className="border-b border-qidra-grayLight px-2 pb-4">
         <p className="text-12 font-medium uppercase text-qidra-accent">{isRu ? "Рабочий кабинет" : "Workspace"}</p>
         <h2 className="mt-2 text-22 font-medium leading-tight text-qidra-dark">{isRu ? "Навигация участника" : "Participant navigation"}</h2>
@@ -117,7 +117,7 @@ function InvestorNavigationContent({ activePath, compact = false, locale }: { ac
                   <Link
                     key={section.path}
                     className={`grid gap-1 rounded-qidra px-4 py-3 text-left transition-[background-color,color,box-shadow] ${
-                      active ? "bg-qidra-dark text-white shadow-[0_12px_28px_rgba(18,20,23,0.18)]" : "text-qidra-dark hover:bg-qidra-grayLight hover:shadow-[inset_3px_0_0_var(--qidra-accent)]"
+                      active ? "bg-qidra-forest text-white shadow-[0_12px_28px_rgba(7,63,54,0.18)]" : "text-qidra-dark hover:bg-qidra-grayLight hover:shadow-[inset_3px_0_0_var(--qidra-accent)]"
                     }`}
                     href={withLocale(section.path, locale)}
                   >

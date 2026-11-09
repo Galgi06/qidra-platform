@@ -47,7 +47,7 @@ export default async function Home({ searchParams }: { searchParams?: Promise<Se
             sizes="100vw"
             className="object-cover object-[58%_center]"
           />
-          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(18,20,23,0.98)_0%,rgba(6,63,55,0.88)_42%,rgba(79,70,229,0.44)_70%,rgba(18,20,23,0.12)_100%)]" />
+          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(17,26,29,0.98)_0%,rgba(7,63,54,0.9)_42%,rgba(173,132,50,0.32)_72%,rgba(17,26,29,0.12)_100%)]" />
           <div className="relative z-10 mx-auto max-w-[1840px] px-5 py-6 sm:px-8 lg:px-11">
             <div className="grid gap-4 border-b border-white/60 pb-5 sm:flex sm:items-center sm:justify-between">
               <div className="flex items-center justify-between gap-3">
