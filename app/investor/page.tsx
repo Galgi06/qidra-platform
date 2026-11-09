@@ -1,4 +1,4 @@
-import { InvestmentStatus, PaymentStatus, TransactionType } from "@prisma/client";
+import { DividendPaymentStatus, InvestmentStatus, PaymentStatus, TransactionType } from "@prisma/client";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { InvestorWorkspace } from "@/components/InvestorTabs";
@@ -50,9 +50,11 @@ export default async function InvestorPage({ searchParams }: { searchParams?: Pr
     prisma.investmentApplication.count({ where: { userId, status: InvestmentStatus.CANCELLED } }),
     prisma.investmentApplication.findMany({
       where: { userId, status: InvestmentStatus.CONFIRMED },
-      include: { project: true },
-      orderBy: { createdAt: "desc" },
-      take: 4
+      include: {
+        project: true,
+        dividendPayments: { select: { amountUsdt: true, status: true } }
+      },
+      orderBy: { createdAt: "desc" }
     }),
     getPrimaryOrganizationForUser(userId)
   ]);
@@ -68,58 +70,60 @@ export default async function InvestorPage({ searchParams }: { searchParams?: Pr
   const walletNotice = walletNoticeContent(profileStatus, availableUsdt, reservedUsdt, pendingUsdt, locale);
   const portfolioTransactions = wallet?.transactions ?? [];
   const activeContractUsdt = sumAmounts(activeContracts.map((contract) => contract.amountUsdt));
-  const accruedUsdt = sumAmounts(portfolioTransactions.filter((transaction) => transaction.type === TransactionType.RETURN).map((transaction) => transaction.amountUsdt));
+  const dividendPayments = activeContracts.flatMap((contract) => contract.dividendPayments);
+  const accruedUsdt = sumAmounts(dividendPayments.filter((payment) => payment.status !== DividendPaymentStatus.CANCELLED).map((payment) => payment.amountUsdt));
+  const paidDividendUsdt = sumAmounts(dividendPayments.filter((payment) => payment.status === DividendPaymentStatus.PAID).map((payment) => payment.amountUsdt));
+  const awaitingDividendUsdt = Math.max(accruedUsdt - paidDividendUsdt, 0);
   const withdrawnUsdt = sumAmounts(portfolioTransactions.filter((transaction) => transaction.type === TransactionType.WITHDRAWAL).map((transaction) => transaction.amountUsdt));
 
   return (
     <>
       <Header locale={locale} path="/investor" />
       <main className="premium-page">
-        <section className="px-5 py-10 sm:px-8 lg:px-11 lg:py-14">
-          <div className="mx-auto grid max-w-[1840px] gap-8">
-            <div className="premium-card grid gap-7 p-6 sm:p-8 lg:grid-cols-[1fr_auto] lg:items-end">
+        <section className="page-hero px-5 py-10 sm:px-8 lg:px-11 lg:py-14">
+          <div className="page-shell relative z-10 grid gap-8">
+            <div className="premium-dark-panel brand-grid reveal grid gap-7 p-6 text-white sm:p-8 lg:grid-cols-[1fr_auto] lg:items-end">
               <div className="flex items-start gap-4 sm:gap-5">
                 <UserAvatar name={userName} />
                 <div>
-                  <p className="eyebrow">{isRu ? "Профиль участника" : "Participant profile"}</p>
-                  <h1 className="mt-3 text-[36px] font-medium leading-tight tracking-[0] text-qidra-dark sm:text-[48px]">{userName}</h1>
-                  {displayEmail ? <p className="mt-2 text-16 text-qidra-grayBlue">{displayEmail}</p> : null}
+                  <p className="text-12 font-semibold uppercase tracking-[0.08em] text-white/60">{isRu ? "Портфель участника" : "Participant portfolio"}</p>
+                  <h1 className="mt-3 text-[36px] font-medium leading-tight tracking-[-0.035em] sm:text-[48px]">{userName}</h1>
+                  {displayEmail ? <p className="mt-2 text-16 text-white/62">{displayEmail}</p> : null}
+                  <p className="mt-4 inline-flex rounded-full border border-white/15 bg-white/8 px-3 py-1.5 text-13 text-white/80">{profileStatusText}</p>
                 </div>
               </div>
               <div className="flex flex-col gap-3 sm:flex-row">
-                <ButtonLink href={withLocale("/investor/kyc", locale)} className="h-12 min-w-44">
+                <ButtonLink href={withLocale("/investor/kyc", locale)} variant="white" className="h-12 min-w-44">
                   {isRu ? "Заполнить профиль" : "Complete profile"}
                 </ButtonLink>
                 {organization ? (
-                  <ButtonLink href={withLocale("/company", locale)} variant="outline" className="h-12 min-w-44">
+                  <ButtonLink href={withLocale("/company", locale)} variant="white" className="h-12 min-w-44">
                     {isRu ? "Открыть кабинет компании" : "Open company workspace"}
                   </ButtonLink>
                 ) : null}
-                <ButtonLink href={withLocale("/projects", locale)} variant="outline" className="h-12 min-w-44">
+                <ButtonLink href={withLocale("/projects", locale)} variant="white" className="h-12 min-w-44">
                   {isRu ? "Открыть проекты" : "Open projects"}
-                </ButtonLink>
-                <ButtonLink href={withLocale("/investor/projects/new", locale)} variant="outline" className="h-12 min-w-44">
-                  {isRu ? "Разместить проект" : "List project"}
                 </ButtonLink>
               </div>
             </div>
           </div>
         </section>
 
-        <section className="px-5 py-12 sm:px-8 lg:px-11 lg:py-16">
+        <section className="px-5 py-10 sm:px-8 lg:px-11 lg:py-14">
           <InvestorWorkspace activePath="/investor" locale={locale}>
             <div className="grid gap-8">
-            <div className="grid gap-5 md:grid-cols-3">
-              <MetricCard label={isRu ? "Статус профиля" : "Profile status"} value={profileStatusText} tone={profileStatus === "APPROVED" ? "neutral" : "warning"} />
-              <MetricCard label={isRu ? "Свободный баланс" : "Available balance"} value={formatUsdt(availableUsdt)} />
-              <MetricCard label={isRu ? "Заявки на проверке" : "Applications in review"} value={pendingApplications.toString()} />
+            <div className="reveal reveal-delay-1 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <MetricCard label={isRu ? "Активные контракты" : "Active contracts"} value={formatUsdt(activeContractUsdt)} />
+              <MetricCard label={isRu ? "Доступный баланс" : "Available balance"} value={formatUsdt(availableUsdt)} />
+              <MetricCard label={isRu ? "Выплачено дивидендов" : "Dividends paid"} value={formatUsdt(paidDividendUsdt)} />
+              <MetricCard label={isRu ? "Ожидает выплаты" : "Awaiting payout"} value={formatUsdt(awaitingDividendUsdt)} tone={awaitingDividendUsdt > 0 ? "warning" : "neutral"} />
             </div>
 
             <div className="grid gap-8 lg:grid-cols-[1fr_0.72fr]">
-              <section className="premium-card p-6 sm:p-8">
+              <section className="data-surface p-6 sm:p-8">
                 <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-start">
                   <div>
-                    <h2 className="text-[32px] font-medium leading-tight tracking-[0] text-qidra-dark sm:text-[40px]">{nextStep.title}</h2>
+                    <h2 className="section-title text-qidra-dark">{nextStep.title}</h2>
                     <p className="mt-3 max-w-2xl text-18 text-qidra-grayBlue">
                       {nextStep.text}
                     </p>
@@ -189,7 +193,7 @@ export default async function InvestorPage({ searchParams }: { searchParams?: Pr
                   tone={profileNotice.tone}
                 />
                 <NotificationCard title={walletNotice.title} text={walletNotice.text} tone={walletNotice.tone} />
-                <section className="premium-card p-6 sm:p-8">
+                <section className="data-surface p-6 sm:p-8">
                   <h2 className="text-[26px] font-medium leading-tight tracking-[0] text-qidra-dark">{isRu ? "Финансовый статус" : "Financial status"}</h2>
                   <div className="mt-6 grid gap-4 text-16 text-qidra-grayBlue">
                     <ActivityItem label={isRu ? "Свободно" : "Available"} value={formatUsdt(availableUsdt)} />
@@ -197,7 +201,7 @@ export default async function InvestorPage({ searchParams }: { searchParams?: Pr
                     <ActivityItem label={isRu ? "Переводы на проверке" : "Transfers in review"} value={formatUsdt(pendingUsdt)} />
                   </div>
                 </section>
-                <section className="premium-card p-6 sm:p-8">
+                <section className="data-surface p-6 sm:p-8">
                   <div className="flex flex-wrap items-center justify-between gap-4">
                     <div>
                       <h2 className="text-[26px] font-medium leading-tight tracking-[0] text-qidra-dark">{isRu ? "Активные партнёрские контракты" : "Active partnership contracts"}</h2>
@@ -210,15 +214,16 @@ export default async function InvestorPage({ searchParams }: { searchParams?: Pr
                     </ButtonLink>
                   </div>
                   <div className="mt-6 grid gap-3 sm:grid-cols-3">
-                    <ContractSummaryCard label={isRu ? "Активировано" : "Activated"} value={formatUsdt(activeContractUsdt)} />
                     <ContractSummaryCard label={isRu ? "Начислено" : "Accrued"} value={formatUsdt(accruedUsdt)} />
+                    <ContractSummaryCard label={isRu ? "Выплачено" : "Paid"} value={formatUsdt(paidDividendUsdt)} />
                     <ContractSummaryCard label={isRu ? "Выведено" : "Withdrawn"} value={formatUsdt(withdrawnUsdt)} />
                   </div>
                   {activeContracts.length ? (
                     <div className="mt-6 grid gap-5">
-                      {activeContracts.map((application) => (
+                      {activeContracts.slice(0, 4).map((application) => (
                         <ActiveContractItem
                           key={application.id}
+                          accrued={formatUsdt(sumAmounts(application.dividendPayments.filter((payment) => payment.status !== DividendPaymentStatus.CANCELLED).map((payment) => payment.amountUsdt)))}
                           amount={formatUsdt(application.amountUsdt)}
                           documentsHref={withLocale(`/projects/${application.project.slug}#documents`, locale)}
                           date={formatDate(application.createdAt, locale)}
@@ -228,6 +233,7 @@ export default async function InvestorPage({ searchParams }: { searchParams?: Pr
                           structure={application.project.structure}
                           title={locale === "ru" ? application.project.titleRu : application.project.titleEn}
                           locale={locale}
+                          paid={formatUsdt(sumAmounts(application.dividendPayments.filter((payment) => payment.status === DividendPaymentStatus.PAID).map((payment) => payment.amountUsdt)))}
                         />
                       ))}
                     </div>
@@ -419,9 +425,9 @@ function MetricCard({ label, value, tone = "neutral" }: { label: string; value: 
   const isWarning = tone === "warning";
 
   return (
-    <article className={`p-6 ${isWarning ? "premium-dark-panel text-white" : "premium-card text-qidra-dark"}`}>
-      <p className={`text-14 font-medium ${isWarning ? "text-white/72" : "text-qidra-grayBlue"}`}>{label}</p>
-      <p className="mt-4 text-[30px] font-medium leading-tight tracking-[0]">{value}</p>
+    <article className={`metric-card ${isWarning ? "bg-[#f7f2e7] text-qidra-dark before:bg-qidra-gold" : "text-qidra-dark"}`}>
+      <p className="text-13 font-medium text-qidra-grayBlue">{label}</p>
+      <p className="mt-4 break-words text-[28px] font-medium leading-tight tracking-[-0.025em]">{value}</p>
     </article>
   );
 }
@@ -459,6 +465,7 @@ function ContractSummaryCard({ label, value }: { label: string; value: string })
 }
 
 function ActiveContractItem({
+  accrued,
   amount,
   date,
   documentsHref,
@@ -466,9 +473,11 @@ function ActiveContractItem({
   expectedYield,
   href,
   locale,
+  paid,
   structure,
   title
 }: {
+  accrued: string;
   amount: string;
   date: string;
   documentsHref: string;
@@ -476,6 +485,7 @@ function ActiveContractItem({
   expectedYield: string;
   href: string;
   locale: "ru" | "en";
+  paid: string;
   structure: string;
   title: string;
 }) {
@@ -502,8 +512,8 @@ function ActiveContractItem({
           value={expectedYield || (locale === "ru" ? "См. документы" : "See documents")}
         />
         <div className="border-t border-qidra-grayMedium/20 pt-3">
-          <ContractLine label={locale === "ru" ? "Начислено по контракту" : "Accrued by contract"} value="0 USDT" />
-          <ContractLine label={locale === "ru" ? "Выведено по контракту" : "Withdrawn by contract"} value="0 USDT" />
+          <ContractLine label={locale === "ru" ? "Начислено по контракту" : "Accrued by contract"} value={accrued} />
+          <ContractLine label={locale === "ru" ? "Выплачено по контракту" : "Paid by contract"} value={paid} />
         </div>
       </div>
       <div className="mt-4 flex flex-wrap gap-3">

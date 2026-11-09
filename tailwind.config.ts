@@ -31,10 +31,10 @@ const config: Config = {
         }
       },
       borderRadius: {
-        qidra: "8px"
+        qidra: "12px"
       },
       boxShadow: {
-        qidra: "0 18px 50px rgba(19, 24, 38, 0.08)"
+        qidra: "0 18px 50px rgba(17, 26, 29, 0.08)"
       }
     }
   },

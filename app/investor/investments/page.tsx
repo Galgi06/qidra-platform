@@ -61,26 +61,26 @@ export default async function InvestmentsPage({ searchParams }: { searchParams?:
   return (
     <>
       <Header locale={locale} path="/investor/investments" />
-      <main>
-        <section className="bg-qidra-grayLight px-5 py-10 sm:px-8 lg:px-11 lg:py-14">
-          <div className="mx-auto grid max-w-[1840px] gap-8">
+      <main className="premium-page">
+        <section className="page-hero px-5 py-10 sm:px-8 lg:px-11 lg:py-14">
+          <div className="page-shell relative z-10 grid gap-8">
             <div>
-              <p className="text-14 font-medium uppercase text-qidra-accent">{isRu ? "Профиль участника" : "Participant profile"}</p>
-              <h1 className="mt-3 max-w-4xl text-[42px] font-medium leading-tight tracking-[0] text-qidra-dark sm:text-[56px]">
-                {isRu ? "Моё участие" : "My participation"}
+              <p className="eyebrow">{isRu ? "Портфель участника" : "Participant portfolio"}</p>
+              <h1 className="display-title mt-3 text-qidra-dark">
+                {isRu ? "Контракты и дивиденды" : "Contracts and dividends"}
               </h1>
               <p className="mt-4 max-w-3xl text-20 text-qidra-grayBlue">
                 {isRu
-                  ? "Здесь отображаются заявки на участие, которые вы отправили через страницы проектов."
-                  : "This page shows participation applications submitted from project pages."}
+                  ? "Все заявки, активные контракты, начисления и доступные действия в одном финансовом представлении."
+                  : "Applications, active contracts, accruals and available actions in one financial view."}
               </p>
             </div>
           </div>
         </section>
 
-        <section className="px-5 py-12 sm:px-8 lg:px-11 lg:py-16">
+        <section className="px-5 py-10 sm:px-8 lg:px-11 lg:py-14">
           <InvestorWorkspace activePath="/investor/investments" locale={locale}>
-          <div className="grid gap-5">
+          <div className="grid gap-6">
             <div className="grid gap-4 md:grid-cols-3">
               <SummaryCard label={isRu ? "Доступно для новых заявок" : "Available for new applications"} value={formatUsdt(freeUsdt)} />
               <SummaryCard label={isRu ? "Зарезервировано" : "Reserved"} value={formatUsdt(reservedUsdt)} />
@@ -109,7 +109,7 @@ export default async function InvestmentsPage({ searchParams }: { searchParams?:
                   const balanceWarning = application.status === InvestmentStatus.PENDING && applicationShortfall > 0;
 
                   return (
-                    <article key={application.id} className="rounded-[20px] bg-white p-6 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] sm:p-8">
+                    <article key={application.id} className="data-surface p-5 sm:p-7">
                       <div className="grid gap-5 lg:grid-cols-[1.2fr_0.7fr_0.7fr_0.7fr_auto] lg:items-center">
                         <div>
                           <p className="text-14 text-qidra-grayBlue">{formatDate(application.createdAt, locale)}</p>
@@ -164,7 +164,7 @@ export default async function InvestmentsPage({ searchParams }: { searchParams?:
                         </div>
                       ) : null}
                       {application.dividendPayments.length ? (
-                        <div className="mt-6 rounded-qidra border border-qidra-grayLight bg-qidra-grayLight p-4">
+                        <div className="mt-6 rounded-[16px] border border-qidra-accent/12 bg-qidra-accent8 p-4">
                           <div className="flex flex-wrap items-center justify-between gap-3">
                             <div>
                               <p className="text-16 font-medium text-qidra-dark">{isRu ? "Начисления по контракту" : "Contract accruals"}</p>
@@ -178,7 +178,7 @@ export default async function InvestmentsPage({ searchParams }: { searchParams?:
                           </div>
                           <div className="mt-4 grid gap-2">
                             {application.dividendPayments.slice(0, 4).map((payment) => (
-                              <div key={payment.id} className="grid gap-2 rounded-qidra bg-white p-3 text-14 sm:grid-cols-[1fr_auto_auto_auto] sm:items-center">
+                              <div key={payment.id} className="grid gap-2 rounded-qidra border border-qidra-dark/6 bg-white p-3 text-14 sm:grid-cols-[1fr_auto_auto_auto] sm:items-center">
                                 <span className="font-medium text-qidra-dark">{payment.period.periodLabel}</span>
                                 <span className="text-qidra-grayBlue">
                                   {payment.reinvestmentOrders.length
@@ -201,7 +201,7 @@ export default async function InvestmentsPage({ searchParams }: { searchParams?:
                 })}
               </div>
             ) : (
-              <section className="grid gap-5 rounded-[20px] bg-white p-6 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] sm:p-8 lg:grid-cols-[1fr_auto] lg:items-center">
+              <section className="data-surface grid gap-5 p-6 sm:p-8 lg:grid-cols-[1fr_auto] lg:items-center">
                 <NotificationCard
                   title={allApplications.length ? (isRu ? "По этому статусу заявок нет" : "No applications with this status") : isRu ? "Заявок пока нет" : "No applications yet"}
                   text={
@@ -229,12 +229,12 @@ export default async function InvestmentsPage({ searchParams }: { searchParams?:
 }
 
 function SummaryCard({ label, tone = "default", value }: { label: string; tone?: "default" | "success" | "warning"; value: string }) {
-  const color = tone === "success" ? "bg-green-50 text-qidra-green" : tone === "warning" ? "bg-yellow-50 text-qidra-dark" : "bg-white text-qidra-dark";
+  const color = tone === "success" ? "bg-[#e9f5ef] text-qidra-green" : tone === "warning" ? "bg-[#f7f2e7] text-qidra-dark before:bg-qidra-gold" : "bg-white text-qidra-dark";
 
   return (
-    <article className={`rounded-[20px] p-6 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] ${color}`}>
-      <p className="text-14 font-medium text-qidra-grayBlue">{label}</p>
-      <p className="mt-3 text-[28px] font-medium leading-tight tracking-[0]">{value}</p>
+    <article className={`metric-card ${color}`}>
+      <p className="text-13 font-medium text-qidra-grayBlue">{label}</p>
+      <p className="mt-3 break-words text-[26px] font-medium leading-tight tracking-[-0.025em]">{value}</p>
     </article>
   );
 }
@@ -254,7 +254,7 @@ type DividendPaymentSummary = {
 
 function InvestmentFilters({ locale, stats, statusFilter }: { locale: "ru" | "en"; stats: ApplicationStats; statusFilter?: InvestmentStatus }) {
   return (
-    <div className="grid gap-2 rounded-qidra border border-qidra-grayLight bg-white p-4">
+    <div className="data-surface grid gap-2 p-4">
       <p className="text-14 font-medium text-qidra-grayBlue">{locale === "ru" ? "Статус заявки" : "Application status"}</p>
       <div className="flex flex-wrap gap-2">
         <InvestmentFilterPill active={!statusFilter} href={investmentFilterHref(locale)}>
@@ -281,7 +281,7 @@ function InvestmentFilterPill({ active, children, href }: { active: boolean; chi
   return (
     <Link
       className={`inline-flex h-10 items-center justify-center rounded-qidra border px-4 text-14 font-medium transition-colors ${
-        active ? "border-qidra-dark bg-qidra-dark text-white" : "border-qidra-grayLight bg-white text-qidra-grayBlue hover:border-qidra-accent hover:text-qidra-accent"
+        active ? "border-qidra-forest bg-qidra-forest text-white" : "border-qidra-grayLight bg-white text-qidra-grayBlue hover:border-qidra-accent hover:text-qidra-accent"
       }`}
       href={href}
     >

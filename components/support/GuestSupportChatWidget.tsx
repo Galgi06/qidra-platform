@@ -220,7 +220,7 @@ export function GuestSupportChatWidget({
   return (
     <>
       <button
-        className="fixed bottom-4 right-4 z-40 inline-flex h-14 items-center justify-center rounded-full bg-qidra-accent px-5 text-15 font-semibold text-white shadow-[0_18px_40px_rgba(79,70,229,0.26)] sm:bottom-6 sm:right-6"
+        className="fixed bottom-4 right-4 z-40 inline-flex h-14 items-center justify-center rounded-full bg-qidra-accent px-5 text-15 font-semibold text-white shadow-[0_18px_40px_rgba(13,107,91,0.24)] sm:bottom-6 sm:right-6"
         onClick={() => setOpen((value) => !value)}
         type="button"
       >

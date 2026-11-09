@@ -42,12 +42,12 @@ export default async function WalletPage({ searchParams }: { searchParams?: Prom
   return (
     <>
       <Header locale={locale} path="/investor/wallet" />
-      <main>
-        <section className="bg-qidra-grayLight px-5 py-10 sm:px-8 lg:px-11 lg:py-14">
-          <div className="mx-auto grid max-w-[1840px] gap-8">
+      <main className="premium-page">
+        <section className="page-hero px-5 py-10 sm:px-8 lg:px-11 lg:py-14">
+          <div className="page-shell relative z-10 grid gap-8">
             <div>
-              <p className="text-14 font-medium uppercase text-qidra-accent">{isRu ? "Профиль участника" : "Participant profile"}</p>
-              <h1 className="mt-3 max-w-4xl text-[42px] font-medium leading-tight tracking-[0] text-qidra-dark sm:text-[56px]">
+              <p className="eyebrow">{isRu ? "Финансы участника" : "Participant finances"}</p>
+              <h1 className="display-title mt-3 text-qidra-dark">
                 {isRu ? "Кошелек USDT TRC20" : "USDT TRC20 wallet"}
               </h1>
               <p className="mt-4 max-w-3xl text-20 text-qidra-grayBlue">
@@ -59,20 +59,20 @@ export default async function WalletPage({ searchParams }: { searchParams?: Prom
           </div>
         </section>
 
-        <section className="px-5 py-12 sm:px-8 lg:px-11 lg:py-16">
+        <section className="px-5 py-10 sm:px-8 lg:px-11 lg:py-14">
           <InvestorWorkspace activePath="/investor/wallet" locale={locale}>
             <div className="grid gap-8">
-              <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-4">
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <BalanceCard label={isRu ? "Доступный баланс" : "Available balance"} value={formatUsdt(availableUsdt)} tone="dark" />
                 <BalanceCard label={isRu ? "Зарезервировано" : "Reserved"} value={formatUsdt(reservedUsdt)} tone="accent" />
                 <BalanceCard label={isRu ? "На проверке" : "Under review"} value={formatUsdt(pendingUsdt)} tone="accent" />
                 <BalanceCard label={isRu ? "Сеть" : "Network"} value="USDT TRC20" tone="light" />
               </div>
 
-              <div className="grid gap-8 2xl:grid-cols-[minmax(0,0.95fr)_minmax(420px,1.05fr)] 2xl:items-start">
+              <div className="grid gap-7 xl:grid-cols-[minmax(0,0.95fr)_minmax(420px,1.05fr)] xl:items-start">
                 <div className="grid content-start gap-6">
                   <FeedbackForm
-                    className="grid content-start gap-6 rounded-[20px] bg-white p-6 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] sm:p-8"
+                    className="data-surface grid content-start gap-6 p-6 sm:p-8"
                   endpoint={`/api/wallet/deposits?lang=${locale}`}
                   feedback={{
                     title: isRu ? "Заявка на пополнение создана" : "Deposit request created",
@@ -141,7 +141,7 @@ export default async function WalletPage({ searchParams }: { searchParams?: Prom
                 </FeedbackForm>
 
                 <FeedbackForm
-                  className="grid content-start gap-5 rounded-[20px] bg-white p-6 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] sm:p-8"
+                  className="data-surface grid content-start gap-5 p-6 sm:p-8"
                   endpoint={`/api/wallet/withdrawals?lang=${locale}`}
                   feedback={{
                     title: isRu ? "Заявка на вывод создана" : "Withdrawal request created",
@@ -176,7 +176,7 @@ export default async function WalletPage({ searchParams }: { searchParams?: Prom
                 </FeedbackForm>
               </div>
 
-              <section className="grid content-start gap-5 rounded-[20px] bg-white p-6 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] sm:p-8">
+              <section className="data-surface grid content-start gap-5 p-6 sm:p-8">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
                     <p className="text-12 font-semibold uppercase text-qidra-accent">{isRu ? "Операционный журнал" : "Operation log"}</p>
@@ -189,8 +189,8 @@ export default async function WalletPage({ searchParams }: { searchParams?: Prom
                     {wallet.transactions.map((transaction) => (
                       <WalletOperationItem
                         key={transaction.id}
-                        title={transactionTitle(transaction.type, locale)}
-                        meta={formatTransactionMeta(transaction.createdAt, transaction.status, transaction.txHash ?? transaction.destinationAddress, locale)}
+                        title={transactionTitle(transaction.type, transaction.note, locale)}
+                        meta={formatTransactionMeta(transaction.createdAt, transaction.status, transaction.txHash ?? transaction.destinationAddress ?? transaction.note, locale)}
                         amount={formatTransactionAmount(transaction.type, transaction.amountUsdt)}
                         tone={paymentTone(transaction.status, transaction.type)}
                       />
@@ -214,12 +214,12 @@ export default async function WalletPage({ searchParams }: { searchParams?: Prom
 }
 
 function BalanceCard({ label, value, tone }: { label: string; value: string; tone: "accent" | "dark" | "light" }) {
-  const color = tone === "dark" ? "bg-qidra-dark text-white" : tone === "accent" ? "bg-[#2418f2] text-white" : "bg-white text-qidra-dark";
+  const color = tone === "dark" ? "border-qidra-forest bg-qidra-forest text-white before:bg-qidra-gold" : tone === "accent" ? "bg-qidra-accentLight text-qidra-dark" : "bg-white text-qidra-dark";
 
   return (
-    <article className={`min-h-[132px] rounded-[20px] p-6 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] ${color}`}>
-      <p className={`text-14 font-medium ${tone === "light" ? "text-qidra-grayBlue" : "text-white/72"}`}>{label}</p>
-      <p className="mt-4 break-words text-[30px] font-medium leading-tight tracking-[0]">{value}</p>
+    <article className={`metric-card min-h-[132px] ${color}`}>
+      <p className={`text-13 font-medium ${tone === "dark" ? "text-white/65" : "text-qidra-grayBlue"}`}>{label}</p>
+      <p className="mt-4 break-words text-[28px] font-medium leading-tight tracking-[-0.025em]">{value}</p>
     </article>
   );
 }
@@ -231,10 +231,11 @@ function paymentTone(status: string, type: string) {
   return "success";
 }
 
-function transactionTitle(type: string, locale: "ru" | "en") {
+function transactionTitle(type: string, note: string | null, locale: "ru" | "en") {
   if (type === "WITHDRAWAL") return locale === "ru" ? "Вывод" : "Withdrawal";
   if (type === "INVESTMENT") return locale === "ru" ? "Участие" : "Participation";
   if (type === "REINVESTMENT") return locale === "ru" ? "Реинвест" : "Reinvestment";
+  if (type === "RETURN" && note?.toLowerCase().includes("dividend")) return locale === "ru" ? "Дивиденды" : "Dividend";
   if (type === "RETURN") return locale === "ru" ? "Возврат" : "Return";
   if (type === "ADJUSTMENT") return locale === "ru" ? "Корректировка" : "Adjustment";
   return locale === "ru" ? "Пополнение" : "Deposit";

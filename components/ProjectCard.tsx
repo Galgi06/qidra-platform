@@ -1,7 +1,7 @@
-import Image from "next/image";
-import { acceptsApplications, type CatalogProject } from "@/lib/project-catalog";
+import type { CatalogProject } from "@/lib/project-catalog";
 import type { Locale } from "@/lib/i18n";
 import { withLocale } from "@/lib/i18n";
+import { ProjectCoverImage } from "@/components/ProjectCoverImage";
 import { ButtonLink } from "@/components/ui/Button";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { ProjectStatusBadge } from "@/components/ui/ProjectStatusBadge";
@@ -38,38 +38,36 @@ export function ProjectCard({ project, locale }: { project: CatalogProject; loca
   const visibleFacts = previewFacts.slice(0, 4);
 
   return (
-    <article className="premium-card overflow-hidden transition-transform duration-150 hover:-translate-y-0.5">
-      <div className="flex h-full flex-col lg:grid lg:h-[360px] lg:grid-cols-[40%_60%]">
-        <a className="relative block h-[240px] overflow-hidden lg:h-full" href={detailHref}>
-          <Image
-            alt={project.title[locale]}
-            className="object-cover"
-            fill
-            sizes="(min-width: 1280px) 18vw, (min-width: 1024px) 30vw, 100vw"
-            src={coverImage}
-          />
-          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(17,24,39,0.12)_0%,rgba(17,24,39,0.56)_100%)]" />
+    <article className="group data-surface overflow-hidden transition-[transform,box-shadow] duration-300 hover:-translate-y-1 hover:shadow-[0_24px_64px_rgba(17,26,29,0.11)]">
+      <div className="flex h-full flex-col lg:grid lg:min-h-[410px] lg:grid-cols-[42%_58%]">
+        <a className="relative block h-[260px] overflow-hidden bg-qidra-forest lg:h-full" href={detailHref}>
+          <ProjectCoverImage alt={project.title[locale]} src={coverImage} />
+          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(7,63,54,0.04)_20%,rgba(10,24,23,0.78)_100%)]" />
+          <div className="absolute inset-x-0 bottom-0 p-5 text-white sm:p-6">
+            <p className="text-12 font-semibold uppercase tracking-[0.08em] text-white/70">{isRu ? "Проект Qidra" : "Qidra project"}</p>
+            <p className="mt-2 line-clamp-2 text-18 font-medium leading-snug">{project.location || objectTitle}</p>
+          </div>
         </a>
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col p-5 sm:p-6">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col p-5 sm:p-7">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <ProjectStatusBadge status={project.status} locale={locale} />
-            <span className="max-w-full truncate rounded-full bg-qidra-accent8 px-3 py-1.5 text-13 font-semibold text-qidra-accent shadow-[inset_0_0_0_1px_rgba(79,70,229,0.14)]">
+            <span className="max-w-full truncate rounded-full border border-qidra-gold/20 bg-[#f7f2e7] px-3 py-1.5 text-12 font-semibold text-[#7f632b]">
               {project.structure}
             </span>
           </div>
 
           <div className="mt-4 min-h-0 min-w-0">
             <a className="mt-2 block" href={detailHref}>
-              <h3 className="line-clamp-2 max-h-[4.2rem] max-w-full overflow-hidden text-[24px] font-medium leading-[1.18] tracking-[0] text-qidra-dark sm:text-[28px]">
+              <h3 className="line-clamp-2 max-h-[4.6rem] max-w-full overflow-hidden text-[26px] font-medium leading-[1.12] tracking-[-0.025em] text-qidra-dark sm:text-[30px]">
                 {objectTitle}
               </h3>
             </a>
             <p className="mt-3 line-clamp-2 max-h-[3rem] max-w-full overflow-hidden text-[15px] leading-6 text-qidra-grayBlue">{summary}</p>
           </div>
 
-          <dl className="mt-5 grid grid-cols-2 gap-3 text-13">
+          <dl className="mt-5 grid grid-cols-2 gap-2.5 text-13">
             {visibleFacts.map((fact) => (
-              <div key={`${fact.label}-${fact.value}`} className="min-w-0 overflow-hidden rounded-qidra bg-qidra-grayLight px-3 py-2.5">
+              <div key={`${fact.label}-${fact.value}`} className="min-w-0 overflow-hidden rounded-qidra border border-qidra-dark/5 bg-qidra-grayLight px-3 py-2.5">
                 <dt className="truncate whitespace-nowrap text-qidra-grayBlue">{fact.label}</dt>
                 <dd className="mt-1 truncate whitespace-nowrap font-medium text-qidra-dark" title={fact.value}>
                   {fact.value}
@@ -78,7 +76,11 @@ export function ProjectCard({ project, locale }: { project: CatalogProject; loca
             ))}
           </dl>
 
-          <div className="mt-5">
+          <div className="mt-5 border-t border-qidra-dark/8 pt-4">
+            <div className="mb-2 flex items-center justify-between gap-3 text-12 font-semibold text-qidra-dark">
+              <span>{isRu ? "Финансирование" : "Funding"}</span>
+              <span>{progress}%</span>
+            </div>
             <ProgressBar value={progress} />
             <div className="mt-2 flex justify-between gap-3 text-13 text-qidra-grayBlue">
               <span className="truncate">
@@ -95,7 +97,7 @@ export function ProjectCard({ project, locale }: { project: CatalogProject; loca
               {isRu ? "Подробнее" : "Details"}
             </ButtonLink>
             <ButtonLink href={documentHref} variant="outline" className="w-full sm:w-fit sm:min-w-36">
-              {isRu ? "Документы" : "Documents"}
+              {isRu ? "Документы и риски" : "Documents & risks"}
             </ButtonLink>
           </div>
         </div>

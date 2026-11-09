@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { ProjectStatus } from "@prisma/client";
+import { detectFileContentType } from "@/lib/file-content-type";
 import { readStoredFile } from "@/lib/file-storage";
 import { parseRealEstateData } from "@/lib/real-estate";
 import { prisma } from "@/lib/prisma";
@@ -37,7 +38,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     return new NextResponse(new Uint8Array(file.body), {
       headers: {
         "Content-Disposition": `inline; filename*=UTF-8''${encodeURIComponent(asset.name)}`,
-        "Content-Type": asset.type || guessContentType(asset.name)
+        "Content-Type": detectFileContentType(file.body, asset.type || guessContentType(asset.name))
       }
     });
   } catch {

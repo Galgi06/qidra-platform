@@ -13,10 +13,10 @@ export async function Footer({ locale }: { locale: Locale }) {
   const projectLinks = uniqueLinks(content.footer.projectLinks);
 
   return (
-    <footer className="border-t border-qidra-grayMedium/20 bg-[#f4f4f5] text-qidra-dark">
-      <div className="mx-auto grid max-w-[1840px] gap-14 px-5 py-14 sm:px-8 lg:grid-cols-[1.1fr_1fr] lg:px-11 lg:py-20">
+    <footer className="border-t border-white/10 bg-qidra-dark text-white">
+      <div className="page-shell grid gap-14 py-14 lg:grid-cols-[1.1fr_1fr] lg:py-20">
         <div className="grid content-start gap-10">
-          <Image src="/assets/brand/qidra-logo-dark.png" alt="Qidra" width={190} height={76} className="h-14 w-auto object-contain" />
+          <Image src="/assets/brand/qidra-logo-light.png" alt="Qidra" width={190} height={76} className="h-14 w-auto object-contain" />
           <div className="flex gap-5">
             <SocialLink kind="telegram" label="Telegram" href={telegramHref} />
             <SocialLink kind="instagram" label="Instagram" href={instagramHref} />
@@ -24,16 +24,16 @@ export async function Footer({ locale }: { locale: Locale }) {
           </div>
         </div>
         <div className="grid gap-10 sm:grid-cols-2">
-          <div className="grid content-start gap-4 text-[22px] leading-[1.35]">
-            <strong className="font-medium">{isRu ? "Проекты" : "Projects"}</strong>
+          <div className="grid content-start gap-3 text-16 leading-[1.45] text-white/70">
+            <strong className="mb-1 text-14 font-semibold uppercase tracking-[0.08em] text-white">{isRu ? "Проекты" : "Projects"}</strong>
             {projectLinks.map((item) => (
               <Link key={`${item.href}-${item.label.en}`} href={localizedHref(item.href, locale)}>
                 {item.label[locale]}
               </Link>
             ))}
           </div>
-          <div className="grid content-start gap-4 text-[22px] leading-[1.35]">
-            <strong className="font-medium">{isRu ? "О платформе" : "About platform"}</strong>
+          <div className="grid content-start gap-3 text-16 leading-[1.45] text-white/70">
+            <strong className="mb-1 text-14 font-semibold uppercase tracking-[0.08em] text-white">{isRu ? "О платформе" : "About platform"}</strong>
             {content.footer.aboutLinks.map((item) => (
               <Link key={`${item.href}-${item.label.en}`} href={localizedHref(item.href, locale)}>
                 {item.label[locale]}
@@ -42,12 +42,12 @@ export async function Footer({ locale }: { locale: Locale }) {
           </div>
         </div>
       </div>
-      <div className="border-t border-qidra-grayMedium/20">
-        <div className="mx-auto grid max-w-[1840px] gap-8 px-5 py-8 text-18 text-qidra-grayBlue sm:px-8 lg:grid-cols-[1.2fr_1fr_auto] lg:items-end lg:px-11">
+      <div className="border-t border-white/10">
+        <div className="page-shell grid gap-8 py-8 text-14 text-white/58 lg:grid-cols-[1.2fr_1fr_auto] lg:items-end">
           <p className="max-w-2xl">{content.footer.companyText}</p>
           <p>
             {content.footer.cooperationLabel[locale]}{" "}
-            <a className="text-qidra-dark" href={`mailto:${content.footer.cooperationEmail}`}>
+            <a className="text-white" href={`mailto:${content.footer.cooperationEmail}`}>
               {content.footer.cooperationEmail}
             </a>
           </p>
@@ -67,7 +67,7 @@ function SocialLink({ kind, label, href }: { kind: "telegram" | "instagram" | "w
   return (
     <Link
       href={href}
-      className="flex h-12 w-12 items-center justify-center rounded-full border border-qidra-dark text-qidra-dark transition-colors hover:border-qidra-accent hover:text-qidra-accent"
+      className="flex h-12 w-12 items-center justify-center rounded-full border border-white/25 text-white transition-colors hover:border-qidra-gold hover:text-qidra-gold"
       aria-label={label}
     >
       <SocialIcon kind={kind} />

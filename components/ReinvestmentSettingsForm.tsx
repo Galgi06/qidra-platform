@@ -23,14 +23,21 @@ export function ReinvestmentSettingsForm({
   const isRu = locale === "ru";
 
   return (
-    <section className="grid gap-5 rounded-[20px] border border-qidra-accent/15 bg-qidra-accent8 p-6 sm:p-8">
+    <section className="data-surface grid gap-5 overflow-hidden p-6 sm:p-8">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="eyebrow">{isRu ? "Только по вашему выбору" : "Only by your choice"}</p>
+          <h2 className="mt-2 text-[28px] font-medium leading-tight tracking-[-0.025em] text-qidra-dark">{isRu ? "Добровольный автореинвест" : "Optional auto-reinvestment"}</h2>
+        </div>
+        <span className={`rounded-full border px-3 py-1.5 text-12 font-semibold ${enabled ? "border-qidra-green/20 bg-[#e9f5ef] text-qidra-green" : "border-qidra-dark/10 bg-qidra-grayLight text-qidra-grayBlue"}`}>
+          {enabled ? (isRu ? "Включён вами" : "Enabled by you") : isRu ? "Выключен" : "Off"}
+        </span>
+      </div>
       <div>
-        <p className="text-14 font-medium uppercase text-qidra-accent">{isRu ? "Добровольная настройка" : "Optional setting"}</p>
-        <h2 className="mt-2 text-[28px] font-medium leading-tight text-qidra-dark">{isRu ? "Автоматический реинвест" : "Automatic reinvestment"}</h2>
         <p className="mt-3 max-w-4xl text-14 leading-6 text-qidra-grayBlue">
           {isRu
-            ? "После каждой будущей выплаты выбранная доля дивидендов будет направлена в указанный проект. Если проект закрыт, заполнен или операция не проходит проверки, вся сумма останется на доступном балансе. Настройку можно отключить в любой момент."
-            : "After each future payout, the selected share of dividends will be directed to the chosen project. If the project is closed, full, or fails validation, the full amount remains available in your wallet. You can disable this setting at any time."}
+            ? "По умолчанию дивиденды поступают на доступный баланс. Только после вашего явного согласия выбранная доля будущих выплат будет направляться в указанный проект. Настройку можно отключить в любой момент."
+            : "By default, dividends are credited to your available balance. Only after your explicit consent will the selected share of future payouts be directed to a chosen project. You can disable this setting at any time."}
         </p>
       </div>
 

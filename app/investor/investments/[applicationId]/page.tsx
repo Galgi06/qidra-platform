@@ -85,8 +85,8 @@ export default async function InvestorContractPage({
     <>
       <Header locale={locale} path={`/investor/investments/${application.id}`} />
       <main>
-        <section className="bg-qidra-grayLight px-5 py-10 sm:px-8 lg:px-11 lg:py-14">
-          <div className="mx-auto grid max-w-[1840px] gap-8">
+        <section className="page-hero px-5 py-10 sm:px-8 lg:px-11 lg:py-14">
+          <div className="page-shell relative z-10 grid gap-8">
             <Breadcrumbs
               items={[
                 { label: t(locale, "nav.home"), href: withLocale("/", locale) },
@@ -98,7 +98,7 @@ export default async function InvestorContractPage({
             <div className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-end">
               <div>
                 <p className="text-14 font-medium uppercase text-qidra-accent">{isRu ? "Партнёрский контракт" : "Partnership contract"}</p>
-                <h1 className="mt-3 max-w-5xl text-[42px] font-medium leading-tight tracking-[0] text-qidra-dark sm:text-[58px]">{projectTitle}</h1>
+              <h1 className="display-title mt-3 text-qidra-dark">{projectTitle}</h1>
                 <p className="mt-4 max-w-4xl text-20 text-qidra-grayBlue">
                   {isRu
                     ? "Детали вашего участия: сумма, статус, документы проекта, начисления, выводы и связанные операции."
@@ -352,7 +352,7 @@ export default async function InvestorContractPage({
 
 function Panel({ children, title }: { children: React.ReactNode; title: string }) {
   return (
-    <section className="grid gap-5 rounded-[20px] bg-white p-6 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] sm:p-8">
+    <section className="data-surface grid gap-5 p-6 sm:p-8">
       <h2 className="text-[30px] font-medium leading-tight tracking-[0] text-qidra-dark">{title}</h2>
       {children}
     </section>
@@ -363,7 +363,7 @@ function MetricCard({ label, tone = "neutral", value }: { label: string; tone?: 
   const toneClass = tone === "success" ? "text-qidra-green" : tone === "danger" ? "text-qidra-red" : tone === "warning" ? "text-qidra-gold" : "text-qidra-dark";
 
   return (
-    <article className="rounded-[20px] bg-white p-6 shadow-[0_0_0_1px_rgba(18,20,23,0.08)]">
+    <article className="metric-card">
       <p className="text-14 font-medium text-qidra-grayBlue">{label}</p>
       <p className={`mt-3 break-words text-[26px] font-medium leading-tight tracking-[0] ${toneClass}`}>{value}</p>
     </article>

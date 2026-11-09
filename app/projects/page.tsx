@@ -47,17 +47,17 @@ export default async function ProjectsPage({ searchParams }: { searchParams?: Pr
   return (
     <>
       <Header locale={locale} path="/projects" />
-      <main>
-        <section className="bg-qidra-grayLight px-5 py-12 sm:px-8 lg:px-11 lg:py-16">
-          <div className="mx-auto grid max-w-[1840px] gap-8">
-          <Breadcrumbs items={[{ label: "Qidra", href: withLocale("/", locale) }, { label: locale === "ru" ? "Проекты" : "Projects" }]} />
+      <main className="premium-page">
+        <section className="page-hero px-5 py-12 sm:px-8 lg:px-11 lg:py-16">
+          <div className="page-shell relative z-10 grid gap-8">
+            <Breadcrumbs items={[{ label: "Qidra", href: withLocale("/", locale) }, { label: locale === "ru" ? "Проекты" : "Projects" }]} />
             <div className="grid gap-7 lg:grid-cols-[1fr_auto] lg:items-end">
               <div>
-                <p className="text-14 font-medium uppercase text-qidra-accent">{isRu ? "Каталог Qidra" : "Qidra catalog"}</p>
-                <h1 className="mt-4 text-[44px] font-medium leading-[1.1] tracking-[0] text-qidra-dark sm:text-[58px] lg:text-[72px]">
+                <p className="eyebrow">{isRu ? "Каталог Qidra" : "Qidra catalog"}</p>
+                <h1 className="display-title mt-4 text-qidra-dark">
                   {isRu ? "Международные проекты" : "International projects"}
                 </h1>
-                <p className="mt-5 max-w-4xl text-20 text-qidra-grayBlue sm:text-[24px]">
+                <p className="mt-5 max-w-3xl text-18 text-qidra-grayBlue sm:text-20">
                   {isRu
                     ? "Выберите направление, изучите документы и условия сотрудничества, затем отправьте заявку на участие."
                     : "Choose a sector, review documents and cooperation terms, then submit a participation application."}
@@ -77,12 +77,12 @@ export default async function ProjectsPage({ searchParams }: { searchParams?: Pr
                 <CatalogStat value="UAE" label={isRu ? "юрисдикция" : "jurisdiction"} />
               </div>
             </div>
-            <form className={`grid gap-3 rounded-[20px] bg-white p-4 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] ${sectorFilter === "real-estate" ? "lg:grid-cols-3 xl:grid-cols-4" : "lg:grid-cols-[1fr_220px_220px_auto]"}`} action="/projects">
+            <form className={`data-surface grid gap-3 p-4 sm:p-5 ${sectorFilter === "real-estate" ? "lg:grid-cols-3 xl:grid-cols-4" : "lg:grid-cols-[1fr_220px_220px_auto]"}`} action="/projects">
               <input name="lang" type="hidden" value={locale} />
               <label className="grid gap-2 text-13 font-medium text-qidra-dark">
                 {isRu ? "Поиск проекта" : "Project search"}
                 <input
-                  className="h-12 rounded-qidra border border-transparent bg-qidra-grayLight px-4 text-16 outline-none transition-colors placeholder:text-qidra-grayMedium focus:border-qidra-accent"
+                  className="field-shell h-12 px-4 text-16 outline-none placeholder:text-qidra-grayMedium"
                   defaultValue={query}
                   name="q"
                   placeholder={isRu ? "Название, отрасль, страна, модель" : "Name, sector, country, model"}
@@ -90,7 +90,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams?: Pr
               </label>
               <label className="grid gap-2 text-13 font-medium text-qidra-dark">
                 {isRu ? "Направление" : "Sector"}
-                <select className="h-12 rounded-qidra border border-transparent bg-qidra-grayLight px-4 text-16 outline-none focus:border-qidra-accent" defaultValue={sectorFilter} name="sector">
+                <select className="field-shell h-12 px-4 text-16 outline-none" defaultValue={sectorFilter} name="sector">
                   <option value="">{isRu ? "Все направления" : "All sectors"}</option>
                   {sectorOptions(locale).map((sector) => (
                     <option key={sector.value} value={sector.value}>{sector.label}</option>
@@ -99,7 +99,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams?: Pr
               </label>
               <label className="grid gap-2 text-13 font-medium text-qidra-dark">
                 {isRu ? "Структура" : "Structure"}
-                <select className="h-12 rounded-qidra border border-transparent bg-qidra-grayLight px-4 text-16 outline-none focus:border-qidra-accent" defaultValue={structureFilter} name="structure">
+                <select className="field-shell h-12 px-4 text-16 outline-none" defaultValue={structureFilter} name="structure">
                   <option value="">{isRu ? "Все модели" : "All models"}</option>
                   <option value="Mudaraba">Mudaraba</option>
                   <option value="Musharaka">Musharaka</option>
@@ -109,7 +109,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams?: Pr
                 <>
                   <label className="grid gap-2 text-13 font-medium text-qidra-dark">
                     {isRu ? "Страна" : "Country"}
-                    <select className="h-12 rounded-qidra border border-transparent bg-qidra-grayLight px-4 text-16 outline-none focus:border-qidra-accent" defaultValue={countryFilter} name="country">
+                    <select className="field-shell h-12 px-4 text-16 outline-none" defaultValue={countryFilter} name="country">
                       <option value="">{isRu ? "Все страны" : "All countries"}</option>
                       {uniqueOptions(realEstateProjects.map((project) => project.realEstate?.country)).map((value) => (
                         <option key={value} value={value}>{value}</option>
@@ -118,7 +118,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams?: Pr
                   </label>
                   <label className="grid gap-2 text-13 font-medium text-qidra-dark">
                     {isRu ? "Город" : "City"}
-                    <select className="h-12 rounded-qidra border border-transparent bg-qidra-grayLight px-4 text-16 outline-none focus:border-qidra-accent" defaultValue={cityFilter} name="city">
+                    <select className="field-shell h-12 px-4 text-16 outline-none" defaultValue={cityFilter} name="city">
                       <option value="">{isRu ? "Все города" : "All cities"}</option>
                       {uniqueOptions(realEstateProjects.map((project) => project.realEstate?.city)).map((value) => (
                         <option key={value} value={value}>{value}</option>
@@ -127,7 +127,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams?: Pr
                   </label>
                   <label className="grid gap-2 text-13 font-medium text-qidra-dark">
                     {isRu ? "Тип недвижимости" : "Property type"}
-                    <select className="h-12 rounded-qidra border border-transparent bg-qidra-grayLight px-4 text-16 outline-none focus:border-qidra-accent" defaultValue={propertyTypeFilter} name="propertyType">
+                    <select className="field-shell h-12 px-4 text-16 outline-none" defaultValue={propertyTypeFilter} name="propertyType">
                       <option value="">{isRu ? "Все типы" : "All types"}</option>
                       {uniqueOptions(realEstateProjects.map((project) => project.realEstate?.propertyType)).map((value) => (
                         <option key={value} value={value}>{propertyTypeLabel(value as never, locale)}</option>
@@ -136,7 +136,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams?: Pr
                   </label>
                   <label className="grid gap-2 text-13 font-medium text-qidra-dark">
                     {isRu ? "Статус" : "Status"}
-                    <select className="h-12 rounded-qidra border border-transparent bg-qidra-grayLight px-4 text-16 outline-none focus:border-qidra-accent" defaultValue={propertyStatusFilter} name="propertyStatus">
+                    <select className="field-shell h-12 px-4 text-16 outline-none" defaultValue={propertyStatusFilter} name="propertyStatus">
                       <option value="">{isRu ? "Все статусы" : "All statuses"}</option>
                       {uniqueOptions(realEstateProjects.map((project) => project.realEstate?.objectStatus)).map((value) => (
                         <option key={value} value={value}>{propertyStatusLabel(value as never, locale)}</option>
@@ -145,7 +145,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams?: Pr
                   </label>
                   <label className="grid gap-2 text-13 font-medium text-qidra-dark">
                     {isRu ? "Источник дохода" : "Income source"}
-                    <select className="h-12 rounded-qidra border border-transparent bg-qidra-grayLight px-4 text-16 outline-none focus:border-qidra-accent" defaultValue={incomeSourceFilter} name="incomeSource">
+                    <select className="field-shell h-12 px-4 text-16 outline-none" defaultValue={incomeSourceFilter} name="incomeSource">
                       <option value="">{isRu ? "Все источники" : "All sources"}</option>
                       {uniqueOptions(realEstateProjects.flatMap((project) => project.realEstate?.incomeSources || [])).map((value) => (
                         <option key={value} value={value}>{incomeSourceLabel(value as never, locale)}</option>
@@ -154,7 +154,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams?: Pr
                   </label>
                   <label className="grid gap-2 text-13 font-medium text-qidra-dark">
                     {isRu ? "Валюта" : "Currency"}
-                    <select className="h-12 rounded-qidra border border-transparent bg-qidra-grayLight px-4 text-16 outline-none focus:border-qidra-accent" defaultValue={currencyFilter} name="currency">
+                    <select className="field-shell h-12 px-4 text-16 outline-none" defaultValue={currencyFilter} name="currency">
                       <option value="">{isRu ? "Все валюты" : "All currencies"}</option>
                       {uniqueOptions(realEstateProjects.map((project) => project.realEstate?.fundraisingCurrency || project.realEstate?.currency)).map((value) => (
                         <option key={value} value={value}>{value}</option>
@@ -163,7 +163,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams?: Pr
                   </label>
                 </>
               ) : null}
-              <button className="h-12 self-end rounded-qidra bg-qidra-dark px-6 text-16 font-medium text-white transition-colors hover:bg-qidra-accent" type="submit">
+              <button className="h-12 self-end rounded-qidra bg-qidra-dark px-6 text-16 font-semibold text-white transition-[background-color,transform] hover:-translate-y-0.5 hover:bg-qidra-accent" type="submit">
                 {isRu ? "Найти" : "Search"}
               </button>
             </form>
@@ -171,8 +171,8 @@ export default async function ProjectsPage({ searchParams }: { searchParams?: Pr
               {sectors.map((sector) => (
                 <a
                   key={sector.value}
-                  className={`rounded-[18px] p-5 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] transition-colors ${
-                    sectorFilter === sector.value ? "bg-qidra-dark text-white" : "bg-white text-qidra-dark hover:bg-qidra-grayLight"
+                  className={`rounded-[16px] border p-5 transition-[background-color,border-color,transform] hover:-translate-y-0.5 ${
+                    sectorFilter === sector.value ? "border-qidra-forest bg-qidra-forest text-white" : "border-qidra-dark/10 bg-white text-qidra-dark hover:border-qidra-accent/30 hover:bg-qidra-accent8"
                   }`}
                   href={projectFilterHref(locale, { sector: sector.value })}
                 >
@@ -187,11 +187,11 @@ export default async function ProjectsPage({ searchParams }: { searchParams?: Pr
         </section>
 
         <section className="px-5 py-12 sm:px-8 lg:px-11 lg:py-16">
-          <div className="mx-auto grid max-w-[1840px] gap-6">
+          <div className="page-shell grid gap-7">
             {openProjects.length ? (
               <div className="grid gap-5">
                 <div>
-                  <h2 className="text-[36px] font-medium leading-tight tracking-[0] text-qidra-dark sm:text-[44px]">
+                  <h2 className="section-title text-qidra-dark">
                     {isRu ? "Открытые для участия" : "Open for participation"}
                   </h2>
                   <p className="mt-3 max-w-4xl text-18 text-qidra-grayBlue">
@@ -200,7 +200,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams?: Pr
                       : "These projects currently accept applications. Participation is available only within the free balance and after reviewing the documents."}
                   </p>
                 </div>
-                <div className="grid gap-5 lg:grid-cols-2">
+                <div className="grid gap-6 xl:grid-cols-2">
                   {openProjects.map((project) => (
                     <ProjectCard key={project.slug} project={project} locale={locale} />
                   ))}
@@ -215,7 +215,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams?: Pr
             {unavailableProjects.length ? (
               <div className="mt-12 grid gap-5">
                 <div>
-                  <h2 className="text-[36px] font-medium leading-tight tracking-[0] text-qidra-dark sm:text-[44px]">
+                  <h2 className="section-title text-qidra-dark">
                     {isRu ? "Завершённые и недоступные для новых заявок" : "Completed or unavailable for new applications"}
                   </h2>
                   <p className="mt-3 max-w-4xl text-18 text-qidra-grayBlue">
@@ -224,14 +224,14 @@ export default async function ProjectsPage({ searchParams }: { searchParams?: Pr
                       : "These projects have reached their target or are temporarily closed by the Qidra team. New applications are not accepted, while profiles and documents remain available for records and review."}
                   </p>
                 </div>
-                <div className="grid gap-5 lg:grid-cols-2">
+                <div className="grid gap-6 xl:grid-cols-2">
                   {unavailableProjects.map((project) => (
                     <ProjectCard key={project.slug} project={project} locale={locale} />
                   ))}
                 </div>
               </div>
             ) : null}
-            <p className="max-w-4xl text-14 text-qidra-grayBlue">
+            <p className="mt-4 max-w-5xl rounded-[16px] border border-qidra-gold/20 bg-[#f7f2e7] px-5 py-4 text-14 text-qidra-grayBlue">
               {isRu
                 ? "Qidra не обещает фиксированную доходность. Любое участие требует самостоятельного изучения документов, условий и рисков проекта."
                 : "Qidra does not promise fixed returns. Any participation requires independent review of project documents, terms and risks."}
