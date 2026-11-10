@@ -184,10 +184,15 @@ test("complete investor journey through HTTP APIs", async () => {
     projectId: fixtures.origin.id
   });
 
-  const automaticOrder = await prisma.reinvestmentOrder.findFirstOrThrow({
-    where: { sourceDividendPaymentId: secondPayment.id, status: "COMPLETED", mode: "AUTOMATIC" }
+  const automaticOrders = await prisma.reinvestmentOrder.findMany({
+    where: {
+      mode: "AUTOMATIC",
+      sourceDividendPayment: { periodId: secondPayment.periodId },
+      status: "COMPLETED",
+      userId: investorUser.id
+    }
   });
-  assert.equal(automaticOrder.investedAmountUsdt.toString(), "200");
+  assert.equal(automaticOrders.reduce((total, order) => total + Number(order.investedAmountUsdt.toString()), 0), 200);
 
   const destinationAddress = `T${"A".repeat(33)}`;
   await expectJson(investor.request("/api/wallet/withdrawals?lang=en", {
@@ -213,8 +218,8 @@ test("complete investor journey through HTTP APIs", async () => {
   assert.equal(finalWallet.availableUsdt.toString(), "2100");
   assert.equal(finalWallet.pendingUsdt.toString(), "0");
   assert.equal(finalWallet.reservedUsdt.toString(), "0");
-  assert.equal(investments.length, 3);
-  assert.equal(orders.length, 2);
+  assert.equal(investments.length, 4);
+  assert.equal(orders.length, 3);
   assert.equal(savedWithdrawal.status, "REJECTED");
 });
 
