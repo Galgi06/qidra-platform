@@ -55,8 +55,13 @@ case "$MODE" in
   restore-drill)
     ENV_FILE="$ENV_FILE" COMPOSE_FILE="$COMPOSE_FILE" bash scripts/restore-drill.sh "$APP_DIR"
     ;;
+  reconciliation)
+    docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" run --rm \
+      -v "$APP_DIR/scripts/reconcile-financial-ledger.mjs:/app/scripts/reconcile-financial-ledger.mjs:ro" \
+      migrate node scripts/reconcile-financial-ledger.mjs
+    ;;
   *)
-    echo "Usage: scripts/run-backup-operations.sh daily|restore-drill [app-dir]" >&2
+    echo "Usage: scripts/run-backup-operations.sh daily|restore-drill|reconciliation [app-dir]" >&2
     exit 2
     ;;
 esac
