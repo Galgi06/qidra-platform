@@ -85,6 +85,13 @@ BACKUP_POSTGRES_COMPOSE=true BACKUP_UPLOAD_S3=true BACKUP_DIR=/var/backups/qidra
 15 2 * * * cd /opt/qidra-platform && bash -lc 'set -a && . ./.env.production && set +a && BACKUP_POSTGRES_COMPOSE=true BACKUP_UPLOAD_S3=true BACKUP_DIR=/var/backups/qidra/postgres RETENTION_DAYS=14 scripts/backup-postgres.sh >> /var/log/qidra-backup.log 2>&1' # qidra-postgres-backup
 ```
 
+В production основным расписанием является GitHub Actions workflow `Qidra backups and restore drill`:
+
+- ежедневно в `02:15 UTC`: PostgreSQL backup, локальный checksum, off-site S3 checksum и инкрементальная копия приватных файлов/KYC;
+- каждое воскресенье в `03:15 UTC`: скачивание последней off-site копии и восстановление в отдельную временную базу;
+- production-база не очищается и не изменяется во время restore-drill;
+- ручной запуск доступен через `workflow_dispatch` с операциями `daily` и `restore-drill`.
+
 Восстановление из архива в отдельную тестовую базу:
 
 ```bash

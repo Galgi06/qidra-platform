@@ -14,9 +14,19 @@ import { getLocale, type SearchParams } from "@/lib/i18n";
 import { prisma } from "@/lib/prisma";
 import { readSupportAttachments } from "@/lib/support-attachments";
 
-export default async function InvestorSupportPage({ searchParams }: { searchParams?: Promise<SearchParams> }) {
+type SupportPageProps = {
+  messengerMode?: boolean;
+  searchParams?: Promise<SearchParams>;
+};
+
+export default async function InvestorSupportPage({ searchParams }: SupportPageProps) {
+  return QidraMessengerExperience({ searchParams });
+}
+
+export async function QidraMessengerExperience({ messengerMode = false, searchParams }: SupportPageProps) {
   const locale = await getLocale(searchParams);
-  const session = await requireAuth(locale, "/investor/support");
+  const entryPath = messengerMode ? "/messenger" : "/investor/support";
+  const session = await requireAuth(locale, entryPath);
   const isRu = locale === "ru";
   const userId = session.user?.id ?? "";
   const latestThread = await prisma.supportThread.findFirst({
@@ -51,14 +61,14 @@ export default async function InvestorSupportPage({ searchParams }: { searchPara
   return (
     <>
       <SupportAutoRefresh />
-      <Header locale={locale} path="/investor/support" />
+      <Header locale={locale} path={entryPath} />
       <main>
         <section className="bg-qidra-grayLight px-5 py-10 sm:px-8 lg:px-11 lg:py-14">
           <div className="mx-auto grid max-w-[1840px] gap-8">
             <div>
-              <p className="text-14 font-medium uppercase text-qidra-accent">{isRu ? "Профиль участника" : "Participant profile"}</p>
+              <p className="text-14 font-medium uppercase text-qidra-accent">{messengerMode ? "Qidra Messenger" : isRu ? "Профиль участника" : "Participant profile"}</p>
               <h1 className="mt-3 max-w-4xl text-[42px] font-medium leading-tight tracking-[0] text-qidra-dark sm:text-[56px]">
-                {isRu ? "Поддержка Qidra" : "Qidra support"}
+                {messengerMode ? (isRu ? "Безопасный диалог с Qidra" : "Secure conversation with Qidra") : isRu ? "Поддержка Qidra" : "Qidra support"}
               </h1>
               <p className="mt-4 max-w-3xl text-20 text-qidra-grayBlue">
                 {isRu
@@ -70,7 +80,7 @@ export default async function InvestorSupportPage({ searchParams }: { searchPara
         </section>
 
         <section className="px-5 py-12 sm:px-8 lg:px-11 lg:py-16">
-          <InvestorWorkspace activePath="/investor/support" locale={locale}>
+          <InvestorWorkspace activePath="/messenger" locale={locale}>
           <div className="grid gap-8 xl:grid-cols-[1fr_0.42fr]">
             <section className="grid gap-5 rounded-[20px] bg-white p-6 shadow-[0_0_0_1px_rgba(18,20,23,0.08)] sm:p-8">
               <div>

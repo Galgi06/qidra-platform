@@ -58,6 +58,16 @@ jobs:
       - name: Support bot safety tests
         run: npm run test:support-bot
 
+      - name: Authentication email normalization tests
+        run: npm run test:auth-email
+
+      - name: Backup operations syntax checks
+        run: |
+          bash -n scripts/backup-postgres.sh scripts/run-backup-operations.sh scripts/restore-drill.sh
+          node --check scripts/backup-files-s3.mjs
+          node --check scripts/download-latest-backup-s3.mjs
+          node --check scripts/verify-backup-s3.mjs
+
       - name: Financial concurrency integration tests
         run: npm run test:integration
 

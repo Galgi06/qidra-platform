@@ -3,10 +3,11 @@ import { z } from "zod";
 import { sendEmail, getAppBaseUrl } from "@/lib/email";
 import { prisma } from "@/lib/prisma";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
+import { normalizeAuthEmail } from "@/lib/auth-email.js";
 import { createRawToken, expiresIn, hashToken } from "@/lib/tokens";
 
 const forgotPasswordSchema = z.object({
-  email: z.string().trim().email().max(255)
+  email: z.preprocess((value) => (typeof value === "string" ? normalizeAuthEmail(value) : value), z.string().email().max(255))
 });
 
 function isRu(request: NextRequest) {
@@ -27,7 +28,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const email = parsed.data.email.toLowerCase();
+  const email = parsed.data.email;
   const rateLimit = checkRateLimit({
     key: `auth:forgot-password:${email}`,
     limit: 4,

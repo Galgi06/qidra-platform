@@ -2,7 +2,7 @@
 
 ## Result
 
-The dependency audit was reduced from 24 findings (3 critical, 13 high, 8 moderate) to 7 findings (2 critical, 5 high, 0 moderate) without forced or unsupported major upgrades.
+The dependency audit was reduced from 24 findings (3 critical, 13 high, 8 moderate) to 7 findings (2 critical, 5 high, 0 moderate) without forced or unsupported major upgrades. On 2026-11-10 every installed Nodemailer copy was overridden to `10.4.0`, removing the actionable mail-library advisories from the installed tree.
 
 Resolved runtime findings include Next.js, Zod, Axios, Sharp, Browserslist, `source-map-js`, `js-yaml`, `brace-expansion`, and the Nodemailer version used by Qidra SMTP delivery. The application build, lint, dividend tests, reinvestment tests, and SMTP module import pass with the updated tree.
 
@@ -12,7 +12,7 @@ Resolved runtime findings include Next.js, Zod, Axios, Sharp, Browserslist, `sou
 
 `next-auth@4.24.15` is the current stable v4 release but requires `@auth/core@0.34.3`. npm reports advisories fixed only in `@auth/core@0.41.3`. The v5 line that uses the fixed core is still published under the `beta` tag, so it is not introduced into the production authentication path in this release.
 
-Qidra does not configure the NextAuth EmailProvider and does not call `getToken()`. Application SMTP delivery imports `nodemailer-secure`, an npm alias pinned to patched `nodemailer@10.3.1`. The older Nodemailer packages reported by npm are optional peer dependencies installed below Auth.js and are not used by Qidra mail delivery.
+Qidra does not configure the NextAuth EmailProvider and does not call `getToken()`. Application SMTP delivery imports `nodemailer-secure`, and both direct and transitive Nodemailer packages are pinned to `10.4.0`. Authentication email input is normalized with Unicode NFKC before validation and lookup, preventing alternate Unicode `@` characters from bypassing the application validation boundary.
 
 The remaining OAuth provider-cookie advisory can only be fully removed by a tested NextAuth v5 migration. That migration must include sign-in, sign-up, Google callback, blocked-user, session invalidation, and password-reset regression tests before release.
 

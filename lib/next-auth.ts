@@ -9,6 +9,7 @@ import { prisma } from "@/lib/prisma";
 import { verifyPassword } from "@/lib/passwords";
 import { isSocialProviderConfigured } from "@/lib/social-auth";
 import { isUserBlocked } from "@/lib/user-access";
+import { normalizeAuthEmail } from "@/lib/auth-email.js";
 
 const googleEnabled = isSocialProviderConfigured(process.env.GOOGLE_CLIENT_ID) && isSocialProviderConfigured(process.env.GOOGLE_CLIENT_SECRET);
 const isProductionBuild = process.env.NEXT_PHASE === "phase-production-build";
@@ -69,7 +70,7 @@ function createQidraAdapter(): Adapter {
 
       const createdUser = await prisma.user.create({
         data: {
-          email: user.email.toLowerCase(),
+          email: normalizeAuthEmail(user.email),
           name: user.name,
           emailVerified: user.emailVerified,
           investorProfile: { create: {} },
@@ -83,7 +84,7 @@ function createQidraAdapter(): Adapter {
       const updatedUser = await prisma.user.update({
         where: { id: user.id },
         data: {
-          email: user.email?.toLowerCase(),
+          email: user.email ? normalizeAuthEmail(user.email) : undefined,
           name: user.name,
           emailVerified: user.emailVerified
         }
@@ -96,7 +97,9 @@ function createQidraAdapter(): Adapter {
       return user ? toAdapterUser(user) : null;
     },
     async getUserByEmail(email: string) {
-      const user = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
+      const normalizedEmail = normalizeAuthEmail(email);
+      if (!normalizedEmail) return null;
+      const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
       return user ? toAdapterUser(user) : null;
     },
     async getUserByAccount(providerAccountId: Pick<AdapterAccount, "provider" | "providerAccountId">) {
@@ -129,7 +132,7 @@ export const authOptions: NextAuthOptions = {
         password: { label: "Password", type: "password" }
       },
       async authorize(credentials) {
-        const email = credentials?.email?.toLowerCase().trim();
+        const email = credentials?.email ? normalizeAuthEmail(credentials.email) : "";
         const password = credentials?.password;
 
         if (!email || !password) {
@@ -173,7 +176,7 @@ export const authOptions: NextAuthOptions = {
 
       if (account?.provider === "google" && profile && "email" in profile && typeof profile.email === "string") {
         const existingUser = await prisma.user.findUnique({
-          where: { email: profile.email.toLowerCase() },
+          where: { email: normalizeAuthEmail(profile.email) },
           select: {
             blockedAt: true,
             blockedUntil: true
@@ -189,7 +192,8 @@ export const authOptions: NextAuthOptions = {
     },
     async jwt({ token, user }) {
       let tokenUserId = (user?.id ?? token.id) as string | undefined;
-      const fallbackEmail = (typeof user?.email === "string" ? user.email : typeof token.email === "string" ? token.email : undefined)?.toLowerCase().trim();
+      const fallbackEmailValue = typeof user?.email === "string" ? user.email : typeof token.email === "string" ? token.email : undefined;
+      const fallbackEmail = fallbackEmailValue ? normalizeAuthEmail(fallbackEmailValue) : undefined;
 
       if (user) {
         token.id = user.id;

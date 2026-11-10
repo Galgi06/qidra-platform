@@ -25,7 +25,7 @@ export async function Header({ locale, path = "/" }: { locale: Locale; path?: st
   const adminSession = canAccessAdmin(session?.user?.role as "ADMIN" | "SUPER_ADMIN" | "guest" | undefined);
   const supportDeskSession = canAccessSupportDesk(session?.user?.role as "ADMIN" | "SUPER_ADMIN" | "TECH_SUPPORT" | "SALES_MANAGER" | "guest" | undefined);
   const operationsHref = adminSession ? "/admin" : "/admin/support";
-  const chatHref = signedIn ? (supportDeskSession ? withLocale("/admin/support", locale) : withLocale("/investor/support", locale)) : null;
+  const chatHref = signedIn ? (supportDeskSession ? withLocale("/admin/support", locale) : withLocale("/messenger", locale)) : null;
   const t = dictionary[locale].nav;
   const links = [
     ...(supportDeskSession ? [{ href: operationsHref, label: locale === "ru" ? "Операционный центр" : "Operations center" }] : []),
