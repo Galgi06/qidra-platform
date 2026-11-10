@@ -62,8 +62,8 @@ export default async function InvestorSupportPage({ searchParams }: { searchPara
               </h1>
               <p className="mt-4 max-w-3xl text-20 text-qidra-grayBlue">
                 {isRu
-                  ? "Отправляйте вопросы по профилю, платежам, проектам и документам. Ответы команды будут сохраняться в этом диалоге."
-                  : "Send questions about your profile, payments, projects and documents. Team replies will be stored in this thread."}
+                  ? "Qidra Assistant сразу отвечает на справочные вопросы. Финансовые вопросы и проверка данных передаются специалисту, а вся переписка сохраняется в этом диалоге."
+                  : "Qidra Assistant immediately answers general questions. Financial questions and data checks are passed to a specialist, and the full conversation is stored in this thread."}
               </p>
             </div>
           </div>

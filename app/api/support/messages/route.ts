@@ -6,6 +6,8 @@ import { authOptions } from "@/lib/next-auth";
 import { prisma } from "@/lib/prisma";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { saveSupportAttachment, supportAttachmentConstraints, validateSupportAttachment } from "@/lib/support-attachments";
+import { notifySupportTeamAboutMemberMessage } from "@/lib/support-alerts";
+import { replyToMemberSupportMessage } from "@/lib/support-bot-service";
 
 const messageSchema = z.object({
   body: z.string().trim().min(2).max(3000),
@@ -169,6 +171,25 @@ export async function POST(request: NextRequest) {
 
     return supportThread;
   });
+
+  const botResult = await replyToMemberSupportMessage({
+    hasAttachments: uploads.length > 0,
+    locale: localeRu ? "ru" : "en",
+    message: parsed.data.body,
+    threadId: thread.id,
+    userId
+  }).catch((error) => {
+    console.error("support_bot_member_reply_failed", error);
+    return null;
+  });
+
+  await notifySupportTeamAboutMemberMessage(prisma, {
+    category: botResult?.category,
+    message: parsed.data.body,
+    subject: parsed.data.subject || thread.subject || (localeRu ? "Обращение участника" : "Participant request"),
+    threadId: thread.id,
+    userId
+  }).catch((error) => console.error("support_member_alert_failed", error));
 
   return NextResponse.json({
     title: localeRu ? "Сообщение отправлено" : "Message sent",

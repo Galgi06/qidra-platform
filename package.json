@@ -17,6 +17,7 @@
     "test:storage": "node scripts/test-s3-storage.mjs",
     "test:dividends": "node --test tests/dividend-calculator.test.mjs",
     "test:reinvestment": "node --test tests/reinvestment-calculator.test.mjs",
+    "test:support-bot": "node --test tests/support-bot.test.mjs",
     "test:integration": "node --test tests/financial-concurrency.integration.mjs",
     "staging:verify": "bash scripts/staging-db-drill.sh",
     "staging:e2e": "bash scripts/staging-e2e.sh",

@@ -309,7 +309,19 @@ export default async function AdminSupportPage({ searchParams }: { searchParams:
                           <div key={message.id} className="rounded-qidra bg-qidra-grayLight p-4">
                             <div className="flex flex-wrap items-center gap-2 text-12 font-medium text-qidra-grayBlue">
                               <span className="text-qidra-dark">{message.senderName || (message.senderKind === "guest" ? thread.name : "Qidra")}</span>
-                              <span>{message.senderKind === "guest" ? (isRu ? "Гость" : "Guest") : isRu ? "Менеджер" : "Manager"}</span>
+                              <span>
+                                {message.senderKind === "guest"
+                                  ? isRu
+                                    ? "Гость"
+                                    : "Guest"
+                                  : message.senderKind === "bot"
+                                    ? isRu
+                                      ? "Автоматический помощник"
+                                      : "Automated assistant"
+                                    : isRu
+                                      ? "Менеджер"
+                                      : "Manager"}
+                              </span>
                               <span>{formatDateTime(message.createdAt, locale)}</span>
                             </div>
                             <p className="mt-2 whitespace-pre-wrap text-15 text-qidra-grayBlue">{message.body}</p>
