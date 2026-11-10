@@ -44,8 +44,13 @@ case "$MODE" in
     test -n "$latest_backup"
     test -s "$latest_backup.sha256"
     sha256sum --check "$latest_backup.sha256"
-    docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" run --rm -v "$BACKUP_DIR:/backups:ro" migrate node scripts/verify-backup-s3.mjs "/backups/$(basename "$latest_backup")"
-    docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" run --rm migrate node scripts/backup-files-s3.mjs
+    docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" run --rm \
+      -v "$BACKUP_DIR:/backups:ro" \
+      -v "$APP_DIR/scripts/verify-backup-s3.mjs:/app/scripts/verify-backup-s3.mjs:ro" \
+      migrate node scripts/verify-backup-s3.mjs "/backups/$(basename "$latest_backup")"
+    docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" run --rm \
+      -v "$APP_DIR/scripts/backup-files-s3.mjs:/app/scripts/backup-files-s3.mjs:ro" \
+      migrate node scripts/backup-files-s3.mjs
     ;;
   restore-drill)
     ENV_FILE="$ENV_FILE" COMPOSE_FILE="$COMPOSE_FILE" bash scripts/restore-drill.sh "$APP_DIR"

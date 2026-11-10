@@ -37,7 +37,10 @@ cleanup() {
 }
 trap cleanup EXIT
 
-download_output="$(docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" run --rm -v "$RESTORE_DIR:/restore" migrate node scripts/download-latest-backup-s3.mjs /restore)"
+download_output="$(docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" run --rm \
+  -v "$RESTORE_DIR:/restore" \
+  -v "$APP_DIR/scripts/download-latest-backup-s3.mjs:/app/scripts/download-latest-backup-s3.mjs:ro" \
+  migrate node scripts/download-latest-backup-s3.mjs /restore)"
 backup_file="$RESTORE_DIR/$(basename "$(printf '%s\n' "$download_output" | tail -1)")"
 test -s "$backup_file"
 test -s "$backup_file.sha256"
