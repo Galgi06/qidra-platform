@@ -152,12 +152,16 @@ test("complete investor journey through HTTP APIs", async () => {
     periodEnd: "2026-11-30",
     projectId: fixtures.origin.id
   });
+  await prisma.project.update({
+    where: { id: fixtures.origin.id },
+    data: { fundedUsdt: 10000, status: "FUNDED" }
+  });
   await expectJson(investor.request("/api/reinvestments?lang=en", {
     method: "POST",
     json: {
       amount: "100",
       sourceDividendPaymentId: firstPayment.id,
-      targetProjectId: fixtures.oneTime.id,
+      targetProjectId: fixtures.origin.id,
       termsAccepted: "on"
     }
   }), 200);
