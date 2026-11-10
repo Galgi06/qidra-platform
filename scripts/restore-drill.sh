@@ -11,12 +11,19 @@ cd "$APP_DIR"
 mkdir -p "$RESTORE_DIR"
 chmod 700 "$RESTORE_DIR"
 
-set -a
-# shellcheck disable=SC1090
-. "$ENV_FILE"
-set +a
+extract_env_value() {
+  local key="$1"
+  local value
+  value="$(sed -n "s/^${key}=//p" "$ENV_FILE" | tail -1)"
+  value="${value%$'\r'}"
+  if [[ "$value" == \"*\" && "$value" == *\" ]]; then value="${value:1:${#value}-2}"; fi
+  if [[ "$value" == \'*\' && "$value" == *\' ]]; then value="${value:1:${#value}-2}"; fi
+  printf '%s' "$value"
+}
 
-database_url="${DATABASE_URL:?DATABASE_URL is required}"
+database_url="${DATABASE_URL:-$(extract_env_value DATABASE_URL)}"
+: "${database_url:?DATABASE_URL is required}"
+export DATABASE_URL="$database_url"
 database_url_no_scheme="${database_url#*://}"
 credentials="${database_url_no_scheme%%@*}"
 export POSTGRES_USER="${POSTGRES_USER:-${credentials%%:*}}"
