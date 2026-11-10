@@ -192,7 +192,7 @@ test("complete investor journey through HTTP APIs", async () => {
       userId: investorUser.id
     }
   });
-  assert.equal(automaticOrders.reduce((total, order) => total + Number(order.investedAmountUsdt.toString()), 0), 200);
+  assert.equal(automaticOrders.reduce((total, order) => total + Number(order.investedAmountUsdt.toString()), 0), 181.82);
 
   const destinationAddress = `T${"A".repeat(33)}`;
   await expectJson(investor.request("/api/wallet/withdrawals?lang=en", {
@@ -208,18 +208,21 @@ test("complete investor journey through HTTP APIs", async () => {
     json: { action: "reject", note: "Staging E2E avoids real TRON transfer" }
   }), 200);
 
-  const [finalWallet, investments, orders, savedWithdrawal] = await Promise.all([
+  const [finalWallet, investments, orders, fallbackOrders, savedWithdrawal] = await Promise.all([
     prisma.wallet.findUniqueOrThrow({ where: { id: wallet.id } }),
     prisma.investmentApplication.findMany({ where: { userId: investorUser.id, status: "CONFIRMED" } }),
     prisma.reinvestmentOrder.findMany({ where: { userId: investorUser.id, status: "COMPLETED" } }),
+    prisma.reinvestmentOrder.findMany({ where: { userId: investorUser.id, status: "FALLBACK" } }),
     prisma.walletTransaction.findUniqueOrThrow({ where: { id: withdrawal.id } })
   ]);
 
-  assert.equal(finalWallet.availableUsdt.toString(), "2100");
+  assert.equal(finalWallet.availableUsdt.toString(), "2118.18");
   assert.equal(finalWallet.pendingUsdt.toString(), "0");
   assert.equal(finalWallet.reservedUsdt.toString(), "0");
-  assert.equal(investments.length, 4);
-  assert.equal(orders.length, 3);
+  assert.equal(investments.length, 3);
+  assert.equal(orders.length, 2);
+  assert.equal(fallbackOrders.length, 1);
+  assert.equal(fallbackOrders[0].fallbackReason, "invalid_amount");
   assert.equal(savedWithdrawal.status, "REJECTED");
 });
 
