@@ -5,6 +5,7 @@ import { z } from "zod";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { prisma } from "@/lib/prisma";
 import { notifySupportTeamAboutGuestMessage } from "@/lib/support-alerts";
+import { replyToGuestSupportMessage } from "@/lib/support-bot-service";
 import { readSupportAttachments, saveSupportAttachment, supportAttachmentConstraints, validateSupportAttachment } from "@/lib/support-attachments";
 
 const guestCreateSchema = z.object({
@@ -243,6 +244,13 @@ export async function POST(request: NextRequest) {
     subject: created.subject || (localeRu ? "Гостевое обращение" : "Guest support request"),
     threadId: created.id
   });
+
+  await replyToGuestSupportMessage({
+    hasAttachments: uploads.length > 0,
+    locale: localeRu ? "ru" : "en",
+    message: parsed.data.body,
+    threadId: created.id
+  }).catch((error) => console.error("support_bot_guest_reply_failed", error));
 
   const thread = await prisma.guestSupportThread.findUnique({
     where: { id: created.id },

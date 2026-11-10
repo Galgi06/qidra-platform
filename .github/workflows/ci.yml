@@ -55,6 +55,9 @@ jobs:
       - name: Reinvestment unit tests
         run: npm run test:reinvestment
 
+      - name: Support bot safety tests
+        run: npm run test:support-bot
+
       - name: Financial concurrency integration tests
         run: npm run test:integration
 

@@ -242,8 +242,8 @@ export function GuestSupportChatWidget({
             </p>
             <p className="mt-2 text-12 leading-snug text-qidra-grayBlue">
               {isRu
-                ? "Ответ менеджера появится в этом окне и дополнительно придёт на email. Если вопрос требует проверки, просто опишите ситуацию как можно подробнее."
-                : "The manager reply appears in this window and is also sent to email. If the issue needs review, describe the situation in as much detail as possible."}
+                ? "Qidra Assistant сразу отвечает на справочные вопросы. Финансовые вопросы и проверка данных передаются менеджеру. Ответ менеджера появится здесь и дополнительно придёт на email."
+                : "Qidra Assistant immediately answers general questions. Financial questions and data checks are passed to a manager. The manager reply appears here and is also sent by email."}
             </p>
           </div>
 
