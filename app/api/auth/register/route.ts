@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { isValidNormalizedPublicSlug, normalizePublicSlug } from "@/lib/public-slug";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { createRawToken, expiresInMinutes, hashToken } from "@/lib/tokens";
+import { normalizeAuthEmail } from "@/lib/auth-email.js";
 
 const registerSchema = z.object({
   accountType: z.enum(["investor", "company"]).default("investor"),
@@ -22,7 +23,7 @@ const registerSchema = z.object({
     .optional(),
   inviteToken: z.string().trim().max(255).optional(),
   name: z.string().trim().min(2).max(120),
-  email: z.string().trim().email().max(255),
+  email: z.preprocess((value) => (typeof value === "string" ? normalizeAuthEmail(value) : value), z.string().email().max(255)),
   password: z.string().max(128).refine(isStrongPassword),
   passwordConfirm: z.string().max(128)
 }).superRefine((data, ctx) => {
@@ -102,7 +103,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const email = parsed.data.email.toLowerCase();
+  const email = parsed.data.email;
   const invite = parsed.data.inviteToken
     ? await prisma.organizationInvite.findUnique({
         where: { token: parsed.data.inviteToken },

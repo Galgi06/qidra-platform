@@ -1,6 +1,6 @@
 # Qidra Messenger: product and technical specification
 
-Status: approved discovery scope, 2026-11-05.
+Status: Stage 1 entry point enabled, 2026-11-10.
 
 ## 1. Product goal
 
@@ -142,6 +142,13 @@ Relevant current modules:
 - Standalone web/PWA, shared Qidra identity, technical-support-only threads, attachments, operator queue, email and in-app owner alerts.
 - Import or expose existing Qidra support history without data loss.
 - Security, accessibility, mobile and end-to-end testing.
+
+Implemented foundation:
+
+- standalone `/messenger` PWA entry point with Qidra branding;
+- shared Qidra Google/email identity and existing support history;
+- investor-to-support-only communication, attachments, operator queue and owner alerts;
+- Qidra Assistant guardrails for financial questions and human escalation.
 
 ### Stage 2: production hardening
 

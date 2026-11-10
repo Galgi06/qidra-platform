@@ -1,0 +1,80 @@
+name: Qidra backups and restore drill
+
+on:
+  schedule:
+    - cron: "15 2 * * *"
+    - cron: "15 3 * * 0"
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Operation to run
+        type: choice
+        required: true
+        default: daily
+        options:
+          - daily
+          - restore-drill
+
+permissions:
+  contents: read
+
+jobs:
+  daily-backup:
+    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.operation == 'daily') || (github.event_name == 'schedule' && github.event.schedule == '15 2 * * *') }}
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: qidra-production-backup
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7
+      - uses: webfactory/ssh-agent@v0.10.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
+      - name: Trust production host
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          if [[ -n "${DEPLOY_KNOWN_HOSTS:-}" ]]; then printf '%s\n' "$DEPLOY_KNOWN_HOSTS" >> ~/.ssh/known_hosts; else ssh-keyscan -p "${DEPLOY_PORT:-22}" -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts; fi
+          chmod 600 ~/.ssh/known_hosts
+      - name: Create and verify database and file backups
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: ssh -p "${DEPLOY_PORT:-22}" "${DEPLOY_USER}@${DEPLOY_HOST}" "bash '${DEPLOY_PATH}/scripts/run-backup-operations.sh' daily '${DEPLOY_PATH}'"
+
+  weekly-restore-drill:
+    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.operation == 'restore-drill') || (github.event_name == 'schedule' && github.event.schedule == '15 3 * * 0') }}
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: qidra-production-backup
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7
+      - uses: webfactory/ssh-agent@v0.10.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
+      - name: Trust production host
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KN_HOSTS }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          if [[ -n "${DEPLOY_KNOWN_HOSTS:-}" ]]; then printf '%s\n' "$DEPLOY_KNOWN_HOSTS" >> ~/.ssh/known_hosts; else ssh-keyscan -p "${DEPLOY_PORT:-22}" -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts; fi
+          chmod 600 ~/.ssh/known_hosts
+      - name: Download off-site backup and restore into isolated database
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: ssh -p "${DEPLOY_PORT:-22}" "${DEPLOY_USER}@${DEPLOY_HOST}" "bash '${DEPLOY_PATH}/scripts/run-backup-operations.sh' restore-drill '${DEPLOY_PATH}'"

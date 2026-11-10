@@ -106,9 +106,9 @@
 ## Инфраструктура перед реальным запуском
 
 - [x] Добавлен скрипт `npm run backup:database` для ежедневного `pg_dump`, gzip-архива, retention и выгрузки в S3/R2.
-- [ ] Production database с ежедневными backup и точкой восстановления.
-- [ ] Подключить production `DATABASE_BACKUP_*` secrets и приватный backup bucket.
-- [ ] Проверить восстановление backup на отдельной базе до запуска с реальными деньгами.
+- [x] Production database с ежедневным off-site backup и контролем checksum через GitHub Actions.
+- [x] Production `DATABASE_BACKUP_*` secrets и приватный backup bucket подключены; production deploy подтвердил загрузку backup и checksum.
+- [x] Добавлен еженедельный restore-drill из off-site bucket в отдельную временную базу; первый production-прогон фиксируется в workflow `Qidra backups and restore drill`.
 - [ ] HTTPS production-домен.
 - [ ] `NEXTAUTH_URL` равен production-домену.
 - [ ] `NEXTAUTH_SECRET` сгенерирован заново и хранится только в secrets.

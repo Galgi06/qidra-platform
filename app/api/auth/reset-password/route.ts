@@ -2,12 +2,13 @@ import bcrypt from "bcryptjs";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { isStrongPassword, passwordPolicyDescription } from "@/lib/password-policy";
+import { normalizeAuthEmail } from "@/lib/auth-email.js";
 import { prisma } from "@/lib/prisma";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { hashToken } from "@/lib/tokens";
 
 const resetPasswordSchema = z.object({
-  email: z.string().trim().email().max(255),
+  email: z.preprocess((value) => (typeof value === "string" ? normalizeAuthEmail(value) : value), z.string().email().max(255)),
   token: z.string().trim().min(20),
   password: z.string().max(128).refine(isStrongPassword),
   passwordConfirm: z.string().max(128)
@@ -62,7 +63,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const email = parsed.data.email.toLowerCase();
+  const email = parsed.data.email;
   const rateLimit = checkRateLimit({
     key: `auth:reset-password:${email}`,
     limit: 8,

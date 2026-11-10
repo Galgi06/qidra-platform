@@ -10,7 +10,7 @@ const investorSections = [
   { group: "finance", path: "/investor/wallet", label: { ru: "Кошелек", en: "Wallet" }, description: { ru: "Баланс, пополнения, вывод", en: "Balance, deposits, withdrawals" } },
   { group: "finance", path: "/investor/investments", label: { ru: "Партнёрские контракты", en: "Partnership contracts" }, description: { ru: "Заявки, контракты, начисления", en: "Applications, contracts, accruals" } },
   { group: "projects", path: "/investor/projects/new", label: { ru: "Разместить проект", en: "List a project" }, description: { ru: "Заявка на листинг инициативы", en: "Listing request for an initiative" } },
-  { group: "support", path: "/investor/support", label: { ru: "Коммуникации", en: "Communications" }, description: { ru: "Техподдержка и отдел проектов", en: "Support and project desk" } }
+  { group: "support", path: "/messenger", label: { ru: "Qidra Messenger", en: "Qidra Messenger" }, description: { ru: "Безопасный диалог с поддержкой", en: "Secure support conversation" } }
 ];
 
 const investorGroups = [
