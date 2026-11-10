@@ -24,18 +24,22 @@ export default async function ReinvestPage({ params, searchParams }: { params: P
     }),
     prisma.wallet.findUnique({ where: { userId }, select: { availableUsdt: true } }),
     prisma.project.findMany({
-      where: { status: ProjectStatus.ACTIVE },
+      where: { status: { in: [ProjectStatus.ACTIVE, ProjectStatus.FUNDED] } },
       orderBy: { createdAt: "desc" },
-      select: { fundedUsdt: true, id: true, targetUsdt: true, titleEn: true, titleRu: true }
+      select: { fundedUsdt: true, id: true, status: true, targetUsdt: true, titleEn: true, titleRu: true }
     })
   ]);
   if (!payment) notFound();
 
-  const activeProjects = projects.filter((project) => project.fundedUsdt.lt(project.targetUsdt));
+  const eligibleProjects = projects.filter(
+    (project) =>
+      project.id === payment.investment.projectId ||
+      (project.status === ProjectStatus.ACTIVE && project.fundedUsdt.lt(project.targetUsdt))
+  );
   const availableUsdt = Number(wallet?.availableUsdt.toString() ?? 0);
   const paymentUsdt = Number(payment.amountUsdt.toString());
   const maximumUsdt = Math.min(availableUsdt, paymentUsdt);
-  const defaultTarget = activeProjects.find((project) => project.id === payment.investment.projectId) ?? activeProjects[0];
+  const defaultTarget = eligibleProjects.find((project) => project.id === payment.investment.projectId) ?? eligibleProjects[0];
   const canReinvest = !payment.reinvestmentOrders.length && maximumUsdt >= 100 && Boolean(defaultTarget);
 
   return (
@@ -77,7 +81,12 @@ export default async function ReinvestPage({ params, searchParams }: { params: P
                   <label className="grid gap-2 text-14 font-semibold text-qidra-dark">
                     {isRu ? "Проект" : "Project"}
                     <select className="field-shell h-12 rounded-qidra px-4 text-16 outline-none" defaultValue={defaultTarget?.id} name="targetProjectId" required>
-                      {activeProjects.map((project) => <option key={project.id} value={project.id}>{isRu ? project.titleRu : project.titleEn}</option>)}
+                      {eligibleProjects.map((project) => (
+                        <option key={project.id} value={project.id}>
+                          {isRu ? project.titleRu : project.titleEn}
+                          {project.id === payment.investment.projectId ? (isRu ? " — текущий контракт" : " — current contract") : ""}
+                        </option>
+                      ))}
                     </select>
                   </label>
                   <Input hint={isRu ? `Доступно из этой выплаты: ${formatUsdt(maximumUsdt)}. Минимум 100 USDT.` : `Available from this payout: ${formatUsdt(maximumUsdt)}. Minimum 100 USDT.`} label={isRu ? "Сумма реинвеста" : "Reinvestment amount"} max={maximumUsdt} min="100" name="amount" required step="0.000001" type="number" defaultValue={maximumUsdt} />
@@ -91,7 +100,7 @@ export default async function ReinvestPage({ params, searchParams }: { params: P
                 </div>
               </FeedbackForm>
             ) : (
-              <NotificationCard title={isRu ? "Реинвест сейчас недоступен" : "Reinvestment is currently unavailable"} text={isRu ? "Нужен доступный баланс не менее 100 USDT и хотя бы один активный проект со свободным объёмом." : "At least 100 USDT of available balance and an active project with remaining capacity are required."} tone="warning" />
+              <NotificationCard title={isRu ? "Реинвест сейчас недоступен" : "Reinvestment is currently unavailable"} text={isRu ? "Нужен доступный баланс не менее 100 USDT и подтверждённый текущий контракт либо активный проект со свободным объёмом." : "At least 100 USDT of available balance and either a confirmed current contract or an active project with remaining capacity are required."} tone="warning" />
             )}
           </div>
         </section>

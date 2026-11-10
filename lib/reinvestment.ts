@@ -50,7 +50,10 @@ export async function executeReinvestment(input: ExecuteReinvestmentInput) {
           userId: input.userId,
           status: DividendPaymentStatus.PAID
         },
-        include: { reinvestmentOrders: { where: { status: ReinvestmentStatus.COMPLETED }, select: { id: true } } }
+        include: {
+          investment: { select: { projectId: true, status: true } },
+          reinvestmentOrders: { where: { status: ReinvestmentStatus.COMPLETED }, select: { id: true } }
+        }
       }),
       tx.project.findUnique({
         where: { id: input.targetProjectId },
@@ -71,7 +74,13 @@ export async function executeReinvestment(input: ExecuteReinvestmentInput) {
     if (!payment) throw new ReinvestmentError("payment_not_found");
     if (payment.reinvestmentOrders.length) throw new ReinvestmentError("already_reinvested");
     if (!approvedKyc) throw new ReinvestmentError("kyc_required");
-    if (!project || project.status !== ProjectStatus.ACTIVE || project.fundedUsdt.gte(project.targetUsdt)) {
+    const continuesCurrentContract =
+      project?.id === payment.investment.projectId &&
+      payment.investment.status === InvestmentStatus.CONFIRMED &&
+      (project.status === ProjectStatus.ACTIVE || project.status === ProjectStatus.FUNDED);
+    const acceptsNewParticipation =
+      project?.status === ProjectStatus.ACTIVE && project.fundedUsdt.lt(project.targetUsdt);
+    if (!project || (!continuesCurrentContract && !acceptsNewParticipation)) {
       throw new ReinvestmentError("project_not_available");
     }
 
@@ -119,14 +128,19 @@ export async function executeReinvestment(input: ExecuteReinvestmentInput) {
     });
     if (walletUpdate.count !== 1) throw new ReinvestmentError("insufficient_balance");
 
-    const projectUpdate = await tx.project.updateMany({
-      where: {
-        id: project.id,
-        status: ProjectStatus.ACTIVE,
-        fundedUsdt: { lte: project.targetUsdt.minus(investedAmountUsdt) }
-      },
-      data: { fundedUsdt: { increment: investedAmountUsdt } }
-    });
+    const projectUpdate = continuesCurrentContract
+      ? await tx.project.updateMany({
+          where: { id: project.id, status: { in: [ProjectStatus.ACTIVE, ProjectStatus.FUNDED] } },
+          data: { fundedUsdt: { increment: investedAmountUsdt } }
+        })
+      : await tx.project.updateMany({
+          where: {
+            id: project.id,
+            status: ProjectStatus.ACTIVE,
+            fundedUsdt: { lte: project.targetUsdt.minus(investedAmountUsdt) }
+          },
+          data: { fundedUsdt: { increment: investedAmountUsdt } }
+        });
     if (projectUpdate.count !== 1) throw new ReinvestmentError("project_capacity_exceeded");
 
     const completedAt = new Date();
