@@ -23,6 +23,7 @@
     "test:support-bot": "node --test tests/support-bot.test.mjs",
     "test:auth-email": "node --test tests/auth-email.test.mjs",
     "test:integration": "node --test tests/financial-concurrency.integration.mjs",
+    "test:reconciliation": "node --test tests/financial-reconciliation.integration.mjs",
     "staging:verify": "bash scripts/staging-db-drill.sh",
     "staging:e2e": "bash scripts/staging-e2e.sh",
     "changes:last-day": "node scripts/report-last-day-changes.mjs",
