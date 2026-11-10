@@ -23,7 +23,7 @@ let skipped = 0;
 const manifest = [];
 
 for (const item of objects) {
-  if (!item.Key || !item.Size) continue;
+  if (!item.Key || item.Size == null) continue;
   const targetKey = `${prefix}/objects/${item.Key}`;
   manifest.push({ etag: item.ETag, key: item.Key, lastModified: item.LastModified?.toISOString(), size: item.Size });
 
@@ -43,6 +43,7 @@ for (const item of objects) {
     new PutObjectCommand({
       Body: sourceObject.Body,
       Bucket: target.bucket,
+      ContentLength: item.Size,
       ContentType: sourceObject.ContentType || "application/octet-stream",
       Key: targetKey,
       Metadata: { sourcebucket: source.bucket, sourceetag: cleanEtag(item.ETag) },
